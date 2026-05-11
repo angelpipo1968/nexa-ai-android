@@ -2,6 +2,7 @@ package com.nexa.ai.ui
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,12 +25,16 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.ui.theme.NexaAccent
-import com.nexa.ai.viewmodel.Message
-import com.nexa.ai.viewmodel.NexaUiState
+import com.nexa.ai.viewmodel.*
 import kotlinx.coroutines.launch
+
+// ═══════════════════════════════════════
+//  MAIN SCREEN
+// ═══════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,137 +48,444 @@ fun NexaChatScreen(
     onStopSpeaking: () -> Unit,
     onSpeakMessage: (String, String) -> Unit,
     onClearChat: () -> Unit,
-    onDismissError: () -> Unit
+    onDismissError: () -> Unit,
+    onToggleDrawer: () -> Unit,
+    onCloseDrawer: () -> Unit,
+    onCreateSession: () -> Unit,
+    onSwitchSession: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+    onToggleSettings: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit
 ) {
-    val listState = rememberLazyListState()
+    val drawerState = rememberDrawerState(
+        initialValue = if (uiState.drawerOpen) DrawerValue.Open else DrawerValue.Closed
+    )
     val coroutineScope = rememberCoroutineScope()
-    val keyboardController = LocalSoftwareKeyboardController.current
 
-    // Auto-scroll on new messages
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    // Sync drawer state with uiState
+    LaunchedEffect(uiState.drawerOpen) {
+        if (uiState.drawerOpen) drawerState.open() else drawerState.close()
+    }
+
+    // Sync uiState when drawer is swiped
+    LaunchedEffect(drawerState.currentValue) {
+        if (drawerState.currentValue == DrawerValue.Open && !uiState.drawerOpen) {
+            onToggleDrawer()
+        } else if (drawerState.currentValue == DrawerValue.Closed && uiState.drawerOpen) {
+            onCloseDrawer()
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(NexaAccent.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("⚡", fontSize = 16.sp)
-                        }
-                        Column {
-                            Text("NEXA", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = 1.5.sp)
-                            Text(
-                                "ANDROID",
-                                fontSize = 8.sp,
-                                color = NexaAccent,
-                                letterSpacing = 0.8.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    // Auto-speak toggle
-                    IconButton(onClick = onToggleAutoSpeak) {
-                        Icon(
-                            if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                            contentDescription = if (uiState.autoSpeak) "Desactivar voz" else "Activar voz",
-                            tint = if (uiState.autoSpeak) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    // Clear chat
-                    IconButton(onClick = onClearChat) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = "Limpiar chat")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(
+                sessions = uiState.sessions,
+                activeSessionId = uiState.activeSessionId,
+                onNewChat = onCreateSession,
+                onSwitchSession = onSwitchSession,
+                onDeleteSession = onDeleteSession,
+                onClose = { coroutineScope.launch { drawerState.close() } }
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
+        gesturesEnabled = true
+    ) {
+        Scaffold(
+            topBar = {
+                ChatTopBar(
+                    uiState = uiState,
+                    onToggleDrawer = onToggleDrawer,
+                    onToggleAutoSpeak = onToggleAutoSpeak,
+                    onStopSpeaking = onStopSpeaking,
+                    onClearChat = onClearChat
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Error banner
+                AnimatedVisibility(visible = uiState.error != null) {
+                    ErrorBanner(uiState.error ?: "", onDismissError)
+                }
+
+                // Messages
+                ChatMessages(
+                    messages = uiState.messages,
+                    isThinking = uiState.isThinking,
+                    speakingMessageId = uiState.speakingMessageId,
+                    onSpeakMessage = onSpeakMessage,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Bottom settings bar
+                BottomSettingsBar(
+                    uiState = uiState,
+                    onSetLanguage = onSetLanguage,
+                    onSetVoiceType = onSetVoiceType,
+                    onToggleTheme = onToggleTheme,
+                    onToggleSettings = onToggleSettings
+                )
+
+                // Input bar
+                InputBar(
+                    text = uiState.inputText,
+                    isListening = uiState.isListening,
+                    isSpeaking = uiState.isSpeaking,
+                    onTextChange = onInputChange,
+                    onSend = onSend,
+                    onStartListening = onStartListening,
+                    onStopListening = onStopListening,
+                    onStopSpeaking = onStopSpeaking
+                )
+            }
+        }
+    }
+
+    // Settings sheet
+    if (uiState.showSettings) {
+        SettingsSheet(
+            uiState = uiState,
+            onDismiss = onToggleSettings,
+            onSetLanguage = onSetLanguage,
+            onSetVoiceType = onSetVoiceType,
+            onToggleTheme = onToggleTheme,
+            onToggleAutoSpeak = onToggleAutoSpeak
+        )
+    }
+}
+
+// ═══════════════════════════════════════
+//  DRAWER
+// ═══════════════════════════════════════
+
+@Composable
+fun DrawerContent(
+    sessions: List<ChatSession>,
+    activeSessionId: String?,
+    onNewChat: () -> Unit,
+    onSwitchSession: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.width(300.dp),
+        drawerContainerColor = MaterialTheme.colorScheme.surface
+    ) {
+        // Header
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .fillMaxWidth()
+                .padding(20.dp)
         ) {
-            // ─── Error banner ───
-            AnimatedVisibility(visible = uiState.error != null) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "❌ ${uiState.error ?: ""}",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = onDismissError, modifier = Modifier.size(20.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-            }
-
-            // ─── Messages ───
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (uiState.messages.isEmpty()) {
-                    item {
-                        EmptyState()
-                    }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(NexaAccent.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⚡", fontSize = 20.sp)
                 }
-
-                items(uiState.messages, key = { it.id }) { msg ->
-                    MessageBubble(
-                        message = msg,
-                        isSpeaking = uiState.speakingMessageId == msg.id,
-                        onSpeak = { onSpeakMessage(msg.content, msg.id) }
+                Column {
+                    Text("NEXA AI", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, letterSpacing = 1.sp)
+                    Text(
+                        "Historial de chats",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
                     )
                 }
+            }
+        }
 
-                // Thinking indicator
-                if (uiState.isThinking) {
-                    item {
-                        ThinkingIndicator()
-                    }
-                }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+        // New chat button
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .clickable { onNewChat() },
+            shape = RoundedCornerShape(12.dp),
+            color = NexaAccent.copy(alpha = 0.1f)
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Nuevo", tint = NexaAccent, modifier = Modifier.size(20.dp))
+                Text("Nuevo chat", color = NexaAccent, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Chat list
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 12.dp)
+        ) {
+            items(sessions, key = { it.id }) { session ->
+                ChatSessionItem(
+                    session = session,
+                    isActive = session.id == activeSessionId,
+                    onClick = { onSwitchSession(session.id) },
+                    onDelete = { onDeleteSession(session.id) }
+                )
+            }
+        }
+
+        // Bottom: app version
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "NEXA AI v2.0",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+fun ChatSessionItem(
+    session: ChatSession,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        color = if (isActive) NexaAccent.copy(alpha = 0.08f) else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.ChatBubbleOutline,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = if (isActive) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    session.title,
+                    fontSize = 13.sp,
+                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isActive) NexaAccent else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${session.messages.size} mensajes",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
             }
 
-            // ─── Input bar ───
-            InputBar(
-                text = uiState.inputText,
-                isListening = uiState.isListening,
-                onTextChange = onInputChange,
-                onSend = {
-                    onSend()
-                    keyboardController?.hide()
-                },
-                onStartListening = onStartListening,
-                onStopListening = onStopListening
+            // Three dots menu
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Opciones",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("🗑️ Borrar chat") },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  TOP BAR
+// ═══════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatTopBar(
+    uiState: NexaUiState,
+    onToggleDrawer: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onStopSpeaking: () -> Unit,
+    onClearChat: () -> Unit
+) {
+    TopAppBar(
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NexaAccent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⚡", fontSize = 16.sp)
+                }
+                Column {
+                    Text("NEXA", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = 1.5.sp)
+                    Text(
+                        "ANDROID",
+                        fontSize = 8.sp,
+                        color = NexaAccent,
+                        letterSpacing = 0.8.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        navigationIcon = {
+            // Hamburger menu for drawer
+            IconButton(onClick = onToggleDrawer) {
+                Icon(
+                    Icons.Default.Menu,
+                    contentDescription = "Menú",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        actions = {
+            // Auto-speak toggle
+            IconButton(onClick = onToggleAutoSpeak) {
+                Icon(
+                    if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (uiState.autoSpeak) "Desactivar voz" else "Activar voz",
+                    tint = if (uiState.autoSpeak) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // Stop speaking
+            if (uiState.isSpeaking) {
+                IconButton(onClick = onStopSpeaking) {
+                    Icon(
+                        Icons.Default.StopCircle,
+                        contentDescription = "Detener lectura",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            // Clear chat
+            IconButton(onClick = onClearChat) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = "Limpiar chat")
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background
+        )
+    )
+}
+
+// ═══════════════════════════════════════
+//  ERROR BANNER
+// ═══════════════════════════════════════
+
+@Composable
+fun ErrorBanner(error: String, onDismiss: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "❌ $error",
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 13.sp,
+                modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  MESSAGES
+// ═══════════════════════════════════════
+
+@Composable
+fun ChatMessages(
+    messages: List<Message>,
+    isThinking: Boolean,
+    speakingMessageId: String?,
+    onSpeakMessage: (String, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (messages.isEmpty()) {
+            item { EmptyState() }
+        }
+
+        items(messages, key = { it.id }) { msg ->
+            MessageBubble(
+                message = msg,
+                isSpeaking = speakingMessageId == msg.id,
+                onSpeak = { onSpeakMessage(msg.content, msg.id) }
+            )
+        }
+
+        if (isThinking) {
+            item { ThinkingIndicator() }
         }
     }
 }
@@ -187,7 +499,7 @@ fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 80.dp),
+            .padding(top = 60.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("🧬", fontSize = 56.sp)
@@ -267,7 +579,6 @@ fun MessageBubble(
             }
         }
 
-        // Action buttons for assistant messages
         if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
             Row(
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp),
@@ -306,16 +617,11 @@ fun ThinkingIndicator() {
                     .size(6.dp)
                     .clip(CircleShape)
                     .background(NexaAccent)
-                    .animateContentSize()
             )
         }
         Text("pensando...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
-
-// ═══════════════════════════════════════
-//  DOTS TYPING
-// ═══════════════════════════════════════
 
 @Composable
 fun DotsTyping() {
@@ -339,17 +645,21 @@ fun DotsTyping() {
 fun InputBar(
     text: String,
     isListening: Boolean,
+    isSpeaking: Boolean,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onStartListening: () -> Unit,
-    onStopListening: () -> Unit
+    onStopListening: () -> Unit,
+    onStopSpeaking: () -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
-        shadowElevation = 8.dp
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+        shadowElevation = 12.dp
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -367,10 +677,10 @@ fun InputBar(
                         onValueChange = onTextChange,
                         modifier = Modifier
                             .weight(1f)
-                            .defaultMinSize(minHeight = 44.dp),
+                            .defaultMinSize(minHeight = 48.dp),
                         placeholder = {
                             Text(
-                                if (isListening) "Escuchando..." else "Escribe un mensaje...",
+                                if (isListening) "🎙️ Escuchando..." else "Escribe un mensaje...",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
@@ -381,35 +691,59 @@ fun InputBar(
                             unfocusedIndicatorColor = Color.Transparent
                         ),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { onSend() }),
+                        keyboardActions = KeyboardActions(onSend = {
+                            onSend()
+                            keyboardController?.hide()
+                        }),
                         maxLines = 4
                     )
 
-                    // Mic button
+                    // Mic button — prominent
                     IconButton(
                         onClick = { if (isListening) onStopListening() else onStartListening() },
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-                                else Color.Transparent
+                                if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                                else NexaAccent.copy(alpha = 0.1f)
                             )
                     ) {
                         Icon(
-                            Icons.Default.Mic,
+                            if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
                             contentDescription = if (isListening) "Detener" else "Hablar",
-                            tint = if (isListening) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            tint = if (isListening) MaterialTheme.colorScheme.error else NexaAccent,
+                            modifier = Modifier.size(22.dp)
                         )
+                    }
+
+                    // Stop TTS button (visible when speaking)
+                    if (isSpeaking) {
+                        IconButton(
+                            onClick = onStopSpeaking,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f))
+                        ) {
+                            Icon(
+                                Icons.Default.StopCircle,
+                                contentDescription = "Detener lectura",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
 
                     // Send button
                     IconButton(
-                        onClick = onSend,
+                        onClick = {
+                            onSend()
+                            keyboardController?.hide()
+                        },
                         enabled = text.isNotBlank(),
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(
                                 if (text.isNotBlank()) NexaAccent
@@ -420,25 +754,229 @@ fun InputBar(
                             Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Enviar",
                             tint = if (text.isNotBlank()) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  BOTTOM SETTINGS BAR
+// ═══════════════════════════════════════
+
+@Composable
+fun BottomSettingsBar(
+    uiState: NexaUiState,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onToggleSettings: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Login
+            BottomSettingItem(
+                icon = Icons.Default.Person,
+                label = "Login",
+                onClick = { /* TODO: Login screen */ }
+            )
+
+            // Settings
+            BottomSettingItem(
+                icon = Icons.Default.Settings,
+                label = "Ajustes",
+                onClick = onToggleSettings
+            )
+
+            // Language
+            BottomSettingItem(
+                icon = Icons.Default.Language,
+                label = uiState.language.label,
+                onClick = {
+                    val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
+                    onSetLanguage(next)
+                }
+            )
+
+            // Voice
+            BottomSettingItem(
+                icon = if (uiState.voiceType == VoiceType.MALE) Icons.Default.Man else Icons.Default.Woman,
+                label = if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer",
+                onClick = {
+                    val next = if (uiState.voiceType == VoiceType.MALE) VoiceType.FEMALE else VoiceType.MALE
+                    onSetVoiceType(next)
+                }
+            )
+
+            // Theme
+            BottomSettingItem(
+                icon = if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                label = if (uiState.isDarkTheme) "Oscuro" else "Claro",
+                onClick = onToggleTheme
+            )
+        }
+    }
+}
+
+@Composable
+fun BottomSettingItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            label,
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS SHEET
+// ═══════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsSheet(
+    uiState: NexaUiState,
+    onDismiss: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onToggleAutoSpeak: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Text(
+                "⚙️ Ajustes",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+
+            // Theme
+            SettingRow(
+                title = "Tema",
+                subtitle = if (uiState.isDarkTheme) "Oscuro" else "Claro"
+            ) {
+                Switch(
+                    checked = uiState.isDarkTheme,
+                    onCheckedChange = { onToggleTheme() },
+                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent)
+                )
+            }
+
+            // Language
+            SettingRow(
+                title = "Idioma",
+                subtitle = uiState.language.label
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppLanguage.entries.forEach { lang ->
+                        FilterChip(
+                            selected = uiState.language == lang,
+                            onClick = { onSetLanguage(lang) },
+                            label = { Text(lang.label, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
+                                selectedLabelColor = NexaAccent
+                            )
                         )
                     }
                 }
             }
 
-            // Hints
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.Center
+            // Voice
+            SettingRow(
+                title = "Voz",
+                subtitle = if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer"
             ) {
-                Text(
-                    "Toca 🎙️ para hablar • Enter para enviar",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VoiceType.entries.forEach { voice ->
+                        FilterChip(
+                            selected = uiState.voiceType == voice,
+                            onClick = { onSetVoiceType(voice) },
+                            label = {
+                                Text(
+                                    if (voice == VoiceType.MALE) "👨 Hombre" else "👩 Mujer",
+                                    fontSize = 12.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
+                                selectedLabelColor = NexaAccent
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Auto-speak
+            SettingRow(
+                title = "Lectura automática",
+                subtitle = if (uiState.autoSpeak) "NEXA habla las respuestas" else "Solo texto"
+            ) {
+                Switch(
+                    checked = uiState.autoSpeak,
+                    onCheckedChange = { onToggleAutoSpeak() },
+                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent)
                 )
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+@Composable
+fun SettingRow(
+    title: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        content()
     }
 }

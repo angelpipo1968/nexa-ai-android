@@ -19,16 +19,36 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
+
+// ═══════════════════════════════════════
+//  DATA MODELS
+// ═══════════════════════════════════════
 
 data class Message(
     val id: String = System.currentTimeMillis().toString(),
-    val role: String, // "user" or "assistant"
+    val role: String,
     val content: String,
     val isStreaming: Boolean = false
 )
 
-data class NexaUiState(
+data class ChatSession(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String = "Nuevo chat",
     val messages: List<Message> = emptyList(),
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+enum class VoiceType { MALE, FEMALE }
+enum class AppLanguage(val code: String, val label: String) {
+    SPANISH("es", "Español"),
+    ENGLISH("en", "English")
+}
+
+data class NexaUiState(
+    val sessions: List<ChatSession> = emptyList(),
+    val activeSessionId: String? = null,
     val inputText: String = "",
     val isListening: Boolean = false,
     val isThinking: Boolean = false,
@@ -37,8 +57,18 @@ data class NexaUiState(
     val currentProvider: String? = null,
     val error: String? = null,
     val autoSpeak: Boolean = true,
-    val language: String = "es"
-)
+    val language: AppLanguage = AppLanguage.SPANISH,
+    val voiceType: VoiceType = VoiceType.FEMALE,
+    val isDarkTheme: Boolean = true,
+    val drawerOpen: Boolean = false,
+    val showSettings: Boolean = false
+) {
+    val activeSession: ChatSession?
+        get() = sessions.find { it.id == activeSessionId }
+
+    val messages: List<Message>
+        get() = activeSession?.messages ?: emptyList()
+}
 
 class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -52,6 +82,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         initTTS()
+        createNewSession()
     }
 
     // ═══════════════════════════════════════
@@ -62,8 +93,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         tts = TextToSpeech(getApplication()) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 ttsReady = true
-                val lang = if (_uiState.value.language == "es") Locale("es", "ES") else Locale.US
-                tts?.language = lang
+                applyVoiceSettings()
                 tts?.setSpeechRate(1.0f)
 
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -82,10 +112,33 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun applyVoiceSettings() {
+        if (!ttsReady) return
+        val locale = when (_uiState.value.language) {
+            AppLanguage.SPANISH -> Locale("es", "ES")
+            AppLanguage.ENGLISH -> Locale.US
+        }
+        tts?.language = locale
+
+        // Try to pick male/female voice
+        val voices = tts?.voices ?: return
+        val targetGender = if (_uiState.value.voiceType == VoiceType.MALE) "male" else "female"
+        val localeStr = locale.language
+
+        val bestVoice = voices.find { voice ->
+            voice.locale.language == localeStr &&
+            voice.name.lowercase().contains(targetGender) &&
+            !voice.isNetworkConnectionRequired
+        } ?: voices.find { voice ->
+            voice.locale.language == localeStr && !voice.isNetworkConnectionRequired
+        }
+
+        bestVoice?.let { tts?.voice = it }
+    }
+
     fun speak(text: String, messageId: String? = null) {
         if (!ttsReady) return
 
-        // If same message is already speaking → stop
         if (messageId != null && _uiState.value.speakingMessageId == messageId) {
             stopSpeaking()
             return
@@ -156,7 +209,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: return
                     _uiState.value = _uiState.value.copy(inputText = text, isListening = false)
-                    // Auto-send
                     sendMessage(text)
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -168,9 +220,14 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             })
         }
 
+        val langCode = when (_uiState.value.language) {
+            AppLanguage.SPANISH -> "es-ES"
+            AppLanguage.ENGLISH -> "en-US"
+        }
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (_uiState.value.language == "es") "es-ES" else "en-US")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
@@ -181,6 +238,55 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun stopListening() {
         speechRecognizer?.stopListening()
         _uiState.value = _uiState.value.copy(isListening = false)
+    }
+
+    // ═══════════════════════════════════════
+    //  SESSION MANAGEMENT
+    // ═══════════════════════════════════════
+
+    fun createNewSession() {
+        val session = ChatSession()
+        _uiState.value = _uiState.value.copy(
+            sessions = listOf(session) + _uiState.value.sessions,
+            activeSessionId = session.id,
+            drawerOpen = false
+        )
+    }
+
+    fun switchSession(sessionId: String) {
+        stopSpeaking()
+        _uiState.value = _uiState.value.copy(
+            activeSessionId = sessionId,
+            drawerOpen = false,
+            error = null
+        )
+    }
+
+    fun deleteSession(sessionId: String) {
+        val updated = _uiState.value.sessions.filter { it.id != sessionId }
+        val newActive = if (_uiState.value.activeSessionId == sessionId) {
+            updated.firstOrNull()?.id
+        } else {
+            _uiState.value.activeSessionId
+        }
+
+        _uiState.value = _uiState.value.copy(
+            sessions = updated,
+            activeSessionId = newActive
+        )
+
+        if (updated.isEmpty()) {
+            createNewSession()
+        }
+    }
+
+    private fun updateActiveSession(transform: (ChatSession) -> ChatSession) {
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == _uiState.value.activeSessionId }
+        if (idx >= 0) {
+            sessions[idx] = transform(sessions[idx])
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+        }
     }
 
     // ═══════════════════════════════════════
@@ -198,12 +304,24 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val userMsg = Message(role = "user", content = content)
         val assistantId = "a-${System.currentTimeMillis()}"
 
-        _uiState.value = _uiState.value.copy(
-            messages = _uiState.value.messages + userMsg,
-            inputText = "",
-            isThinking = true,
-            error = null
-        )
+        // Update session title from first user message
+        val session = _uiState.value.activeSession
+        val isFirstMessage = session?.messages?.isEmpty() == true
+        val title = if (isFirstMessage) {
+            content.take(30) + if (content.length > 30) "..." else ""
+        } else {
+            session?.title ?: "Nuevo chat"
+        }
+
+        updateActiveSession { s ->
+            s.copy(
+                messages = s.messages + userMsg,
+                title = title,
+                updatedAt = System.currentTimeMillis()
+            )
+        }
+
+        _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null)
 
         viewModelScope.launch {
             val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
@@ -213,33 +331,35 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 when (event) {
                     is StreamEvent.Text -> {
                         fullResponse += event.text
-                        val updated = _uiState.value.messages.toMutableList()
-                        val idx = updated.indexOfFirst { it.id == assistantId }
-                        if (idx >= 0) {
-                            updated[idx] = updated[idx].copy(content = fullResponse, isStreaming = true)
-                        } else {
-                            updated.add(Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = true))
+                        updateActiveSession { s ->
+                            val updated = s.messages.toMutableList()
+                            val idx = updated.indexOfFirst { it.id == assistantId }
+                            if (idx >= 0) {
+                                updated[idx] = updated[idx].copy(content = fullResponse, isStreaming = true)
+                            } else {
+                                updated.add(Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = true))
+                            }
+                            s.copy(messages = updated)
                         }
-                        _uiState.value = _uiState.value.copy(messages = updated, isThinking = false)
+                        _uiState.value = _uiState.value.copy(isThinking = false)
                     }
                     is StreamEvent.Provider -> {
                         _uiState.value = _uiState.value.copy(currentProvider = event.name)
                     }
                     is StreamEvent.Error -> {
-                        _uiState.value = _uiState.value.copy(
-                            error = event.message,
-                            isThinking = false
-                        )
+                        _uiState.value = _uiState.value.copy(error = event.message, isThinking = false)
                     }
                     is StreamEvent.Done -> {
-                        val updated = _uiState.value.messages.toMutableList()
-                        val idx = updated.indexOfFirst { it.id == assistantId }
-                        if (idx >= 0) {
-                            updated[idx] = updated[idx].copy(isStreaming = false)
+                        updateActiveSession { s ->
+                            val updated = s.messages.toMutableList()
+                            val idx = updated.indexOfFirst { it.id == assistantId }
+                            if (idx >= 0) {
+                                updated[idx] = updated[idx].copy(isStreaming = false)
+                            }
+                            s.copy(messages = updated, updatedAt = System.currentTimeMillis())
                         }
-                        _uiState.value = _uiState.value.copy(messages = updated, isThinking = false)
+                        _uiState.value = _uiState.value.copy(isThinking = false)
 
-                        // Auto-speak the response
                         if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
                             speak(fullResponse, assistantId)
                         }
@@ -260,7 +380,46 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearChat() {
         stopSpeaking()
-        _uiState.value = _uiState.value.copy(messages = emptyList(), error = null)
+        updateActiveSession { it.copy(messages = emptyList()) }
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    // ═══════════════════════════════════════
+    //  DRAWER
+    // ═══════════════════════════════════════
+
+    fun toggleDrawer() {
+        _uiState.value = _uiState.value.copy(drawerOpen = !_uiState.value.drawerOpen)
+    }
+
+    fun closeDrawer() {
+        _uiState.value = _uiState.value.copy(drawerOpen = false)
+    }
+
+    // ═══════════════════════════════════════
+    //  SETTINGS
+    // ═══════════════════════════════════════
+
+    fun toggleSettings() {
+        _uiState.value = _uiState.value.copy(showSettings = !_uiState.value.showSettings)
+    }
+
+    fun setLanguage(lang: AppLanguage) {
+        _uiState.value = _uiState.value.copy(language = lang)
+        applyVoiceSettings()
+        // Update speech recognizer language
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang.code)
+        }
+    }
+
+    fun setVoiceType(type: VoiceType) {
+        _uiState.value = _uiState.value.copy(voiceType = type)
+        applyVoiceSettings()
+    }
+
+    fun toggleTheme() {
+        _uiState.value = _uiState.value.copy(isDarkTheme = !_uiState.value.isDarkTheme)
     }
 
     override fun onCleared() {

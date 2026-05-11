@@ -33,10 +33,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            NexaTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    val uiState by viewModel.uiState.collectAsState()
+            val uiState by viewModel.uiState.collectAsState()
 
+            NexaTheme(darkTheme = uiState.isDarkTheme) {
+                Surface(modifier = Modifier.fillMaxSize()) {
                     NexaChatScreen(
                         uiState = uiState,
                         onSend = { viewModel.sendMessage() },
@@ -55,7 +55,16 @@ class MainActivity : ComponentActivity() {
                         onStopSpeaking = { viewModel.stopSpeaking() },
                         onSpeakMessage = { text, id -> viewModel.speak(text, id) },
                         onClearChat = { viewModel.clearChat() },
-                        onDismissError = { viewModel.clearError() }
+                        onDismissError = { viewModel.clearError() },
+                        onToggleDrawer = { viewModel.toggleDrawer() },
+                        onCloseDrawer = { viewModel.closeDrawer() },
+                        onCreateSession = { viewModel.createNewSession() },
+                        onSwitchSession = { viewModel.switchSession(it) },
+                        onDeleteSession = { viewModel.deleteSession(it) },
+                        onToggleSettings = { viewModel.toggleSettings() },
+                        onSetLanguage = { viewModel.setLanguage(it) },
+                        onSetVoiceType = { viewModel.setVoiceType(it) },
+                        onToggleTheme = { viewModel.toggleTheme() }
                     )
                 }
             }
