@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -21,9 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,7 +39,7 @@ import com.nexa.ai.viewmodel.*
 import kotlinx.coroutines.launch
 
 // ═══════════════════════════════════════
-//  MAIN SCREEN
+//  MAIN SCREEN WITH NAVIGATION
 // ═══════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,19 +63,595 @@ fun NexaChatScreen(
     onToggleSettings: () -> Unit,
     onSetLanguage: (AppLanguage) -> Unit,
     onSetVoiceType: (VoiceType) -> Unit,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onNavigateToRegister: () -> Unit,
+    onNavigateToChat: () -> Unit,
+    onUpdateLoginEmail: (String) -> Unit,
+    onUpdateLoginPassword: (String) -> Unit,
+    onLogin: () -> Unit,
+    onUpdateRegisterName: (String) -> Unit,
+    onUpdateRegisterEmail: (String) -> Unit,
+    onUpdateRegisterPassword: (String) -> Unit,
+    onUpdateRegisterConfirmPassword: (String) -> Unit,
+    onRegister: () -> Unit,
+    onLogout: () -> Unit,
+    onDismissUpdate: () -> Unit,
+    onOpenUpdatePage: () -> Unit
+) {
+    // Update dialog
+    if (uiState.showUpdateDialog && uiState.updateInfo != null) {
+        UpdateDialog(
+            updateInfo = uiState.updateInfo,
+            onDismiss = onDismissUpdate,
+            onUpdate = onOpenUpdatePage
+        )
+    }
+
+    when (uiState.currentScreen) {
+        Screen.LOGIN -> LoginScreen(
+            email = uiState.loginEmail,
+            password = uiState.loginPassword,
+            error = uiState.loginError,
+            isLoading = uiState.isLoggingIn,
+            onEmailChange = onUpdateLoginEmail,
+            onPasswordChange = onUpdateLoginPassword,
+            onLogin = onLogin,
+            onGoToRegister = onNavigateToRegister,
+            onBack = onNavigateToChat,
+            isDarkTheme = uiState.isDarkTheme
+        )
+        Screen.REGISTER -> RegisterScreen(
+            name = uiState.registerName,
+            email = uiState.registerEmail,
+            password = uiState.registerPassword,
+            confirmPassword = uiState.registerConfirmPassword,
+            error = uiState.registerError,
+            isLoading = uiState.isRegistering,
+            onNameChange = onUpdateRegisterName,
+            onEmailChange = onUpdateRegisterEmail,
+            onPasswordChange = onUpdateRegisterPassword,
+            onConfirmPasswordChange = onUpdateRegisterConfirmPassword,
+            onRegister = onRegister,
+            onGoToLogin = onNavigateToLogin,
+            onBack = onNavigateToChat,
+            isDarkTheme = uiState.isDarkTheme
+        )
+        Screen.CHAT -> ChatMainScreen(
+            uiState = uiState,
+            onSend = onSend,
+            onInputChange = onInputChange,
+            onStartListening = onStartListening,
+            onStopListening = onStopListening,
+            onToggleAutoSpeak = onToggleAutoSpeak,
+            onStopSpeaking = onStopSpeaking,
+            onSpeakMessage = onSpeakMessage,
+            onClearChat = onClearChat,
+            onDismissError = onDismissError,
+            onToggleDrawer = onToggleDrawer,
+            onCloseDrawer = onCloseDrawer,
+            onCreateSession = onCreateSession,
+            onSwitchSession = onSwitchSession,
+            onDeleteSession = onDeleteSession,
+            onToggleSettings = onToggleSettings,
+            onSetLanguage = onSetLanguage,
+            onSetVoiceType = onSetVoiceType,
+            onToggleTheme = onToggleTheme,
+            onNavigateToLogin = onNavigateToLogin,
+            onLogout = onLogout
+        )
+    }
+}
+
+// ═══════════════════════════════════════
+//  LOGIN SCREEN
+// ═══════════════════════════════════════
+
+@Composable
+fun LoginScreen(
+    email: String,
+    password: String,
+    error: String?,
+    isLoading: Boolean,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLogin: () -> Unit,
+    onGoToRegister: () -> Unit,
+    onBack: () -> Unit,
+    isDarkTheme: Boolean
+) {
+    var showPassword by remember { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = if (isDarkTheme) Color(0xFF0A0A0A) else Color(0xFFF5F5F5)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Back button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = if (isDarkTheme) Color.White else Color.Black
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Logo
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(NexaAccent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("⚡", fontSize = 36.sp)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("NEXA AI", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Text(
+                "Inicia sesión",
+                fontSize = 14.sp,
+                color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666),
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Email
+            OutlinedTextField(
+                value = email,
+                onValueChange = onEmailChange,
+                label = { Text("Email") },
+                placeholder = { Text("tu@email.com") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NexaAccent,
+                    focusedLabelColor = NexaAccent,
+                    cursorColor = NexaAccent
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Password
+            OutlinedTextField(
+                value = password,
+                onValueChange = onPasswordChange,
+                label = { Text("Contraseña") },
+                placeholder = { Text("••••••••") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (showPassword) "Ocultar" else "Mostrar"
+                        )
+                    }
+                },
+                singleLine = true,
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = {
+                    onLogin()
+                    keyboardController?.hide()
+                }),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NexaAccent,
+                    focusedLabelColor = NexaAccent,
+                    cursorColor = NexaAccent
+                )
+            )
+
+            // Error
+            if (error != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "❌ $error",
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Login button
+            Button(
+                onClick = {
+                    onLogin()
+                    keyboardController?.hide()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NexaAccent),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        "Iniciar sesión",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Divider
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = if (isDarkTheme) Color(0xFF2A2A2A) else Color(0xFFDDDDDD))
+                Text("  o  ", fontSize = 12.sp, color = if (isDarkTheme) Color(0xFF666666) else Color(0xFF999999))
+                HorizontalDivider(modifier = Modifier.weight(1f), color = if (isDarkTheme) Color(0xFF2A2A2A) else Color(0xFFDDDDDD))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Register link
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "¿No tienes cuenta? ",
+                    fontSize = 14.sp,
+                    color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666)
+                )
+                Text(
+                    "Regístrate",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NexaAccent,
+                    modifier = Modifier.clickable { onGoToRegister() }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  REGISTER SCREEN
+// ═══════════════════════════════════════
+
+@Composable
+fun RegisterScreen(
+    name: String,
+    email: String,
+    password: String,
+    confirmPassword: String,
+    error: String?,
+    isLoading: Boolean,
+    onNameChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onConfirmPasswordChange: (String) -> Unit,
+    onRegister: () -> Unit,
+    onGoToLogin: () -> Unit,
+    onBack: () -> Unit,
+    isDarkTheme: Boolean
+) {
+    var showPassword by remember { mutableStateOf(false) }
+    var showConfirm by remember { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = if (isDarkTheme) Color(0xFF0A0A0A) else Color(0xFFF5F5F5)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Back
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = if (isDarkTheme) Color.White else Color.Black
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(NexaAccent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("⚡", fontSize = 36.sp)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("NEXA AI", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Text(
+                "Crea tu cuenta",
+                fontSize = 14.sp,
+                color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666),
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Name
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                label = { Text("Nombre") },
+                placeholder = { Text("Tu nombre") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NexaAccent,
+                    focusedLabelColor = NexaAccent,
+                    cursorColor = NexaAccent
+                )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Email
+            OutlinedTextField(
+                value = email,
+                onValueChange = onEmailChange,
+                label = { Text("Email") },
+                placeholder = { Text("tu@email.com") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NexaAccent,
+                    focusedLabelColor = NexaAccent,
+                    cursorColor = NexaAccent
+                )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Password
+            OutlinedTextField(
+                value = password,
+                onValueChange = onPasswordChange,
+                label = { Text("Contraseña") },
+                placeholder = { Text("Mínimo 6 caracteres") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = null
+                        )
+                    }
+                },
+                singleLine = true,
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NexaAccent,
+                    focusedLabelColor = NexaAccent,
+                    cursorColor = NexaAccent
+                )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Confirm password
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = onConfirmPasswordChange,
+                label = { Text("Confirmar contraseña") },
+                placeholder = { Text("Repite la contraseña") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = { showConfirm = !showConfirm }) {
+                        Icon(
+                            if (showConfirm) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = null
+                        )
+                    }
+                },
+                singleLine = true,
+                visualTransformation = if (showConfirm) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = {
+                    onRegister()
+                    keyboardController?.hide()
+                }),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NexaAccent,
+                    focusedLabelColor = NexaAccent,
+                    cursorColor = NexaAccent
+                )
+            )
+
+            if (error != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "❌ $error",
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Button(
+                onClick = {
+                    onRegister()
+                    keyboardController?.hide()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NexaAccent),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        "Crear cuenta",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "¿Ya tienes cuenta? ",
+                    fontSize = 14.sp,
+                    color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666)
+                )
+                Text(
+                    "Inicia sesión",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NexaAccent,
+                    modifier = Modifier.clickable { onGoToLogin() }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  CHAT MAIN SCREEN
+// ═══════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatMainScreen(
+    uiState: NexaUiState,
+    onSend: () -> Unit,
+    onInputChange: (String) -> Unit,
+    onStartListening: () -> Unit,
+    onStopListening: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onStopSpeaking: () -> Unit,
+    onSpeakMessage: (String, String) -> Unit,
+    onClearChat: () -> Unit,
+    onDismissError: () -> Unit,
+    onToggleDrawer: () -> Unit,
+    onCloseDrawer: () -> Unit,
+    onCreateSession: () -> Unit,
+    onSwitchSession: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+    onToggleSettings: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val drawerState = rememberDrawerState(
         initialValue = if (uiState.drawerOpen) DrawerValue.Open else DrawerValue.Closed
     )
     val coroutineScope = rememberCoroutineScope()
 
-    // Sync drawer state with uiState
     LaunchedEffect(uiState.drawerOpen) {
         if (uiState.drawerOpen) drawerState.open() else drawerState.close()
     }
 
-    // Sync uiState when drawer is swiped
     LaunchedEffect(drawerState.currentValue) {
         if (drawerState.currentValue == DrawerValue.Open && !uiState.drawerOpen) {
             onToggleDrawer()
@@ -84,10 +666,13 @@ fun NexaChatScreen(
             DrawerContent(
                 sessions = uiState.sessions,
                 activeSessionId = uiState.activeSessionId,
+                user = uiState.user,
                 onNewChat = onCreateSession,
                 onSwitchSession = onSwitchSession,
                 onDeleteSession = onDeleteSession,
-                onClose = { coroutineScope.launch { drawerState.close() } }
+                onClose = { coroutineScope.launch { drawerState.close() } },
+                onNavigateToLogin = onNavigateToLogin,
+                onLogout = onLogout
             )
         },
         gesturesEnabled = true
@@ -109,12 +694,10 @@ fun NexaChatScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                // Error banner
                 AnimatedVisibility(visible = uiState.error != null) {
                     ErrorBanner(uiState.error ?: "", onDismissError)
                 }
 
-                // Messages
                 ChatMessages(
                     messages = uiState.messages,
                     isThinking = uiState.isThinking,
@@ -123,7 +706,6 @@ fun NexaChatScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Bottom settings bar
                 BottomSettingsBar(
                     uiState = uiState,
                     onSetLanguage = onSetLanguage,
@@ -132,7 +714,6 @@ fun NexaChatScreen(
                     onToggleSettings = onToggleSettings
                 )
 
-                // Input bar
                 InputBar(
                     text = uiState.inputText,
                     isListening = uiState.isListening,
@@ -147,7 +728,6 @@ fun NexaChatScreen(
         }
     }
 
-    // Settings sheet
     if (uiState.showSettings) {
         SettingsSheet(
             uiState = uiState,
@@ -168,22 +748,28 @@ fun NexaChatScreen(
 fun DrawerContent(
     sessions: List<ChatSession>,
     activeSessionId: String?,
+    user: UserData,
     onNewChat: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSession: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onLogout: () -> Unit
 ) {
+    var showUserMenu by remember { mutableStateOf(false) }
+
     ModalDrawerSheet(
         modifier = Modifier.width(300.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface
     ) {
-        // Header
+        // User section
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -196,21 +782,62 @@ fun DrawerContent(
                 ) {
                     Text("⚡", fontSize = 20.sp)
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text("NEXA AI", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, letterSpacing = 1.sp)
-                    Text(
-                        "Historial de chats",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
+                    if (user.isLoggedIn) {
+                        Text(
+                            user.displayName,
+                            fontSize = 11.sp,
+                            color = NexaAccent,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // User menu
+                Box {
+                    IconButton(onClick = { showUserMenu = true }) {
+                        Icon(
+                            if (user.isLoggedIn) Icons.Default.Person else Icons.Default.PersonOutline,
+                            contentDescription = "Usuario",
+                            tint = if (user.isLoggedIn) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showUserMenu,
+                        onDismissRequest = { showUserMenu = false }
+                    ) {
+                        if (user.isLoggedIn) {
+                            DropdownMenuItem(
+                                text = { Text("📧 ${user.email}") },
+                                onClick = { showUserMenu = false },
+                                enabled = false
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("🚪 Cerrar sesión") },
+                                onClick = {
+                                    showUserMenu = false
+                                    onLogout()
+                                }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text("🔑 Iniciar sesión") },
+                                onClick = {
+                                    showUserMenu = false
+                                    onNavigateToLogin()
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-        // New chat button
+        // New chat
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -246,8 +873,9 @@ fun DrawerContent(
             }
         }
 
-        // Bottom: app version
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+        // Version
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -255,7 +883,7 @@ fun DrawerContent(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "NEXA AI v2.0",
+                "NEXA AI v2.0 • ${sessions.size} chats",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
@@ -309,7 +937,6 @@ fun ChatSessionItem(
                 )
             }
 
-            // Three dots menu
             Box {
                 IconButton(
                     onClick = { showMenu = true },
@@ -380,17 +1007,11 @@ fun ChatTopBar(
             }
         },
         navigationIcon = {
-            // Hamburger menu for drawer
             IconButton(onClick = onToggleDrawer) {
-                Icon(
-                    Icons.Default.Menu,
-                    contentDescription = "Menú",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+                Icon(Icons.Default.Menu, contentDescription = "Menú", tint = MaterialTheme.colorScheme.onSurface)
             }
         },
         actions = {
-            // Auto-speak toggle
             IconButton(onClick = onToggleAutoSpeak) {
                 Icon(
                     if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
@@ -398,24 +1019,16 @@ fun ChatTopBar(
                     tint = if (uiState.autoSpeak) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // Stop speaking
             if (uiState.isSpeaking) {
                 IconButton(onClick = onStopSpeaking) {
-                    Icon(
-                        Icons.Default.StopCircle,
-                        contentDescription = "Detener lectura",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+                    Icon(Icons.Default.StopCircle, contentDescription = "Detener", tint = MaterialTheme.colorScheme.error)
                 }
             }
-            // Clear chat
             IconButton(onClick = onClearChat) {
                 Icon(Icons.Default.DeleteOutline, contentDescription = "Limpiar chat")
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background
-        )
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
     )
 }
 
@@ -429,16 +1042,8 @@ fun ErrorBanner(error: String, onDismiss: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "❌ $error",
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 13.sp,
-                modifier = Modifier.weight(1f)
-            )
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("❌ $error", color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.weight(1f))
             IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
             }
@@ -460,7 +1065,7 @@ fun ChatMessages(
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -489,10 +1094,6 @@ fun ChatMessages(
         }
     }
 }
-
-// ═══════════════════════════════════════
-//  EMPTY STATE
-// ═══════════════════════════════════════
 
 @Composable
 fun EmptyState() {
@@ -533,10 +1134,6 @@ fun EmptyState() {
         }
     }
 }
-
-// ═══════════════════════════════════════
-//  MESSAGE BUBBLE
-// ═══════════════════════════════════════
 
 @Composable
 fun MessageBubble(
@@ -584,10 +1181,7 @@ fun MessageBubble(
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconButton(
-                    onClick = onSpeak,
-                    modifier = Modifier.size(28.dp)
-                ) {
+                IconButton(onClick = onSpeak, modifier = Modifier.size(28.dp)) {
                     Icon(
                         if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
                         contentDescription = if (isSpeaking) "Detener" else "Leer",
@@ -600,10 +1194,6 @@ fun MessageBubble(
     }
 }
 
-// ═══════════════════════════════════════
-//  THINKING INDICATOR
-// ═══════════════════════════════════════
-
 @Composable
 fun ThinkingIndicator() {
     Row(
@@ -612,12 +1202,7 @@ fun ThinkingIndicator() {
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         repeat(3) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(NexaAccent)
-            )
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(NexaAccent))
         }
         Text("pensando...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -627,12 +1212,7 @@ fun ThinkingIndicator() {
 fun DotsTyping() {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         repeat(3) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(NexaAccent)
-            )
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(NexaAccent))
         }
     }
 }
@@ -666,18 +1246,13 @@ fun InputBar(
                 border = ButtonDefaults.outlinedButtonBorder
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(4.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    // Text input
                     TextField(
                         value = text,
                         onValueChange = onTextChange,
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp),
+                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
                         placeholder = {
                             Text(
                                 if (isListening) "🎙️ Escuchando..." else "Escribe un mensaje...",
@@ -698,7 +1273,6 @@ fun InputBar(
                         maxLines = 4
                     )
 
-                    // Mic button — prominent
                     IconButton(
                         onClick = { if (isListening) onStopListening() else onStartListening() },
                         modifier = Modifier
@@ -717,7 +1291,6 @@ fun InputBar(
                         )
                     }
 
-                    // Stop TTS button (visible when speaking)
                     if (isSpeaking) {
                         IconButton(
                             onClick = onStopSpeaking,
@@ -735,7 +1308,6 @@ fun InputBar(
                         }
                     }
 
-                    // Send button
                     IconButton(
                         onClick = {
                             onSend()
@@ -786,44 +1358,25 @@ fun BottomSettingsBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Login
-            BottomSettingItem(
-                icon = Icons.Default.Person,
-                label = "Login",
-                onClick = { /* TODO: Login screen */ }
-            )
+            BottomSettingItem(Icons.Default.Settings, "Ajustes", onClick = onToggleSettings)
 
-            // Settings
-            BottomSettingItem(
-                icon = Icons.Default.Settings,
-                label = "Ajustes",
-                onClick = onToggleSettings
-            )
+            BottomSettingItem(Icons.Default.Language, uiState.language.label, onClick = {
+                val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
+                onSetLanguage(next)
+            })
 
-            // Language
             BottomSettingItem(
-                icon = Icons.Default.Language,
-                label = uiState.language.label,
-                onClick = {
-                    val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
-                    onSetLanguage(next)
-                }
-            )
-
-            // Voice
-            BottomSettingItem(
-                icon = if (uiState.voiceType == VoiceType.MALE) Icons.Default.Man else Icons.Default.Woman,
-                label = if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer",
+                if (uiState.voiceType == VoiceType.MALE) Icons.Default.Man else Icons.Default.Woman,
+                if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer",
                 onClick = {
                     val next = if (uiState.voiceType == VoiceType.MALE) VoiceType.FEMALE else VoiceType.MALE
                     onSetVoiceType(next)
                 }
             )
 
-            // Theme
             BottomSettingItem(
-                icon = if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
-                label = if (uiState.isDarkTheme) "Oscuro" else "Claro",
+                if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                if (uiState.isDarkTheme) "Oscuro" else "Claro",
                 onClick = onToggleTheme
             )
         }
@@ -831,29 +1384,15 @@ fun BottomSettingsBar(
 }
 
 @Composable
-fun BottomSettingItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
+fun BottomSettingItem(icon: ImageVector, label: String, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 4.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = label,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            label,
-            fontSize = 9.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium
-        )
+        Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -879,19 +1418,11 @@ fun SettingsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 8.dp)
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                "⚙️ Ajustes",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
+            Text("⚙️ Ajustes", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 20.dp))
 
-            // Theme
-            SettingRow(
-                title = "Tema",
-                subtitle = if (uiState.isDarkTheme) "Oscuro" else "Claro"
-            ) {
+            SettingRow("Tema", if (uiState.isDarkTheme) "Oscuro" else "Claro") {
                 Switch(
                     checked = uiState.isDarkTheme,
                     onCheckedChange = { onToggleTheme() },
@@ -899,11 +1430,7 @@ fun SettingsSheet(
                 )
             }
 
-            // Language
-            SettingRow(
-                title = "Idioma",
-                subtitle = uiState.language.label
-            ) {
+            SettingRow("Idioma", uiState.language.label) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppLanguage.entries.forEach { lang ->
                         FilterChip(
@@ -919,22 +1446,13 @@ fun SettingsSheet(
                 }
             }
 
-            // Voice
-            SettingRow(
-                title = "Voz",
-                subtitle = if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer"
-            ) {
+            SettingRow("Voz", if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VoiceType.entries.forEach { voice ->
                         FilterChip(
                             selected = uiState.voiceType == voice,
                             onClick = { onSetVoiceType(voice) },
-                            label = {
-                                Text(
-                                    if (voice == VoiceType.MALE) "👨 Hombre" else "👩 Mujer",
-                                    fontSize = 12.sp
-                                )
-                            },
+                            label = { Text(if (voice == VoiceType.MALE) "👨 Hombre" else "👩 Mujer", fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
                                 selectedLabelColor = NexaAccent
@@ -944,11 +1462,7 @@ fun SettingsSheet(
                 }
             }
 
-            // Auto-speak
-            SettingRow(
-                title = "Lectura automática",
-                subtitle = if (uiState.autoSpeak) "NEXA habla las respuestas" else "Solo texto"
-            ) {
+            SettingRow("Lectura automática", if (uiState.autoSpeak) "NEXA habla las respuestas" else "Solo texto") {
                 Switch(
                     checked = uiState.autoSpeak,
                     onCheckedChange = { onToggleAutoSpeak() },
@@ -962,15 +1476,9 @@ fun SettingsSheet(
 }
 
 @Composable
-fun SettingRow(
-    title: String,
-    subtitle: String,
-    content: @Composable () -> Unit
-) {
+fun SettingRow(title: String, subtitle: String, content: @Composable () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -979,4 +1487,63 @@ fun SettingRow(
         }
         content()
     }
+}
+
+// ═══════════════════════════════════════
+//  UPDATE DIALOG
+// ═══════════════════════════════════════
+
+@Composable
+fun UpdateDialog(
+    updateInfo: com.nexa.ai.data.UpdateInfo,
+    onDismiss: () -> Unit,
+    onUpdate: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { if (!updateInfo.forceUpdate) onDismiss() },
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("🔄", fontSize = 24.sp)
+                Text("Actualización disponible", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    "Nueva versión: ${updateInfo.versionName}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NexaAccent
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    updateInfo.changelog,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 20.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onUpdate,
+                colors = ButtonDefaults.buttonColors(containerColor = NexaAccent),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Actualizar", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            if (!updateInfo.forceUpdate) {
+                TextButton(onClick = onDismiss) {
+                    Text("Después", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        shape = RoundedCornerShape(18.dp)
+    )
 }

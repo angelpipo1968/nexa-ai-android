@@ -64,7 +64,21 @@ class MainActivity : ComponentActivity() {
                         onToggleSettings = { viewModel.toggleSettings() },
                         onSetLanguage = { viewModel.setLanguage(it) },
                         onSetVoiceType = { viewModel.setVoiceType(it) },
-                        onToggleTheme = { viewModel.toggleTheme() }
+                        onToggleTheme = { viewModel.toggleTheme() },
+                        onNavigateToLogin = { viewModel.navigateToLogin() },
+                        onNavigateToRegister = { viewModel.navigateToRegister() },
+                        onNavigateToChat = { viewModel.navigateToChat() },
+                        onUpdateLoginEmail = { viewModel.updateLoginEmail(it) },
+                        onUpdateLoginPassword = { viewModel.updateLoginPassword(it) },
+                        onLogin = { viewModel.login() },
+                        onUpdateRegisterName = { viewModel.updateRegisterName(it) },
+                        onUpdateRegisterEmail = { viewModel.updateRegisterEmail(it) },
+                        onUpdateRegisterPassword = { viewModel.updateRegisterPassword(it) },
+                        onUpdateRegisterConfirmPassword = { viewModel.updateRegisterConfirmPassword(it) },
+                        onRegister = { viewModel.register() },
+                        onLogout = { viewModel.logout() },
+                        onDismissUpdate = { viewModel.dismissUpdate() },
+                        onOpenUpdatePage = { viewModel.openUpdatePage() }
                     )
                 }
             }

@@ -11,8 +11,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.1"
 
         // URL de tu API en Vercel
         buildConfigField("String", "API_BASE_URL", "\"https://nexa-ai-dev.vercel.app\"")

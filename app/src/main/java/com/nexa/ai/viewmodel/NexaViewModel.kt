@@ -14,6 +14,8 @@ import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.ChatMessage
 import com.nexa.ai.data.NexaRepository
 import com.nexa.ai.data.StreamEvent
+import com.nexa.ai.data.UpdateChecker
+import com.nexa.ai.data.UpdateInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +48,14 @@ enum class AppLanguage(val code: String, val label: String) {
     ENGLISH("en", "English")
 }
 
+data class UserData(
+    val email: String = "",
+    val displayName: String = "",
+    val isLoggedIn: Boolean = false
+)
+
+enum class Screen { CHAT, LOGIN, REGISTER }
+
 data class NexaUiState(
     val sessions: List<ChatSession> = emptyList(),
     val activeSessionId: String? = null,
@@ -61,7 +71,24 @@ data class NexaUiState(
     val voiceType: VoiceType = VoiceType.FEMALE,
     val isDarkTheme: Boolean = true,
     val drawerOpen: Boolean = false,
-    val showSettings: Boolean = false
+    val showSettings: Boolean = false,
+    // Login
+    val currentScreen: Screen = Screen.CHAT,
+    val user: UserData = UserData(),
+    val loginEmail: String = "",
+    val loginPassword: String = "",
+    val loginError: String? = null,
+    val isLoggingIn: Boolean = false,
+    // Register
+    val registerName: String = "",
+    val registerEmail: String = "",
+    val registerPassword: String = "",
+    val registerConfirmPassword: String = "",
+    val registerError: String? = null,
+    val isRegistering: Boolean = false,
+    // Update
+    val updateInfo: UpdateInfo? = null,
+    val showUpdateDialog: Boolean = false
 ) {
     val activeSession: ChatSession?
         get() = sessions.find { it.id == activeSessionId }
@@ -76,13 +103,199 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<NexaUiState> = _uiState.asStateFlow()
 
     private val repository = NexaRepository()
+    private val updateChecker = UpdateChecker()
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
+    // Simulated user storage (replace with real backend later)
+    private val userDatabase = mutableMapOf<String, Pair<String, String>>() // email -> (name, password)
+
     init {
         initTTS()
         createNewSession()
+        checkForUpdates()
+    }
+
+    // ═══════════════════════════════════════
+    //  AUTO-UPDATE
+    // ═══════════════════════════════════════
+
+    private fun checkForUpdates() {
+        viewModelScope.launch {
+            try {
+                val info = updateChecker.checkForUpdate(BuildConfig.VERSION_CODE)
+                if (info != null) {
+                    _uiState.value = _uiState.value.copy(
+                        updateInfo = info,
+                        showUpdateDialog = true
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun dismissUpdate() {
+        _uiState.value = _uiState.value.copy(showUpdateDialog = false)
+    }
+
+    fun openUpdatePage() {
+        val url = _uiState.value.updateInfo?.downloadUrl
+            ?: "https://github.com/angelpipo1968/nexa-ai-android/releases/latest"
+        updateChecker.openDownloadPage(getApplication(), url)
+        _uiState.value = _uiState.value.copy(showUpdateDialog = false)
+    }
+
+    // ═══════════════════════════════════════
+    //  LOGIN / REGISTER
+    // ═══════════════════════════════════════
+
+    fun navigateToLogin() {
+        _uiState.value = _uiState.value.copy(
+            currentScreen = Screen.LOGIN,
+            loginEmail = "",
+            loginPassword = "",
+            loginError = null
+        )
+    }
+
+    fun navigateToRegister() {
+        _uiState.value = _uiState.value.copy(
+            currentScreen = Screen.REGISTER,
+            registerName = "",
+            registerEmail = "",
+            registerPassword = "",
+            registerConfirmPassword = "",
+            registerError = null
+        )
+    }
+
+    fun navigateToChat() {
+        _uiState.value = _uiState.value.copy(currentScreen = Screen.CHAT)
+    }
+
+    fun updateLoginEmail(email: String) {
+        _uiState.value = _uiState.value.copy(loginEmail = email)
+    }
+
+    fun updateLoginPassword(password: String) {
+        _uiState.value = _uiState.value.copy(loginPassword = password)
+    }
+
+    fun updateRegisterName(name: String) {
+        _uiState.value = _uiState.value.copy(registerName = name)
+    }
+
+    fun updateRegisterEmail(email: String) {
+        _uiState.value = _uiState.value.copy(registerEmail = email)
+    }
+
+    fun updateRegisterPassword(password: String) {
+        _uiState.value = _uiState.value.copy(registerPassword = password)
+    }
+
+    fun updateRegisterConfirmPassword(password: String) {
+        _uiState.value = _uiState.value.copy(registerConfirmPassword = password)
+    }
+
+    fun login() {
+        val email = _uiState.value.loginEmail.trim()
+        val password = _uiState.value.loginPassword
+
+        if (email.isBlank() || password.isBlank()) {
+            _uiState.value = _uiState.value.copy(loginError = "Completa todos los campos")
+            return
+        }
+
+        if (!email.contains("@")) {
+            _uiState.value = _uiState.value.copy(loginError = "Email no válido")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isLoggingIn = true, loginError = null)
+
+        // Simulate network delay
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(800)
+
+            val stored = userDatabase[email]
+            if (stored != null && stored.second == password) {
+                _uiState.value = _uiState.value.copy(
+                    user = UserData(email = email, displayName = stored.first, isLoggedIn = true),
+                    currentScreen = Screen.CHAT,
+                    isLoggingIn = false
+                )
+            } else if (stored != null) {
+                _uiState.value = _uiState.value.copy(
+                    loginError = "Contraseña incorrecta",
+                    isLoggingIn = false
+                )
+            } else {
+                // Auto-register on first login attempt
+                userDatabase[email] = Pair(email.substringBefore("@"), password)
+                _uiState.value = _uiState.value.copy(
+                    user = UserData(email = email, displayName = email.substringBefore("@"), isLoggedIn = true),
+                    currentScreen = Screen.CHAT,
+                    isLoggingIn = false
+                )
+            }
+        }
+    }
+
+    fun register() {
+        val name = _uiState.value.registerName.trim()
+        val email = _uiState.value.registerEmail.trim()
+        val password = _uiState.value.registerPassword
+        val confirm = _uiState.value.registerConfirmPassword
+
+        if (name.isBlank() || email.isBlank() || password.isBlank()) {
+            _uiState.value = _uiState.value.copy(registerError = "Completa todos los campos")
+            return
+        }
+
+        if (!email.contains("@")) {
+            _uiState.value = _uiState.value.copy(registerError = "Email no válido")
+            return
+        }
+
+        if (password.length < 6) {
+            _uiState.value = _uiState.value.copy(registerError = "Mínimo 6 caracteres")
+            return
+        }
+
+        if (password != confirm) {
+            _uiState.value = _uiState.value.copy(registerError = "Las contraseñas no coinciden")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isRegistering = true, registerError = null)
+
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(800)
+
+            if (userDatabase.containsKey(email)) {
+                _uiState.value = _uiState.value.copy(
+                    registerError = "Este email ya está registrado",
+                    isRegistering = false
+                )
+            } else {
+                userDatabase[email] = Pair(name, password)
+                _uiState.value = _uiState.value.copy(
+                    user = UserData(email = email, displayName = name, isLoggedIn = true),
+                    currentScreen = Screen.CHAT,
+                    isRegistering = false
+                )
+            }
+        }
+    }
+
+    fun logout() {
+        stopSpeaking()
+        _uiState.value = _uiState.value.copy(
+            user = UserData(),
+            currentScreen = Screen.CHAT,
+            drawerOpen = false
+        )
     }
 
     // ═══════════════════════════════════════
@@ -120,7 +333,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         tts?.language = locale
 
-        // Try to pick male/female voice
         val voices = tts?.voices ?: return
         val targetGender = if (_uiState.value.voiceType == VoiceType.MALE) "male" else "female"
         val localeStr = locale.language
@@ -304,7 +516,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val userMsg = Message(role = "user", content = content)
         val assistantId = "a-${System.currentTimeMillis()}"
 
-        // Update session title from first user message
         val session = _uiState.value.activeSession
         val isFirstMessage = session?.messages?.isEmpty() == true
         val title = if (isFirstMessage) {
@@ -407,10 +618,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun setLanguage(lang: AppLanguage) {
         _uiState.value = _uiState.value.copy(language = lang)
         applyVoiceSettings()
-        // Update speech recognizer language
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang.code)
-        }
     }
 
     fun setVoiceType(type: VoiceType) {
