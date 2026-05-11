@@ -639,22 +639,72 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun copyToClipboard(text: String) {
-        val clipboard = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val context = getApplication<Application>()
+        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("Nexa Message", text)
         clipboard.setPrimaryClip(clip)
+        
+        // Show confirmation toast
+        android.widget.Toast.makeText(context, "Copiado al portapapeles", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     fun exportToPdf(message: Message) {
-        // This will be a "Pro" feature to implement later with a PDF library
-        // For now, let's share it as text which is also very useful
-        val sendIntent: Intent = Intent().apply {
-            action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, message.content)
-            type = "text/plain"
+        val context = getApplication<Application>()
+        
+        try {
+            // Create a PDF document
+            val pdfDocument = android.graphics.pdf.PdfDocument()
+            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+            val paint = android.graphics.Paint()
+            
+            // Draw title
+            paint.textSize = 18f
+            paint.isFakeBoldText = true
+            canvas.drawText("NEXA PRO - Chat Export", 50f, 50f, paint)
+            
+            // Draw content
+            paint.textSize = 12f
+            paint.isFakeBoldText = false
+            
+            val lines = message.content.split("\n")
+            var y = 100f
+            for (line in lines) {
+                // Basic text wrapping (simplified for this implementation)
+                if (y > 800f) break // Stop if page is full
+                canvas.drawText(line.take(80), 50f, y, paint)
+                y += 20f
+            }
+            
+            pdfDocument.finishPage(page)
+            
+            // Save to a temporary file and share
+            val file = java.io.File(context.cacheDir, "nexa_message_${System.currentTimeMillis()}.pdf")
+            pdfDocument.writeTo(java.io.FileOutputStream(file))
+            pdfDocument.close()
+            
+            // Share the generated PDF
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            
+            val shareIntent = Intent.createChooser(intent, "Guardar PDF")
+            shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(shareIntent)
+            
+        } catch (e: Exception) {
+            android.util.Log.e("NEXA", "PDF Error: ${e.message}")
+            android.widget.Toast.makeText(context, "Error al generar PDF", android.widget.Toast.LENGTH_SHORT).show()
         }
-        val shareIntent = Intent.createChooser(sendIntent, "Exportar mensaje")
-        shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        getApplication<Application>().startActivity(shareIntent)
     }
 
     override fun onCleared() {

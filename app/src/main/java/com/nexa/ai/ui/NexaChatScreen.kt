@@ -1357,13 +1357,6 @@ fun MessageBubble(
                     ) {
                         DropdownMenuItem(
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Default.BugReport, null, modifier = Modifier.size(18.dp))
-                                Text("Report Issue")
-                            }},
-                            onClick = { showMsgMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
                                 Text("Export to PDF")
                             }},
@@ -1381,13 +1374,6 @@ fun MessageBubble(
                                 showMsgMenu = false
                                 onSpeak()
                             }
-                        )
-                        DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Default.Forum, null, modifier = Modifier.size(18.dp))
-                                Text("Start Thread")
-                            }},
-                            onClick = { showMsgMenu = false }
                         )
                     }
                 }
