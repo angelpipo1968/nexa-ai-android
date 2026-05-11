@@ -638,6 +638,25 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(isDarkTheme = !_uiState.value.isDarkTheme)
     }
 
+    fun copyToClipboard(text: String) {
+        val clipboard = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Nexa Message", text)
+        clipboard.setPrimaryClip(clip)
+    }
+
+    fun exportToPdf(message: Message) {
+        // This will be a "Pro" feature to implement later with a PDF library
+        // For now, let's share it as text which is also very useful
+        val sendIntent: Intent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, message.content)
+            type = "text/plain"
+        }
+        val shareIntent = Intent.createChooser(sendIntent, "Exportar mensaje")
+        shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        getApplication<Application>().startActivity(shareIntent)
+    }
+
     override fun onCleared() {
         super.onCleared()
         speechRecognizer?.destroy()

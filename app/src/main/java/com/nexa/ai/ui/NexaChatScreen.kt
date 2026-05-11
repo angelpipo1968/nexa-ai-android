@@ -81,7 +81,9 @@ fun NexaChatScreen(
     onRegister: () -> Unit,
     onLogout: () -> Unit,
     onDismissUpdate: () -> Unit,
-    onOpenUpdatePage: () -> Unit
+    onOpenUpdatePage: () -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onExportMessage: (Message) -> Unit
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -142,7 +144,9 @@ fun NexaChatScreen(
             onSetVoiceType = onSetVoiceType,
             onToggleTheme = onToggleTheme,
             onNavigateToLogin = onNavigateToLogin,
-            onLogout = onLogout
+            onLogout = onLogout,
+            onCopyMessage = onCopyMessage,
+            onExportMessage = onExportMessage
         )
     }
 }
@@ -645,7 +649,9 @@ fun ChatMainScreen(
     onSetVoiceType: (VoiceType) -> Unit,
     onToggleTheme: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onExportMessage: (Message) -> Unit
 ) {
     val drawerState = rememberDrawerState(
         initialValue = if (uiState.drawerOpen) DrawerValue.Open else DrawerValue.Closed
@@ -711,6 +717,8 @@ fun ChatMainScreen(
                     language = uiState.language,
                     speakingMessageId = uiState.speakingMessageId,
                     onSpeakMessage = onSpeakMessage,
+                    onCopyMessage = onCopyMessage,
+                    onExportMessage = onExportMessage,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -1203,6 +1211,8 @@ fun ChatMessages(
     language: AppLanguage,
     speakingMessageId: String?,
     onSpeakMessage: (String, String) -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onExportMessage: (Message) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -1227,7 +1237,9 @@ fun ChatMessages(
             MessageBubble(
                 message = msg,
                 isSpeaking = speakingMessageId == msg.id,
-                onSpeak = { onSpeakMessage(msg.content, msg.id) }
+                onSpeak = { onSpeakMessage(msg.content, msg.id) },
+                onCopy = { onCopyMessage(msg.content) },
+                onExport = { onExportMessage(msg) }
             )
         }
 
@@ -1263,7 +1275,9 @@ fun EmptyState(lang: AppLanguage) {
 fun MessageBubble(
     message: Message,
     isSpeaking: Boolean,
-    onSpeak: () -> Unit
+    onSpeak: () -> Unit,
+    onCopy: () -> Unit,
+    onExport: () -> Unit
 ) {
     val isUser = message.role == "user"
 
@@ -1317,7 +1331,7 @@ fun MessageBubble(
                 }
 
                 // Copy Button
-                IconButton(onClick = { /* Copy logic would go here */ }, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onCopy, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.ContentCopy,
                         contentDescription = "Copiar",
@@ -1353,7 +1367,10 @@ fun MessageBubble(
                                 Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
                                 Text("Export to PDF")
                             }},
-                            onClick = { showMsgMenu = false }
+                            onClick = { 
+                                showMsgMenu = false
+                                onExport()
+                            }
                         )
                         DropdownMenuItem(
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

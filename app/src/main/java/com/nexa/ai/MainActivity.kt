@@ -78,7 +78,9 @@ class MainActivity : ComponentActivity() {
                         onRegister = { viewModel.register() },
                         onLogout = { viewModel.logout() },
                         onDismissUpdate = { viewModel.dismissUpdate() },
-                        onOpenUpdatePage = { viewModel.openUpdatePage() }
+                        onOpenUpdatePage = { viewModel.openUpdatePage() },
+                        onCopyMessage = { viewModel.copyToClipboard(it) },
+                        onExportMessage = { viewModel.exportToPdf(it) }
                     )
                 }
             }
