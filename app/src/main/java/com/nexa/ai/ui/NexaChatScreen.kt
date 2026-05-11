@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -205,7 +206,7 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Text("NEXA AI", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
             Text(
                 "Inicia sesión",
                 fontSize = 14.sp,
@@ -424,7 +425,7 @@ fun RegisterScreen(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Text("NEXA AI", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
             Text(
                 "Crea tu cuenta",
                 fontSize = 14.sp,
@@ -783,7 +784,7 @@ fun DrawerContent(
                     Text("⚡", fontSize = 20.sp)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("NEXA AI", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, letterSpacing = 1.sp)
+                    Text("NEXA PRO", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, letterSpacing = 1.sp)
                     if (user.isLoggedIn) {
                         Text(
                             user.displayName,
@@ -883,7 +884,7 @@ fun DrawerContent(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "NEXA AI v2.0 • ${sessions.size} chats",
+                "NEXA PRO v2.1 • ${sessions.size} chats",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
@@ -995,7 +996,7 @@ fun ChatTopBar(
                     Text("⚡", fontSize = 16.sp)
                 }
                 Column {
-                    Text("NEXA", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = 1.5.sp)
+                    Text("NEXA PRO", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = 1.5.sp)
                     Text(
                         "ANDROID",
                         fontSize = 8.sp,
@@ -1105,7 +1106,7 @@ fun EmptyState() {
     ) {
         Text("🧬", fontSize = 56.sp)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("NEXA AI", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+        Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             "Toca el micrófono y habla,\no escribe tu mensaje.",
@@ -1233,30 +1234,93 @@ fun InputBar(
     onStopSpeaking: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
+    var showMenu by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+        color = MaterialTheme.colorScheme.background,
         shadowElevation = 12.dp
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 border = ButtonDefaults.outlinedButtonBorder
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(4.dp),
-                    verticalAlignment = Alignment.Bottom
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Cross/X button with menu
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Menú",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📎", fontSize = 18.sp)
+                                    Text("Adjuntar archivo", fontSize = 14.sp)
+                                }},
+                                onClick = { showMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🖼️", fontSize = 18.sp)
+                                    Text("Enviar imagen", fontSize = 14.sp)
+                                }},
+                                onClick = { showMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🧹", fontSize = 18.sp)
+                                    Text("Limpiar chat", fontSize = 14.sp)
+                                }},
+                                onClick = { showMenu = false }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("⚙️", fontSize = 18.sp)
+                                    Text("Ajustes", fontSize = 14.sp)
+                                }},
+                                onClick = { showMenu = false }
+                            )
+                        }
+                    }
+
+                    // Text input
                     TextField(
                         value = text,
                         onValueChange = onTextChange,
-                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .defaultMinSize(minHeight = 44.dp),
                         placeholder = {
                             Text(
                                 if (isListening) "🎙️ Escuchando..." else "Escribe un mensaje...",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
                             )
                         },
                         colors = TextFieldDefaults.colors(
@@ -1270,32 +1334,35 @@ fun InputBar(
                             onSend()
                             keyboardController?.hide()
                         }),
-                        maxLines = 4
+                        maxLines = 4,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
                     )
 
+                    // Mic button
                     IconButton(
                         onClick = { if (isListening) onStopListening() else onStartListening() },
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(
                                 if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
-                                else NexaAccent.copy(alpha = 0.1f)
+                                else NexaAccent.copy(alpha = 0.12f)
                             )
                     ) {
                         Icon(
                             if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
                             contentDescription = if (isListening) "Detener" else "Hablar",
                             tint = if (isListening) MaterialTheme.colorScheme.error else NexaAccent,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
+                    // Stop TTS
                     if (isSpeaking) {
                         IconButton(
                             onClick = onStopSpeaking,
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f))
                         ) {
@@ -1303,11 +1370,12 @@ fun InputBar(
                                 Icons.Default.StopCircle,
                                 contentDescription = "Detener lectura",
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
+                    // Send button
                     IconButton(
                         onClick = {
                             onSend()
@@ -1315,7 +1383,7 @@ fun InputBar(
                         },
                         enabled = text.isNotBlank(),
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(
                                 if (text.isNotBlank()) NexaAccent
@@ -1326,10 +1394,24 @@ fun InputBar(
                             Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Enviar",
                             tint = if (text.isNotBlank()) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+            }
+
+            // Hint
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    "🎙️ hablar • ↵ enviar",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                )
             }
         }
     }
@@ -1349,12 +1431,13 @@ fun BottomSettingsBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {

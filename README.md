@@ -1,6 +1,6 @@
-# NEXA AI — Android App
+# NEXA PRO — Android App
 
-App nativa de Android para hablar con NEXA AI por voz.
+App nativa de Android para hablar con NEXA PRO por voz.
 
 ## Características
 
