@@ -42,7 +42,7 @@ data class ChatSession(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
-enum class VoiceType { MALE, FEMALE }
+enum class VoiceType { MALE_1, MALE_2, FEMALE_1, FEMALE_2 }
 enum class AppLanguage(val code: String, val label: String) {
     SPANISH("es", "Español"),
     ENGLISH("en", "English")
@@ -68,7 +68,7 @@ data class NexaUiState(
     val error: String? = null,
     val autoSpeak: Boolean = true,
     val language: AppLanguage = AppLanguage.SPANISH,
-    val voiceType: VoiceType = VoiceType.FEMALE,
+    val voiceType: VoiceType = VoiceType.FEMALE_1,
     val isDarkTheme: Boolean = true,
     val drawerOpen: Boolean = false,
     val showSettings: Boolean = false,
@@ -333,19 +333,28 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         tts?.language = locale
 
-        val voices = tts?.voices ?: return
-        val targetGender = if (_uiState.value.voiceType == VoiceType.MALE) "male" else "female"
-        val localeStr = locale.language
+        val voices = tts?.voices?.filter { it.locale.language == locale.language } ?: return
+        if (voices.isEmpty()) return
 
-        val bestVoice = voices.find { voice ->
-            voice.locale.language == localeStr &&
-            voice.name.lowercase().contains(targetGender) &&
-            !voice.isNetworkConnectionRequired
-        } ?: voices.find { voice ->
-            voice.locale.language == localeStr && !voice.isNetworkConnectionRequired
+        val voiceType = _uiState.value.voiceType
+        val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2
+        val isSecond = voiceType == VoiceType.MALE_2 || voiceType == VoiceType.FEMALE_2
+        
+        val genderTag = if (isMale) "male" else "female"
+        
+        // Filter by gender if possible
+        val genderVoices = voices.filter { it.name.lowercase().contains(genderTag) }
+        
+        val candidates = if (genderVoices.isNotEmpty()) genderVoices else voices
+        
+        // Pick the 1st or 2nd available candidate
+        val selectedVoice = if (isSecond && candidates.size > 1) {
+            candidates[1]
+        } else {
+            candidates[0]
         }
 
-        bestVoice?.let { tts?.voice = it }
+        tts?.voice = selectedVoice
     }
 
     fun speak(text: String, messageId: String? = null) {

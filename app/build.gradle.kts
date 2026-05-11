@@ -15,7 +15,7 @@ android {
         versionName = "2.1"
 
         // URL de tu API en Vercel
-        buildConfigField("String", "API_BASE_URL", "\"https://nexa-ai-dev.vercel.app\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://nexa-ai.dev\"")
     }
 
     buildTypes {
@@ -49,9 +49,10 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("com.google.android.material:material:1.11.0")
 
     // Compose BOM
-    implementation(platform("androidx.compose:compose-bom:2024.01.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")

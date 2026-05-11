@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nexa Pro S26</string>
+    <string name="welcome_message">Bienvenido a la Singularidad, S26 Ultra.</string>
+    <string name="cloud_sync_label">Sincronizando con Nexa Cloud Core...</string>
+</resources>

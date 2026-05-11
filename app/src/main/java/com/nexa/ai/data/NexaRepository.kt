@@ -41,41 +41,67 @@ class NexaRepository {
 
         val request = Request.Builder()
             .url("$baseUrl/api/chat")
+            .header("Accept", "text/event-stream")
+            .header("Cache-Control", "no-cache")
+            .header("Connection", "keep-alive")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        val response = client.newCall(request).execute()
+        try {
+            val response = client.newCall(request).execute()
 
-        if (!response.isSuccessful) {
-            emit(StreamEvent.Error("Error ${response.code}: ${response.message}"))
-            return@flow
-        }
-
-        val reader = BufferedReader(InputStreamReader(response.body?.byteStream()))
-        var line: String?
-
-        while (reader.readLine().also { line = it } != null) {
-            val l = line?.trim() ?: continue
-            if (!l.startsWith("data: ")) continue
-
-            val jsonStr = l.removePrefix("data: ")
-            if (jsonStr == "[DONE]") {
-                emit(StreamEvent.Done)
-                continue
+            if (!response.isSuccessful) {
+                emit(StreamEvent.Error("Error ${response.code}: ${response.message}"))
+                return@flow
             }
 
-            try {
-                val obj = gson.fromJson(jsonStr, JsonObject::class.java)
-                when {
-                    obj.has("error") -> emit(StreamEvent.Error(obj.get("error").asString))
-                    obj.has("text") -> emit(StreamEvent.Text(obj.get("text").asString))
-                    obj.has("provider") -> emit(StreamEvent.Provider(obj.get("provider").asString))
-                    obj.has("done") -> emit(StreamEvent.Done)
-                }
-            } catch (_: Exception) {}
-        }
+            val source = response.body?.source() ?: throw Exception("Response body is null")
+            
+            while (!source.exhausted()) {
+                val line = source.readUtf8Line()?.trim() ?: break
+                if (line.isEmpty() || !line.startsWith("data: ")) continue
 
-        reader.close()
+                val jsonStr = line.removePrefix("data: ")
+                if (jsonStr == "[DONE]") {
+                    emit(StreamEvent.Done)
+                    break
+                }
+
+                try {
+                    val obj = gson.fromJson(jsonStr, JsonObject::class.java)
+                    
+                    // Prioritize 'done' state
+                    if (obj.has("done") && obj.get("done").asBoolean) {
+                        emit(StreamEvent.Done)
+                        break
+                    }
+
+                    // Handle text chunk
+                    if (obj.has("text")) {
+                        val text = obj.get("text").asString
+                        if (text.isNotEmpty()) {
+                            emit(StreamEvent.Text(text))
+                        }
+                    }
+
+                    // Handle provider info
+                    if (obj.has("provider")) {
+                        emit(StreamEvent.Provider(obj.get("provider").asString))
+                    }
+
+                    // Handle potential errors
+                    if (obj.has("error")) {
+                        emit(StreamEvent.Error(obj.get("error").asString))
+                        break
+                    }
+                } catch (e: Exception) {
+                    // Skip malformed JSON in the stream
+                }
+            }
+            response.close()
+        } catch (e: Exception) {
+            emit(StreamEvent.Error("Connection error: ${e.localizedMessage}"))
+        }
     }.flowOn(Dispatchers.IO)
 }
 

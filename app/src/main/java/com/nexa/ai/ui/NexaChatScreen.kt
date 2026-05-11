@@ -13,6 +13,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.scale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -25,7 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalTextStyle
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -665,15 +668,18 @@ fun ChatMainScreen(
         drawerState = drawerState,
         drawerContent = {
             DrawerContent(
-                sessions = uiState.sessions,
-                activeSessionId = uiState.activeSessionId,
-                user = uiState.user,
+                uiState = uiState,
                 onNewChat = onCreateSession,
                 onSwitchSession = onSwitchSession,
                 onDeleteSession = onDeleteSession,
                 onClose = { coroutineScope.launch { drawerState.close() } },
                 onNavigateToLogin = onNavigateToLogin,
-                onLogout = onLogout
+                onLogout = onLogout,
+                onSetLanguage = onSetLanguage,
+                onSetVoiceType = onSetVoiceType,
+                onToggleTheme = onToggleTheme,
+                onToggleSettings = onToggleSettings,
+                onToggleAutoSpeak = onToggleAutoSpeak
             )
         },
         gesturesEnabled = true
@@ -702,21 +708,15 @@ fun ChatMainScreen(
                 ChatMessages(
                     messages = uiState.messages,
                     isThinking = uiState.isThinking,
+                    language = uiState.language,
                     speakingMessageId = uiState.speakingMessageId,
                     onSpeakMessage = onSpeakMessage,
                     modifier = Modifier.weight(1f)
                 )
 
-                BottomSettingsBar(
-                    uiState = uiState,
-                    onSetLanguage = onSetLanguage,
-                    onSetVoiceType = onSetVoiceType,
-                    onToggleTheme = onToggleTheme,
-                    onToggleSettings = onToggleSettings
-                )
-
                 InputBar(
                     text = uiState.inputText,
+                    language = uiState.language,
                     isListening = uiState.isListening,
                     isSpeaking = uiState.isSpeaking,
                     onTextChange = onInputChange,
@@ -730,14 +730,7 @@ fun ChatMainScreen(
     }
 
     if (uiState.showSettings) {
-        SettingsSheet(
-            uiState = uiState,
-            onDismiss = onToggleSettings,
-            onSetLanguage = onSetLanguage,
-            onSetVoiceType = onSetVoiceType,
-            onToggleTheme = onToggleTheme,
-            onToggleAutoSpeak = onToggleAutoSpeak
-        )
+        // We will now handle settings inside the sidebar
     }
 }
 
@@ -747,17 +740,24 @@ fun ChatMainScreen(
 
 @Composable
 fun DrawerContent(
-    sessions: List<ChatSession>,
-    activeSessionId: String?,
-    user: UserData,
+    uiState: NexaUiState,
     onNewChat: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSession: (String) -> Unit,
     onClose: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onToggleSettings: () -> Unit,
+    onToggleAutoSpeak: () -> Unit
 ) {
+    val sessions = uiState.sessions
+    val activeSessionId = uiState.activeSessionId
+    val user = uiState.user
     var showUserMenu by remember { mutableStateOf(false) }
+    var viewMode by remember { mutableStateOf(0) } // 0: History, 1: Settings
 
     ModalDrawerSheet(
         modifier = Modifier.width(300.dp),
@@ -794,107 +794,247 @@ fun DrawerContent(
                         )
                     }
                 }
+            }
+        }
 
-                // User menu
-                Box {
-                    IconButton(onClick = { showUserMenu = true }) {
-                        Icon(
-                            if (user.isLoggedIn) Icons.Default.Person else Icons.Default.PersonOutline,
-                            contentDescription = "Usuario",
-                            tint = if (user.isLoggedIn) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showUserMenu,
-                        onDismissRequest = { showUserMenu = false }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+        // Main Content Area
+        AnimatedContent(
+            targetState = viewMode,
+            modifier = Modifier.weight(1f),
+            transitionSpec = {
+                if (targetState > initialState) {
+                    slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
+                } else {
+                    slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+                }
+            }
+        ) { mode ->
+            if (mode == 0) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // New chat
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clickable { onNewChat() },
+                        shape = RoundedCornerShape(12.dp),
+                        color = NexaAccent.copy(alpha = 0.1f)
                     ) {
-                        if (user.isLoggedIn) {
-                            DropdownMenuItem(
-                                text = { Text("📧 ${user.email}") },
-                                onClick = { showUserMenu = false },
-                                enabled = false
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("🚪 Cerrar sesión") },
-                                onClick = {
-                                    showUserMenu = false
-                                    onLogout()
-                                }
-                            )
-                        } else {
-                            DropdownMenuItem(
-                                text = { Text("🔑 Iniciar sesión") },
-                                onClick = {
-                                    showUserMenu = false
-                                    onNavigateToLogin()
-                                }
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Nuevo", tint = NexaAccent, modifier = Modifier.size(20.dp))
+                            Text(NexaStrings.get("new_chat", uiState.language), color = NexaAccent, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Chat list
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        items(sessions, key = { it.id }) { session ->
+                            ChatSessionItem(
+                                session = session,
+                                language = uiState.language,
+                                isActive = session.id == activeSessionId,
+                                onClick = { onSwitchSession(session.id) },
+                                onDelete = { onDeleteSession(session.id) }
                             )
                         }
                     }
                 }
+            } else {
+                // NEXA ULTRA SETTINGS VIEW
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        "GENERAL",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NexaAccent.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                    
+                    UltraSettingRow(
+                        icon = Icons.Default.DarkMode,
+                        title = NexaStrings.get("theme", uiState.language)
+                    ) {
+                        // Segmented Theme Picker
+                        Row(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            listOf(Icons.Default.LightMode, Icons.Default.DarkMode).forEach { icon ->
+                                val selected = if (icon == Icons.Default.DarkMode) uiState.isDarkTheme else !uiState.isDarkTheme
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (selected) NexaAccent else Color.Transparent)
+                                        .clickable { if (!selected) onToggleTheme() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(icon, null, modifier = Modifier.size(14.dp), tint = if (selected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+
+                    UltraSettingRow(
+                        icon = Icons.Default.Language,
+                        title = NexaStrings.get("language", uiState.language),
+                        value = uiState.language.label,
+                        onClick = {
+                            val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
+                            onSetLanguage(next)
+                        }
+                    )
+
+                    UltraSettingRow(
+                        icon = if (uiState.voiceType == VoiceType.MALE_1 || uiState.voiceType == VoiceType.MALE_2) Icons.Default.Man else Icons.Default.Woman,
+                        title = NexaStrings.get("voice", uiState.language),
+                        value = NexaStrings.get(uiState.voiceType.name.lowercase(), uiState.language),
+                        onClick = {
+                            // Cycle through 4 voices
+                            val voices = VoiceType.entries.toList()
+                            val nextIndex = (voices.indexOf(uiState.voiceType) + 1) % voices.size
+                            onSetVoiceType(voices[nextIndex])
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "INTERFAZ",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NexaAccent.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+
+                    UltraSettingRow(
+                        icon = Icons.Default.VolumeUp,
+                        title = NexaStrings.get("auto_speak", uiState.language)
+                    ) {
+                        Switch(
+                            checked = uiState.autoSpeak,
+                            onCheckedChange = { onToggleAutoSpeak() },
+                            colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
+                            modifier = Modifier.scale(0.7f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "CUENTA",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NexaAccent.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+
+                    UltraSettingRow(
+                        icon = if (user.isLoggedIn) Icons.Default.Person else Icons.Default.PersonOutline,
+                        title = if (user.isLoggedIn) user.email else NexaStrings.get("login", uiState.language),
+                        value = if (user.isLoggedIn) NexaStrings.get("logout", uiState.language) else null,
+                        onClick = {
+                            if (user.isLoggedIn) onLogout() else onNavigateToLogin()
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
-        // New chat
-        Surface(
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        
+        // Footer Row
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clickable { onNewChat() },
-            shape = RoundedCornerShape(12.dp),
-            color = NexaAccent.copy(alpha = 0.1f)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Nuevo", tint = NexaAccent, modifier = Modifier.size(20.dp))
-                Text("Nuevo chat", color = NexaAccent, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Chat list
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 12.dp)
-        ) {
-            items(sessions, key = { it.id }) { session ->
-                ChatSessionItem(
-                    session = session,
-                    isActive = session.id == activeSessionId,
-                    onClick = { onSwitchSession(session.id) },
-                    onDelete = { onDeleteSession(session.id) }
+            IconButton(onClick = { viewMode = if (viewMode == 0) 1 else 0 }) {
+                Icon(
+                    if (viewMode == 0) Icons.Default.Settings else Icons.Default.History,
+                    contentDescription = null,
+                    tint = if (viewMode == 1) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Text(
+                "NEXA v2.2 ULTRA",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
         // Version
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(bottom = 12.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 "NEXA PRO v2.1 • ${sessions.size} chats",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
         }
     }
 }
 
 @Composable
+fun DrawerSettingItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 4.dp)
+            .width(56.dp)
+    ) {
+        Icon(
+            icon, 
+            contentDescription = label, 
+            modifier = Modifier.size(18.dp), 
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            label, 
+            fontSize = 8.sp, 
+            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
 fun ChatSessionItem(
     session: ChatSession,
+    language: AppLanguage,
     isActive: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit
@@ -932,7 +1072,7 @@ fun ChatSessionItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "${session.messages.size} mensajes",
+                    "${session.messages.size} ${NexaStrings.get("messages_count", language)}",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
@@ -1060,6 +1200,7 @@ fun ErrorBanner(error: String, onDismiss: () -> Unit) {
 fun ChatMessages(
     messages: List<Message>,
     isThinking: Boolean,
+    language: AppLanguage,
     speakingMessageId: String?,
     onSpeakMessage: (String, String) -> Unit,
     modifier: Modifier = Modifier
@@ -1079,7 +1220,7 @@ fun ChatMessages(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (messages.isEmpty()) {
-            item { EmptyState() }
+            item { EmptyState(language) }
         }
 
         items(messages, key = { it.id }) { msg ->
@@ -1091,13 +1232,13 @@ fun ChatMessages(
         }
 
         if (isThinking) {
-            item { ThinkingIndicator() }
+            item { ThinkingIndicator(language) }
         }
     }
 }
 
 @Composable
-fun EmptyState() {
+fun EmptyState(lang: AppLanguage) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1109,30 +1250,12 @@ fun EmptyState() {
         Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Toca el micrófono y habla,\no escribe tu mensaje.",
+            NexaStrings.get("welcome_msg", lang),
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             lineHeight = 22.sp
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("¿Qué puedes hacer?", "Escribe un poema", "Cuéntame un chiste").forEach { suggestion ->
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = NexaAccent.copy(alpha = 0.1f),
-                    border = ButtonDefaults.outlinedButtonBorder
-                ) {
-                    Text(
-                        suggestion,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        fontSize = 12.sp,
-                        color = NexaAccent,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -1196,7 +1319,7 @@ fun MessageBubble(
 }
 
 @Composable
-fun ThinkingIndicator() {
+fun ThinkingIndicator(lang: AppLanguage) {
     Row(
         modifier = Modifier.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1205,7 +1328,7 @@ fun ThinkingIndicator() {
         repeat(3) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(NexaAccent))
         }
-        Text("pensando...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(NexaStrings.get("thinking", lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1225,6 +1348,7 @@ fun DotsTyping() {
 @Composable
 fun InputBar(
     text: String,
+    language: AppLanguage,
     isListening: Boolean,
     isSpeaking: Boolean,
     onTextChange: (String) -> Unit,
@@ -1294,7 +1418,7 @@ fun InputBar(
                             DropdownMenuItem(
                                 text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text("🧹", fontSize = 18.sp)
-                                    Text("Limpiar chat", fontSize = 14.sp)
+                                    Text(NexaStrings.get("clear_chat", language), fontSize = 14.sp)
                                 }},
                                 onClick = { showMenu = false }
                             )
@@ -1302,7 +1426,7 @@ fun InputBar(
                             DropdownMenuItem(
                                 text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text("⚙️", fontSize = 18.sp)
-                                    Text("Ajustes", fontSize = 14.sp)
+                                    Text(NexaStrings.get("settings", language), fontSize = 14.sp)
                                 }},
                                 onClick = { showMenu = false }
                             )
@@ -1318,7 +1442,8 @@ fun InputBar(
                             .defaultMinSize(minHeight = 44.dp),
                         placeholder = {
                             Text(
-                                if (isListening) "🎙️ Escuchando..." else "Escribe un mensaje...",
+                                if (isListening) NexaStrings.get("listening", language)
+                                else NexaStrings.get("input_hint", language),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 14.sp
                             )
@@ -1408,7 +1533,7 @@ fun InputBar(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    "🎙️ hablar • ↵ enviar",
+                    NexaStrings.get("mic_hint", language),
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                 )
@@ -1417,67 +1542,6 @@ fun InputBar(
     }
 }
 
-// ═══════════════════════════════════════
-//  BOTTOM SETTINGS BAR
-// ═══════════════════════════════════════
-
-@Composable
-fun BottomSettingsBar(
-    uiState: NexaUiState,
-    onSetLanguage: (AppLanguage) -> Unit,
-    onSetVoiceType: (VoiceType) -> Unit,
-    onToggleTheme: () -> Unit,
-    onToggleSettings: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-        shadowElevation = 4.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BottomSettingItem(Icons.Default.Settings, "Ajustes", onClick = onToggleSettings)
-
-            BottomSettingItem(Icons.Default.Language, uiState.language.label, onClick = {
-                val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
-                onSetLanguage(next)
-            })
-
-            BottomSettingItem(
-                if (uiState.voiceType == VoiceType.MALE) Icons.Default.Man else Icons.Default.Woman,
-                if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer",
-                onClick = {
-                    val next = if (uiState.voiceType == VoiceType.MALE) VoiceType.FEMALE else VoiceType.MALE
-                    onSetVoiceType(next)
-                }
-            )
-
-            BottomSettingItem(
-                if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
-                if (uiState.isDarkTheme) "Oscuro" else "Claro",
-                onClick = onToggleTheme
-            )
-        }
-    }
-}
-
-@Composable
-fun BottomSettingItem(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp)
-    ) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
-    }
-}
 
 // ═══════════════════════════════════════
 //  SETTINGS SHEET
@@ -1493,6 +1557,7 @@ fun SettingsSheet(
     onToggleTheme: () -> Unit,
     onToggleAutoSpeak: () -> Unit
 ) {
+    val lang = uiState.language
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface
@@ -1503,57 +1568,136 @@ fun SettingsSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("⚙️ Ajustes", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 20.dp))
+            Text("⚙️ ${NexaStrings.get("settings", lang)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 16.dp))
 
-            SettingRow("Tema", if (uiState.isDarkTheme) "Oscuro" else "Claro") {
-                Switch(
-                    checked = uiState.isDarkTheme,
-                    onCheckedChange = { onToggleTheme() },
-                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent)
-                )
-            }
-
-            SettingRow("Idioma", uiState.language.label) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppLanguage.entries.forEach { lang ->
-                        FilterChip(
-                            selected = uiState.language == lang,
-                            onClick = { onSetLanguage(lang) },
-                            label = { Text(lang.label, fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
-                                selectedLabelColor = NexaAccent
-                            )
-                        )
+            // Row 1: Theme & Language (Compact)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CompactSettingCard(
+                    modifier = Modifier.weight(1f),
+                    title = NexaStrings.get("theme", lang),
+                    icon = if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode
+                ) {
+                    Switch(
+                        checked = uiState.isDarkTheme,
+                        onCheckedChange = { onToggleTheme() },
+                        colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+                CompactSettingCard(
+                    modifier = Modifier.weight(1f),
+                    title = NexaStrings.get("language", lang),
+                    icon = Icons.Default.Language
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        AppLanguage.entries.forEach { l ->
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onSetLanguage(l) },
+                                color = if (uiState.language == l) NexaAccent.copy(alpha = 0.2f) else Color.Transparent,
+                                border = if (uiState.language == l) BorderStroke(1.dp, NexaAccent) else null
+                            ) {
+                                Text(
+                                    l.code.uppercase(),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (uiState.language == l) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            SettingRow("Voz", if (uiState.voiceType == VoiceType.MALE) "Hombre" else "Mujer") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VoiceType.entries.forEach { voice ->
-                        FilterChip(
-                            selected = uiState.voiceType == voice,
-                            onClick = { onSetVoiceType(voice) },
-                            label = { Text(if (voice == VoiceType.MALE) "👨 Hombre" else "👩 Mujer", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
-                                selectedLabelColor = NexaAccent
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Row 2: Voice Selection (4 Voices Grid)
+            Text(NexaStrings.get("voice", lang), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.height(120.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(VoiceType.entries.toList()) { voice ->
+                    val isMale = voice == VoiceType.MALE_1 || voice == VoiceType.MALE_2
+                    val labelKey = voice.name.lowercase()
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSetVoiceType(voice) },
+                        color = if (uiState.voiceType == voice) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        border = if (uiState.voiceType == voice) BorderStroke(1.5.dp, NexaAccent) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
+                            Text(
+                                NexaStrings.get(labelKey, lang),
+                                fontSize = 11.sp,
+                                fontWeight = if (uiState.voiceType == voice) FontWeight.Bold else FontWeight.Normal,
+                                color = if (uiState.voiceType == voice) NexaAccent else MaterialTheme.colorScheme.onSurface
                             )
-                        )
+                        }
                     }
                 }
             }
 
-            SettingRow("Lectura automática", if (uiState.autoSpeak) "NEXA habla las respuestas" else "Solo texto") {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Row 3: Auto Speak
+            CompactSettingCard(
+                modifier = Modifier.fillMaxWidth(),
+                title = NexaStrings.get("auto_speak", lang),
+                subtitle = if (uiState.autoSpeak) NexaStrings.get("auto_speak_desc", lang) else NexaStrings.get("text_only", lang),
+                icon = if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff
+            ) {
                 Switch(
                     checked = uiState.autoSpeak,
                     onCheckedChange = { onToggleAutoSpeak() },
-                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent)
+                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
+                    modifier = Modifier.scale(0.8f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun CompactSettingCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = NexaAccent)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                if (subtitle != null) {
+                    Text(subtitle, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            content()
         }
     }
 }
@@ -1629,4 +1773,129 @@ fun UpdateDialog(
         },
         shape = RoundedCornerShape(18.dp)
     )
+}
+
+// ═══════════════════════════════════════
+//  TRANSLATIONS
+// ═══════════════════════════════════════
+
+object NexaStrings {
+    fun get(key: String, lang: AppLanguage): String {
+        return when (lang) {
+            AppLanguage.SPANISH -> when (key) {
+                "new_chat" -> "Nuevo chat"
+                "settings" -> "Ajustes"
+                "language" -> "Idioma"
+                "voice" -> "Voz"
+                "theme" -> "Tema"
+                "dark" -> "Oscuro"
+                "light" -> "Claro"
+                "male_1" -> "Hombre 1"
+                "male_2" -> "Hombre 2"
+                "female_1" -> "Mujer 1"
+                "female_2" -> "Mujer 2"
+                "login" -> "Iniciar sesión"
+                "logout" -> "Cerrar sesión"
+                "register" -> "Registrarse"
+                "email" -> "Email"
+                "password" -> "Contraseña"
+                "thinking" -> "pensando..."
+                "input_hint" -> "Escribe un mensaje..."
+                "listening" -> "🎙️ Escuchando..."
+                "mic_hint" -> "🎙️ hablar • ↵ enviar"
+                "messages_count" -> "mensajes"
+                "delete_chat" -> "Borrar chat"
+                "auto_speak" -> "Lectura automática"
+                "auto_speak_desc" -> "NEXA habla las respuestas"
+                "text_only" -> "Solo texto"
+                "welcome_msg" -> "Toca el micrófono y habla,\no escribe tu mensaje."
+                "clear_chat" -> "Limpiar chat"
+                "attach" -> "Adjuntar archivo"
+                "send_img" -> "Enviar imagen"
+                "back" -> "Volver"
+                "update_available" -> "Actualización disponible"
+                "update_now" -> "Actualizar"
+                "later" -> "Después"
+                else -> key
+            }
+            AppLanguage.ENGLISH -> when (key) {
+                "new_chat" -> "New Chat"
+                "settings" -> "Settings"
+                "language" -> "Language"
+                "voice" -> "Voice"
+                "theme" -> "Theme"
+                "dark" -> "Dark"
+                "light" -> "Light"
+                "male_1" -> "Male 1"
+                "male_2" -> "Male 2"
+                "female_1" -> "Female 1"
+                "female_2" -> "Female 2"
+                "login" -> "Login"
+                "logout" -> "Logout"
+                "register" -> "Register"
+                "email" -> "Email"
+                "password" -> "Password"
+                "thinking" -> "thinking..."
+                "input_hint" -> "Type a message..."
+                "listening" -> "🎙️ Listening..."
+                "mic_hint" -> "🎙️ speak • ↵ send"
+                "messages_count" -> "messages"
+                "delete_chat" -> "Delete chat"
+                "auto_speak" -> "Auto-speak"
+                "auto_speak_desc" -> "NEXA speaks responses"
+                "text_only" -> "Text only"
+                "welcome_msg" -> "Tap the mic and speak,\nor type your message."
+                "clear_chat" -> "Clear chat"
+                "attach" -> "Attach file"
+                "send_img" -> "Send image"
+                "back" -> "Back"
+                "update_available" -> "Update Available"
+                "update_now" -> "Update"
+                "later" -> "Later"
+                else -> key
+            }
+        }
+    }
+}
+
+@Composable
+fun UltraSettingRow(
+    icon: ImageVector,
+    title: String,
+    value: String? = null,
+    onClick: (() -> Unit)? = null,
+    content: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .let { if (onClick != null) it.clickable { onClick() } else it }
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, modifier = Modifier.size(16.dp), tint = NexaAccent)
+        }
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+        }
+
+        if (value != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(value, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            }
+        }
+
+        content?.invoke()
+    }
 }
