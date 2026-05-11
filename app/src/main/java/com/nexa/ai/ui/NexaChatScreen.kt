@@ -1303,8 +1303,10 @@ fun MessageBubble(
         if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
             Row(
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Speaker Button
                 IconButton(onClick = onSpeak, modifier = Modifier.size(28.dp)) {
                     Icon(
                         if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
@@ -1312,6 +1314,65 @@ fun MessageBubble(
                         modifier = Modifier.size(16.dp),
                         tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Copy Button
+                IconButton(onClick = { /* Copy logic would go here */ }, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Copiar",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Three Dots Menu
+                var showMsgMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { showMsgMenu = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Icons.Default.MoreHoriz,
+                            contentDescription = "Más opciones",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMsgMenu,
+                        onDismissRequest = { showMsgMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.BugReport, null, modifier = Modifier.size(18.dp))
+                                Text("Report Issue")
+                            }},
+                            onClick = { showMsgMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
+                                Text("Export to PDF")
+                            }},
+                            onClick = { showMsgMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(18.dp))
+                                Text("Read aloud")
+                            }},
+                            onClick = { 
+                                showMsgMenu = false
+                                onSpeak()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(Icons.Default.Forum, null, modifier = Modifier.size(18.dp))
+                                Text("Start Thread")
+                            }},
+                            onClick = { showMsgMenu = false }
+                        )
+                    }
                 }
             }
         }

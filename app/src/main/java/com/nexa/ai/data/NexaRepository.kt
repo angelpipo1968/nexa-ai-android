@@ -1,17 +1,19 @@
 package com.nexa.ai.data
 
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import okhttp3.sse.EventSource
+import okhttp3.sse.EventSourceListener
+import okhttp3.sse.EventSources
 import java.util.concurrent.TimeUnit
 
 data class ChatMessage(
@@ -23,16 +25,17 @@ class NexaRepository {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.SECONDS) // Infinite timeout for streaming
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
     private val gson = Gson()
+    private val TAG = "NexaRepository"
 
     fun sendMessage(
         messages: List<ChatMessage>,
         baseUrl: String
-    ): Flow<StreamEvent> = flow {
+    ): Flow<StreamEvent> = callbackFlow {
         val body = JsonObject().apply {
             add("messages", gson.toJsonTree(messages.map {
                 mapOf("role" to it.role, "content" to it.content)
@@ -43,64 +46,68 @@ class NexaRepository {
             .url("$baseUrl/api/chat")
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
-            .header("Connection", "keep-alive")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        try {
-            val response = client.newCall(request).execute()
-
-            if (!response.isSuccessful) {
-                emit(StreamEvent.Error("Error ${response.code}: ${response.message}"))
-                return@flow
+        val listener = object : EventSourceListener() {
+            override fun onOpen(eventSource: EventSource, response: Response) {
+                Log.d(TAG, "SSE Connection Opened")
             }
 
-            val source = response.body?.source() ?: throw Exception("Response body is null")
-            
-            while (!source.exhausted()) {
-                val line = source.readUtf8Line()?.trim() ?: break
-                if (line.isEmpty() || !line.startsWith("data: ")) continue
-
-                val jsonStr = line.removePrefix("data: ")
-                if (jsonStr == "[DONE]") {
-                    emit(StreamEvent.Done)
-                    break
+            override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                if (data == "[DONE]") {
+                    trySend(StreamEvent.Done)
+                    return
                 }
 
                 try {
-                    val obj = gson.fromJson(jsonStr, JsonObject::class.java)
+                    val obj = gson.fromJson(data, JsonObject::class.java)
                     
-                    // Prioritize 'done' state
                     if (obj.has("done") && obj.get("done").asBoolean) {
-                        emit(StreamEvent.Done)
-                        break
+                        trySend(StreamEvent.Done)
+                        return
                     }
 
-                    // Handle text chunk
                     if (obj.has("text")) {
                         val text = obj.get("text").asString
-                        if (text.isNotEmpty()) {
-                            emit(StreamEvent.Text(text))
-                        }
+                        if (text.isNotEmpty()) trySend(StreamEvent.Text(text))
                     }
 
-                    // Handle provider info
                     if (obj.has("provider")) {
-                        emit(StreamEvent.Provider(obj.get("provider").asString))
+                        trySend(StreamEvent.Provider(obj.get("provider").asString))
                     }
 
-                    // Handle potential errors
                     if (obj.has("error")) {
-                        emit(StreamEvent.Error(obj.get("error").asString))
-                        break
+                        trySend(StreamEvent.Error(obj.get("error").asString))
                     }
                 } catch (e: Exception) {
-                    // Skip malformed JSON in the stream
+                    Log.e(TAG, "Error parsing SSE data: $data", e)
                 }
             }
-            response.close()
-        } catch (e: Exception) {
-            emit(StreamEvent.Error("Connection error: ${e.localizedMessage}"))
+
+            override fun onClosed(eventSource: EventSource) {
+                Log.d(TAG, "SSE Connection Closed")
+                trySend(StreamEvent.Done)
+                close()
+            }
+
+            override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                Log.e(TAG, "SSE Failure: ${t?.message}", t)
+                val errorMsg = when {
+                    response?.code == 429 -> "Límite de mensajes alcanzado. Intenta más tarde."
+                    response?.code == 401 -> "Error de autenticación."
+                    t != null -> "Error de conexión: ${t.localizedMessage}"
+                    else -> "Error desconocido en el servidor (${response?.code})"
+                }
+                trySend(StreamEvent.Error(errorMsg))
+                close(t)
+            }
+        }
+
+        val eventSource = EventSources.createFactory(client).newEventSource(request, listener)
+
+        awaitClose {
+            eventSource.cancel()
         }
     }.flowOn(Dispatchers.IO)
 }
