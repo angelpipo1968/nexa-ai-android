@@ -93,13 +93,20 @@ class NexaRepository {
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 Log.e(TAG, "SSE Failure: ${t?.message}", t)
-                val errorMsg = when {
-                    response?.code == 429 -> "Límite de mensajes alcanzado. Intenta más tarde."
-                    response?.code == 401 -> "Error de autenticación."
-                    t != null -> "Error de conexión: ${t.localizedMessage}"
-                    else -> "Error desconocido en el servidor (${response?.code})"
+                when {
+                    response?.code == 401 -> {
+                        trySend(StreamEvent.AuthExpired)
+                    }
+                    response?.code == 429 -> {
+                        trySend(StreamEvent.Error("Límite de mensajes alcanzado. Intenta más tarde."))
+                    }
+                    t != null -> {
+                        trySend(StreamEvent.Error("Error de conexión: ${t.localizedMessage}"))
+                    }
+                    else -> {
+                        trySend(StreamEvent.Error("Error desconocido en el servidor (${response?.code})"))
+                    }
                 }
-                trySend(StreamEvent.Error(errorMsg))
                 close(t)
             }
         }
@@ -117,4 +124,5 @@ sealed class StreamEvent {
     data class Provider(val name: String) : StreamEvent()
     data class Error(val message: String) : StreamEvent()
     data object Done : StreamEvent()
+    data object AuthExpired : StreamEvent()
 }

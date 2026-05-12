@@ -2,5 +2,4 @@
 <resources>
     <string name="app_name">NEXA PRO</string>
     <string name="welcome_message">Bienvenido a NEXA PRO</string>
-    <string name="cloud_sync_label">Sincronizando con Nexa Cloud Core...</string>
 </resources>

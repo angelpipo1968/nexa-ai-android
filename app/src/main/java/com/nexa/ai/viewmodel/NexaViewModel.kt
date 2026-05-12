@@ -107,6 +107,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
+    // Rate limiting
+    private var lastSendTimestamp = 0L
+    private val sendCooldownMs = 1500L // 1.5 seconds between sends
+
     init {
         initTTS()
         restoreState()
@@ -588,6 +592,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val content = text ?: _uiState.value.inputText.trim()
         if (content.isBlank()) return
 
+        // Rate limiting
+        val now = System.currentTimeMillis()
+        if (now - lastSendTimestamp < sendCooldownMs) return
+        lastSendTimestamp = now
+
         val userMsg = Message(role = "user", content = content)
         val assistantId = "a-${System.currentTimeMillis()}"
 
@@ -634,6 +643,14 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     is StreamEvent.Error -> {
                         _uiState.value = _uiState.value.copy(error = event.message, isThinking = false)
+                    }
+                    is StreamEvent.AuthExpired -> {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Sesión expirada. Inicia sesión de nuevo.",
+                            isThinking = false
+                        )
+                        logout()
+                        navigateToLogin()
                     }
                     is StreamEvent.Done -> {
                         updateActiveSession { s ->
