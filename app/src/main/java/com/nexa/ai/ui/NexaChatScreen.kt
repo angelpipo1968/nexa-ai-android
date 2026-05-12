@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.scale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -154,6 +157,20 @@ fun NexaChatScreen(
             onSurpriseMe = onSurpriseMe,
             onSetDrawerView = onSetDrawerView,
             onAttachFile = onAttachFile
+        )
+    }
+
+    if (uiState.showSettings) {
+        GeneralSettingsDialog(
+            uiState = uiState,
+            onDismiss = onToggleSettings,
+            onSetLanguage = onSetLanguage,
+            onSetVoiceType = onSetVoiceType,
+            onToggleTheme = onToggleTheme,
+            onToggleAutoSpeak = onToggleAutoSpeak,
+            onClearChat = onClearChat,
+            onNavigateToLogin = onNavigateToLogin,
+            onLogout = onLogout
         )
     }
 }
@@ -698,10 +715,11 @@ fun ChatMainScreen(
                     onToggleAutoSpeak = onToggleAutoSpeak,
                     onStopSpeaking = onStopSpeaking,
                     onClearChat = onClearChat,
-                    onSurpriseMe = onSurpriseMe
+                    onSurpriseMe = onSurpriseMe,
+                    onToggleSettings = onToggleSettings
                 )
             },
-            containerColor = MaterialTheme.colorScheme.background
+            containerColor = if (uiState.isDarkTheme) Color.Black else Color.White
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -723,6 +741,7 @@ fun ChatMainScreen(
                     modifier = Modifier.weight(1f)
                 )
 
+                // Back to 100% Clean Input Bar
                 InputBar(
                     text = uiState.inputText,
                     language = uiState.language,
@@ -806,49 +825,8 @@ fun DrawerContent(
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-        // Tab selector: History | Settings
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            val lang = uiState.language
-            listOf(
-                Triple(0, Icons.Default.Chat, NexaStrings.get("history", lang)),
-                Triple(1, Icons.Default.Settings, NexaStrings.get("settings", lang))
-            ).forEach { (view, icon, label) ->
-                val selected = uiState.drawerView == view
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onSetDrawerView(view) },
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (selected) NexaAccent.copy(alpha = 0.12f) else Color.Transparent
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            label,
-                            fontSize = 12.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
+        // Removed tab selector from here
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
@@ -903,32 +881,44 @@ fun DrawerContent(
                         }
                     }
                 }
-            } else {
-                // Settings view
-                SettingsPanel(
-                    uiState = uiState,
-                    onSetLanguage = onSetLanguage,
-                    onSetVoiceType = onSetVoiceType,
-                    onToggleTheme = onToggleTheme,
-                    onToggleAutoSpeak = onToggleAutoSpeak,
-                    onNavigateToLogin = onNavigateToLogin,
-                    onLogout = onLogout
-                )
             }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
+        // Sticky Settings Button at the VERY BOTTOM
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp), // Less vertical padding to push it down
+            contentAlignment = Alignment.CenterStart
+        ) {
+            IconButton(
+                onClick = { 
+                    onToggleSettings()
+                    onClose() 
+                },
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = NexaAccent,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+
         // Footer
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 20.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "NEXA PRO v2.1",
+                "NEXA PRO v3.0",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -1207,7 +1197,8 @@ fun ChatTopBar(
     onToggleAutoSpeak: () -> Unit,
     onStopSpeaking: () -> Unit,
     onClearChat: () -> Unit,
-    onSurpriseMe: () -> Unit
+    onSurpriseMe: () -> Unit,
+    onToggleSettings: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -1225,7 +1216,7 @@ fun ChatTopBar(
                     Text("⚡", fontSize = 16.sp)
                 }
                 Column {
-                    Text("NEXA PRO", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = 1.5.sp)
+                    Text("NEXA PRO v3.0", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, letterSpacing = 1.5.sp)
                     Text(
                         "ANDROID",
                         fontSize = 8.sp,
@@ -1266,7 +1257,7 @@ fun ChatTopBar(
                 Icon(Icons.Default.DeleteOutline, contentDescription = NexaStrings.get("clear_chat", uiState.language))
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = if (uiState.isDarkTheme) Color.Black else Color.White)
     )
 }
 
@@ -1998,4 +1989,149 @@ fun UltraSettingRow(
 
         content?.invoke()
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GeneralSettingsDialog(
+    uiState: NexaUiState,
+    onDismiss: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onClearChat: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onLogout: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(NexaStrings.get("settings", uiState.language), fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Language
+                Text(NexaStrings.get("language", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val langs = listOf(AppLanguage.SPANISH to "Español 🇪🇸", AppLanguage.ENGLISH to "English 🇺🇸")
+                    langs.forEach { (lang, label) ->
+                        FilterChip(
+                            selected = uiState.language == lang,
+                            onClick = { onSetLanguage(lang) },
+                            label = { Text(label) }
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFEEEEEE))
+
+                // Voice Selection
+                Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                
+                // Manual Grid using Columns/Rows because LazyVerticalGrid inside Scrollable is tricky
+                val voices = VoiceType.entries.toList()
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    voices.chunked(3).forEach { rowVoices ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowVoices.forEach { voice ->
+                                val isMale = voice.name.contains("MALE")
+                                val selected = uiState.voiceType == voice
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onSetVoiceType(voice) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (selected) NexaAccent.copy(alpha = 0.2f) else (if (uiState.isDarkTheme) Color(0xFF1A1A1A) else Color(0xFFF5F5F5)),
+                                    border = if (selected) BorderStroke(2.dp, NexaAccent) else BorderStroke(1.dp, if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFDDDDDD))
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
+                                        Text(
+                                            NexaStrings.get(voice.name.lowercase(), uiState.language),
+                                            fontSize = 9.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (selected) NexaAccent else (if (uiState.isDarkTheme) Color.White else Color.Black),
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFEEEEEE))
+
+                // Auto Speak
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(NexaStrings.get("auto_speak", uiState.language), modifier = Modifier.weight(1f))
+                    Switch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() })
+                }
+
+                // Theme
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(NexaStrings.get("theme", uiState.language), modifier = Modifier.weight(1f))
+                    Switch(checked = uiState.isDarkTheme, onCheckedChange = { onToggleTheme() })
+                }
+
+                HorizontalDivider(color = if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFEEEEEE))
+
+                // Clear Chat
+                Button(
+                    onClick = { 
+                        onClearChat()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(NexaStrings.get("clear_chat", uiState.language))
+                }
+                if (uiState.user.isLoggedIn) {
+                    Button(
+                        onClick = {
+                            onLogout()
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = NexaAccent),
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(NexaStrings.get("logout", uiState.language))
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            onNavigateToLogin()
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NexaAccent, contentColor = Color.Black),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Person, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(NexaStrings.get("login", uiState.language), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("OK", color = NexaAccent)
+            }
+        },
+        containerColor = if (uiState.isDarkTheme) Color(0xFF111111) else Color.White,
+        shape = RoundedCornerShape(24.dp)
+    )
 }

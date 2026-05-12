@@ -12,6 +12,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.*
+import com.nexa.ai.ui.NexaStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -430,28 +431,44 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         tts?.language = locale
 
-        val voices = tts?.voices?.filter { it.locale.language == locale.language } ?: return
-        if (voices.isEmpty()) return
+        val allVoices = tts?.voices?.filter { it.locale.language == locale.language } ?: return
+        if (allVoices.isEmpty()) return
 
         val voiceType = _uiState.value.voiceType
-        val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2 || voiceType == VoiceType.MALE_3
-        val voiceIndex = when (voiceType) {
-            VoiceType.MALE_1, VoiceType.FEMALE_1 -> 0
-            VoiceType.MALE_2, VoiceType.FEMALE_2 -> 1
-            VoiceType.MALE_3, VoiceType.FEMALE_3 -> 2
+        
+        // Mapeo exacto basado en los registros del S26 Ultra del usuario
+        val voiceName = when (voiceType) {
+            VoiceType.FEMALE_1 -> "es-es-x-eea-local"
+            VoiceType.FEMALE_2 -> "es-es-x-eec-local"
+            VoiceType.FEMALE_3 -> "es-us-x-esc-local"
+            VoiceType.MALE_1   -> "es-es-x-eed-local"
+            VoiceType.MALE_2   -> "es-es-x-eee-local"
+            VoiceType.MALE_3   -> "es-us-x-esd-local"
         }
 
-        val genderTag = if (isMale) "male" else "female"
-        val genderVoices = voices.filter { it.name.lowercase().contains(genderTag) }
-        val candidates = if (genderVoices.isNotEmpty()) genderVoices else voices
-
-        val selectedVoice = if (voiceIndex < candidates.size) {
-            candidates[voiceIndex]
-        } else {
-            candidates.last()
-        }
+        val selectedVoice = allVoices.find { it.name == voiceName } 
+            ?: allVoices.find { it.name.contains(voiceName.split("-").last()) }
+            ?: allVoices.first()
 
         tts?.voice = selectedVoice
+        
+        // FORZAR DIFERENCIA DE TONO (PITCH)
+        val pitch = when (voiceType) {
+            VoiceType.FEMALE_1 -> 1.1f // Un poco más aguda
+            VoiceType.FEMALE_2 -> 1.0f // Normal
+            VoiceType.FEMALE_3 -> 0.9f // Un poco más profunda
+            VoiceType.MALE_1   -> 0.8f // Voz de barítono (grave)
+            VoiceType.MALE_2   -> 1.0f // Normal
+            VoiceType.MALE_3   -> 1.2f // Voz más joven (aguda)
+        }
+        tts?.setPitch(pitch)
+        tts?.setSpeechRate(1.0f)
+        
+        android.widget.Toast.makeText(
+            getApplication(), 
+            "Personalidad: ${voiceType.name} (Pitch: $pitch)", 
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
     }
 
     fun speak(text: String, messageId: String? = null) {
