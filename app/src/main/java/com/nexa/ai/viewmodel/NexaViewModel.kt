@@ -388,12 +388,16 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         stopSpeaking()
         viewModelScope.launch {
             userStore.clearUser()
+            sessionStore.clear()
         }
         _uiState.value = _uiState.value.copy(
             user = UserData(),
+            sessions = emptyList(),
+            activeSessionId = null,
             currentScreen = Screen.CHAT,
             drawerOpen = false
         )
+        createNewSession()
     }
 
     // ═══════════════════════════════════════
@@ -435,40 +439,50 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         if (allVoices.isEmpty()) return
 
         val voiceType = _uiState.value.voiceType
+        val isSpanish = _uiState.value.language == AppLanguage.SPANISH
         
-        // Mapeo exacto basado en los registros del S26 Ultra del usuario
-        val voiceName = when (voiceType) {
-            VoiceType.FEMALE_1 -> "es-es-x-eea-local"
-            VoiceType.FEMALE_2 -> "es-es-x-eec-local"
-            VoiceType.FEMALE_3 -> "es-us-x-esc-local"
-            VoiceType.MALE_1   -> "es-es-x-eed-local"
-            VoiceType.MALE_2   -> "es-es-x-eee-local"
-            VoiceType.MALE_3   -> "es-us-x-esd-local"
+        // Voice names per locale
+        val voiceName = if (isSpanish) {
+            when (voiceType) {
+                VoiceType.FEMALE_1 -> "es-es-x-eea-local"
+                VoiceType.FEMALE_2 -> "es-es-x-eec-local"
+                VoiceType.FEMALE_3 -> "es-us-x-esc-local"
+                VoiceType.MALE_1   -> "es-es-x-eed-local"
+                VoiceType.MALE_2   -> "es-es-x-eee-local"
+                VoiceType.MALE_3   -> "es-us-x-esd-local"
+            }
+        } else {
+            when (voiceType) {
+                VoiceType.FEMALE_1 -> "en-us-x-tpf-local"
+                VoiceType.FEMALE_2 -> "en-us-x-tpd-local"
+                VoiceType.FEMALE_3 -> "en-gb-x-gba-local"
+                VoiceType.MALE_1   -> "en-us-x-tpc-local"
+                VoiceType.MALE_2   -> "en-us-x-tpa-local"
+                VoiceType.MALE_3   -> "en-gb-x-gbb-local"
+            }
         }
 
-        val selectedVoice = allVoices.find { it.name == voiceName } 
-            ?: allVoices.find { it.name.contains(voiceName.split("-").last()) }
+        // Strategy: exact match → gender keyword match → first available
+        val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2 || voiceType == VoiceType.MALE_3
+        val selectedVoice = allVoices.find { it.name == voiceName }
+            ?: run {
+                val genderKeywords = if (isMale) listOf("male", "man", "hom") else listOf("female", "woman", "fem")
+                allVoices.find { v -> genderKeywords.any { v.name.lowercase().contains(it) } }
+            }
             ?: allVoices.first()
 
         tts?.voice = selectedVoice
         
-        // FORZAR DIFERENCIA DE TONO (PITCH)
         val pitch = when (voiceType) {
-            VoiceType.FEMALE_1 -> 1.1f // Un poco más aguda
-            VoiceType.FEMALE_2 -> 1.0f // Normal
-            VoiceType.FEMALE_3 -> 0.9f // Un poco más profunda
-            VoiceType.MALE_1   -> 0.8f // Voz de barítono (grave)
-            VoiceType.MALE_2   -> 1.0f // Normal
-            VoiceType.MALE_3   -> 1.2f // Voz más joven (aguda)
+            VoiceType.FEMALE_1 -> 1.1f
+            VoiceType.FEMALE_2 -> 1.0f
+            VoiceType.FEMALE_3 -> 0.9f
+            VoiceType.MALE_1   -> 0.8f
+            VoiceType.MALE_2   -> 1.0f
+            VoiceType.MALE_3   -> 1.2f
         }
         tts?.setPitch(pitch)
         tts?.setSpeechRate(1.0f)
-        
-        android.widget.Toast.makeText(
-            getApplication(), 
-            "Personalidad: ${voiceType.name} (Pitch: $pitch)", 
-            android.widget.Toast.LENGTH_SHORT
-        ).show()
     }
 
     fun speak(text: String, messageId: String? = null) {
@@ -496,11 +510,14 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun cleanForSpeech(text: String): String {
         return text
+            .replace(Regex("https?://\\S+"), "")
             .replace(Regex("#{1,6}\\s*"), "")
             .replace(Regex("\\*{1,3}(.+?)\\*{1,3}"), "$1")
             .replace(Regex("_{1,3}(.+?)_{1,3}"), "$1")
             .replace(Regex("```[\\s\\S]*?```"), "código")
             .replace(Regex("`([^`]+)`"), "$1")
+            .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
+            .replace(Regex("!\\[[^]]*]\\([^)]+\\)"), "")
             .replace(Regex("\\n{2,}"), ". ")
             .replace(Regex("\\n"), ". ")
             .replace(Regex("\\s{2,}"), " ")
@@ -699,55 +716,62 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null, pendingAttachment = null)
 
         viewModelScope.launch {
-            val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
-            var fullResponse = ""
+            try {
+                val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
+                var fullResponse = ""
 
-            repository.sendMessage(allMessages, BuildConfig.API_BASE_URL).collect { event ->
-                when (event) {
-                    is StreamEvent.Text -> {
-                        fullResponse += event.text
-                        updateActiveSession { s ->
-                            val updated = s.messages.toMutableList()
-                            val idx = updated.indexOfFirst { it.id == assistantId }
-                            if (idx >= 0) {
-                                updated[idx] = updated[idx].copy(content = fullResponse, isStreaming = true)
-                            } else {
-                                updated.add(Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = true))
+                repository.sendMessage(allMessages, BuildConfig.API_BASE_URL).collect { event ->
+                    when (event) {
+                        is StreamEvent.Text -> {
+                            fullResponse += event.text
+                            updateActiveSession { s ->
+                                val updated = s.messages.toMutableList()
+                                val idx = updated.indexOfFirst { it.id == assistantId }
+                                if (idx >= 0) {
+                                    updated[idx] = updated[idx].copy(content = fullResponse, isStreaming = true)
+                                } else {
+                                    updated.add(Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = true))
+                                }
+                                s.copy(messages = updated)
                             }
-                            s.copy(messages = updated)
+                            _uiState.value = _uiState.value.copy(isThinking = false)
                         }
-                        _uiState.value = _uiState.value.copy(isThinking = false)
-                    }
-                    is StreamEvent.Provider -> {
-                        _uiState.value = _uiState.value.copy(currentProvider = event.name)
-                    }
-                    is StreamEvent.Error -> {
-                        _uiState.value = _uiState.value.copy(error = event.message, isThinking = false)
-                    }
-                    is StreamEvent.AuthExpired -> {
-                        _uiState.value = _uiState.value.copy(
-                            error = NexaStrings.get("session_expired", _uiState.value.language),
-                            isThinking = false
-                        )
-                        logout()
-                        navigateToLogin()
-                    }
-                    is StreamEvent.Done -> {
-                        updateActiveSession { s ->
-                            val updated = s.messages.toMutableList()
-                            val idx = updated.indexOfFirst { it.id == assistantId }
-                            if (idx >= 0) {
-                                updated[idx] = updated[idx].copy(isStreaming = false)
+                        is StreamEvent.Provider -> {
+                            _uiState.value = _uiState.value.copy(currentProvider = event.name)
+                        }
+                        is StreamEvent.Error -> {
+                            _uiState.value = _uiState.value.copy(error = event.message, isThinking = false)
+                        }
+                        is StreamEvent.AuthExpired -> {
+                            _uiState.value = _uiState.value.copy(
+                                error = NexaStrings.get("session_expired", _uiState.value.language),
+                                isThinking = false
+                            )
+                            logout()
+                            navigateToLogin()
+                        }
+                        is StreamEvent.Done -> {
+                            updateActiveSession { s ->
+                                val updated = s.messages.toMutableList()
+                                val idx = updated.indexOfFirst { it.id == assistantId }
+                                if (idx >= 0) {
+                                    updated[idx] = updated[idx].copy(isStreaming = false)
+                                }
+                                s.copy(messages = updated, updatedAt = System.currentTimeMillis())
                             }
-                            s.copy(messages = updated, updatedAt = System.currentTimeMillis())
-                        }
-                        _uiState.value = _uiState.value.copy(isThinking = false)
+                            _uiState.value = _uiState.value.copy(isThinking = false)
 
-                        if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
-                            speak(fullResponse, assistantId)
+                            if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
+                                speak(fullResponse, assistantId)
+                            }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Error de conexión: ${e.localizedMessage ?: "desconocido"}",
+                    isThinking = false
+                )
             }
         }
     }
@@ -818,10 +842,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
-            val page = pdfDocument.startPage(pageInfo)
-            val canvas = page.canvas
             val paint = android.graphics.Paint()
+            var pageNum = 1
+            var pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
+            var page = pdfDocument.startPage(pageInfo)
+            var canvas = page.canvas
 
             paint.textSize = 18f
             paint.isFakeBoldText = true
@@ -833,12 +858,31 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             val lines = message.content.split("\n")
             var y = 100f
             for (line in lines) {
+                if (y > 790f) {
+                    pdfDocument.finishPage(page)
+                    pageNum++
+                    pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
+                    page = pdfDocument.startPage(pageInfo)
+                    canvas = page.canvas
+                    paint.textSize = 12f
+                    paint.isFakeBoldText = false
+                    y = 50f
+                }
                 val words = line.split(" ")
                 var currentLine = ""
                 for (word in words) {
                     val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
                     if (paint.measureText(testLine) > 495f) {
-                        if (y > 800f) break
+                        if (y > 790f) {
+                            pdfDocument.finishPage(page)
+                            pageNum++
+                            pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
+                            page = pdfDocument.startPage(pageInfo)
+                            canvas = page.canvas
+                            paint.textSize = 12f
+                            paint.isFakeBoldText = false
+                            y = 50f
+                        }
                         canvas.drawText(currentLine, 50f, y, paint)
                         y += 18f
                         currentLine = word
@@ -846,7 +890,17 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                         currentLine = testLine
                     }
                 }
-                if (currentLine.isNotEmpty() && y <= 800f) {
+                if (currentLine.isNotEmpty()) {
+                    if (y > 790f) {
+                        pdfDocument.finishPage(page)
+                        pageNum++
+                        pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
+                        page = pdfDocument.startPage(pageInfo)
+                        canvas = page.canvas
+                        paint.textSize = 12f
+                        paint.isFakeBoldText = false
+                        y = 50f
+                    }
                     canvas.drawText(currentLine, 50f, y, paint)
                     y += 18f
                 }

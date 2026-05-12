@@ -92,7 +92,8 @@ class MainActivity : ComponentActivity() {
                         onExportMessage = { viewModel.exportToPdf(it) },
                         onSurpriseMe = { viewModel.surpriseMe() },
                         onSetDrawerView = { viewModel.setDrawerView(it) },
-                        onAttachFile = { pickFile.launch("*/*") }
+                        onAttachFile = { pickFile.launch("*/*") },
+                        onClearAttachment = { viewModel.clearPendingAttachment() }
                     )
                 }
             }

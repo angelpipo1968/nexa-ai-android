@@ -89,7 +89,8 @@ fun NexaChatScreen(
     onExportMessage: (Message) -> Unit,
     onSurpriseMe: () -> Unit,
     onSetDrawerView: (Int) -> Unit,
-    onAttachFile: () -> Unit
+    onAttachFile: () -> Unit,
+    onClearAttachment: () -> Unit = {}
 ) {
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
         UpdateDialog(
@@ -156,7 +157,8 @@ fun NexaChatScreen(
             onExportMessage = onExportMessage,
             onSurpriseMe = onSurpriseMe,
             onSetDrawerView = onSetDrawerView,
-            onAttachFile = onAttachFile
+            onAttachFile = onAttachFile,
+            onClearAttachment = onClearAttachment
         )
     }
 
@@ -667,23 +669,26 @@ fun ChatMainScreen(
     onExportMessage: (Message) -> Unit,
     onSurpriseMe: () -> Unit,
     onSetDrawerView: (Int) -> Unit,
-    onAttachFile: () -> Unit
+    onAttachFile: () -> Unit,
+    onClearAttachment: () -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(
-        initialValue = if (uiState.drawerOpen) DrawerValue.Open else DrawerValue.Closed
+        initialValue = DrawerValue.Closed
     )
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(uiState.drawerOpen) {
-        if (uiState.drawerOpen) drawerState.open() else drawerState.close()
+    // Sync drawer FROM UI → ViewModel (user swiped)
+    LaunchedEffect(drawerState.targetValue) {
+        val isOpen = drawerState.targetValue == DrawerValue.Open
+        if (isOpen != uiState.drawerOpen) {
+            if (isOpen) onToggleDrawer() else onCloseDrawer()
+        }
     }
 
-    LaunchedEffect(drawerState.currentValue) {
-        if (drawerState.currentValue == DrawerValue.Open && !uiState.drawerOpen) {
-            onToggleDrawer()
-        } else if (drawerState.currentValue == DrawerValue.Closed && uiState.drawerOpen) {
-            onCloseDrawer()
-        }
+    // Sync drawer FROM ViewModel → UI (programmatic)
+    LaunchedEffect(uiState.drawerOpen) {
+        if (uiState.drawerOpen && drawerState.isClosed) drawerState.open()
+        else if (!uiState.drawerOpen && drawerState.isOpen) drawerState.close()
     }
 
     ModalNavigationDrawer(
@@ -754,7 +759,7 @@ fun ChatMainScreen(
                     onStopListening = onStopListening,
                     onStopSpeaking = onStopSpeaking,
                     onAttachFile = onAttachFile,
-                    onClearAttachment = { /* handled by parent */ }
+                    onClearAttachment = onClearAttachment
                 )
             }
         }
