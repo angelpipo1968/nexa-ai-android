@@ -29,6 +29,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val pickFile = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val fileName = it.lastPathSegment ?: "archivo"
+            viewModel.setPendingAttachment(fileName)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -80,7 +89,10 @@ class MainActivity : ComponentActivity() {
                         onDismissUpdate = { viewModel.dismissUpdate() },
                         onOpenUpdatePage = { viewModel.openUpdatePage() },
                         onCopyMessage = { viewModel.copyToClipboard(it) },
-                        onExportMessage = { viewModel.exportToPdf(it) }
+                        onExportMessage = { viewModel.exportToPdf(it) },
+                        onSurpriseMe = { viewModel.surpriseMe() },
+                        onSetDrawerView = { viewModel.setDrawerView(it) },
+                        onAttachFile = { pickFile.launch("*/*") }
                     )
                 }
             }

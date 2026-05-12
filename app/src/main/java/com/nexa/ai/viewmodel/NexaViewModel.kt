@@ -28,7 +28,8 @@ data class Message(
     val id: String = System.currentTimeMillis().toString(),
     val role: String,
     val content: String,
-    val isStreaming: Boolean = false
+    val isStreaming: Boolean = false,
+    val attachmentName: String? = null
 )
 
 data class ChatSession(
@@ -39,7 +40,7 @@ data class ChatSession(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
-enum class VoiceType { MALE_1, MALE_2, FEMALE_1, FEMALE_2 }
+enum class VoiceType { MALE_1, MALE_2, MALE_3, FEMALE_1, FEMALE_2, FEMALE_3 }
 enum class AppLanguage(val code: String, val label: String) {
     SPANISH("es", "Español"),
     ENGLISH("en", "English")
@@ -85,7 +86,11 @@ data class NexaUiState(
     val isRegistering: Boolean = false,
     // Update
     val updateInfo: UpdateInfo? = null,
-    val showUpdateDialog: Boolean = false
+    val showUpdateDialog: Boolean = false,
+    // Attachment
+    val pendingAttachment: String? = null,
+    // Drawer view (0=history, 1=settings)
+    val drawerView: Int = 0
 ) {
     val activeSession: ChatSession?
         get() = sessions.find { it.id == activeSessionId }
@@ -107,9 +112,34 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
-    // Rate limiting
     private var lastSendTimestamp = 0L
-    private val sendCooldownMs = 1500L // 1.5 seconds between sends
+    private val sendCooldownMs = 1500L
+
+    private val surprisePromptsEs = listOf(
+        "Cuéntame algo fascinante sobre el universo",
+        "Dame una receta rápida y deliciosa",
+        "¿Cuál es el mejor consejo de vida que puedes dar?",
+        "Escribe un poema corto sobre la tecnología",
+        "Explícame la mecánica cuántica como si tuviera 10 años",
+        "¿Qué pasaría si los humanos pudieran volar?",
+        "Dame 3 ideas para un negocio innovador",
+        "Cuéntame una historia de ciencia ficción en 100 palabras",
+        "¿Cuál es el misterio más grande de la humanidad?",
+        "Dame un plan de ejercicios para 15 minutos"
+    )
+
+    private val surprisePromptsEn = listOf(
+        "Tell me something fascinating about the universe",
+        "Give me a quick and delicious recipe",
+        "What's the best life advice you can give?",
+        "Write a short poem about technology",
+        "Explain quantum mechanics like I'm 10",
+        "What if humans could fly?",
+        "Give me 3 ideas for an innovative business",
+        "Tell me a sci-fi story in 100 words",
+        "What's humanity's greatest mystery?",
+        "Give me a 15-minute workout plan"
+    )
 
     init {
         initTTS()
@@ -122,7 +152,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun restoreState() {
         viewModelScope.launch {
-            // Restore user session
             val savedUser = userStore.currentUser.first()
             if (savedUser != null) {
                 _uiState.value = _uiState.value.copy(
@@ -134,7 +163,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
 
-            // Restore chat sessions
             val savedSessions = sessionStore.sessions.first()
             val savedActiveId = sessionStore.activeSessionId.first()
 
@@ -209,7 +237,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ═══════════════════════════════════════
-    //  LOGIN / REGISTER (PERSISTENT)
+    //  LOGIN / REGISTER
     // ═══════════════════════════════════════
 
     fun navigateToLogin() {
@@ -265,12 +293,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val password = _uiState.value.loginPassword
 
         if (email.isBlank() || password.isBlank()) {
-            _uiState.value = _uiState.value.copy(loginError = "Completa todos los campos")
+            _uiState.value = _uiState.value.copy(loginError = NexaStrings.get("fill_all", _uiState.value.language))
             return
         }
 
         if (!email.contains("@")) {
-            _uiState.value = _uiState.value.copy(loginError = "Email no válido")
+            _uiState.value = _uiState.value.copy(loginError = NexaStrings.get("invalid_email", _uiState.value.language))
             return
         }
 
@@ -305,22 +333,22 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val confirm = _uiState.value.registerConfirmPassword
 
         if (name.isBlank() || email.isBlank() || password.isBlank()) {
-            _uiState.value = _uiState.value.copy(registerError = "Completa todos los campos")
+            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("fill_all", _uiState.value.language))
             return
         }
 
         if (!email.contains("@")) {
-            _uiState.value = _uiState.value.copy(registerError = "Email no válido")
+            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("invalid_email", _uiState.value.language))
             return
         }
 
         if (password.length < 6) {
-            _uiState.value = _uiState.value.copy(registerError = "Mínimo 6 caracteres")
+            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("min_chars", _uiState.value.language))
             return
         }
 
         if (password != confirm) {
-            _uiState.value = _uiState.value.copy(registerError = "Las contraseñas no coinciden")
+            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("passwords_no_match", _uiState.value.language))
             return
         }
 
@@ -342,7 +370,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
-                        registerError = "Este email ya está registrado",
+                        registerError = NexaStrings.get("email_taken", _uiState.value.language),
                         isRegistering = false
                     )
                 }
@@ -406,17 +434,21 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         if (voices.isEmpty()) return
 
         val voiceType = _uiState.value.voiceType
-        val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2
-        val isSecond = voiceType == VoiceType.MALE_2 || voiceType == VoiceType.FEMALE_2
+        val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2 || voiceType == VoiceType.MALE_3
+        val voiceIndex = when (voiceType) {
+            VoiceType.MALE_1, VoiceType.FEMALE_1 -> 0
+            VoiceType.MALE_2, VoiceType.FEMALE_2 -> 1
+            VoiceType.MALE_3, VoiceType.FEMALE_3 -> 2
+        }
 
         val genderTag = if (isMale) "male" else "female"
         val genderVoices = voices.filter { it.name.lowercase().contains(genderTag) }
         val candidates = if (genderVoices.isNotEmpty()) genderVoices else voices
 
-        val selectedVoice = if (isSecond && candidates.size > 1) {
-            candidates[1]
+        val selectedVoice = if (voiceIndex < candidates.size) {
+            candidates[voiceIndex]
         } else {
-            candidates[0]
+            candidates.last()
         }
 
         tts?.voice = selectedVoice
@@ -466,7 +498,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val context = getApplication<Application>()
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            _uiState.value = _uiState.value.copy(error = "Reconocimiento de voz no disponible")
+            _uiState.value = _uiState.value.copy(error = NexaStrings.get("voice_unavailable", _uiState.value.language))
             return
         }
 
@@ -527,7 +559,32 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ═══════════════════════════════════════
-    //  SESSION MANAGEMENT (PERSISTENT)
+    //  SURPRISE ME
+    // ═══════════════════════════════════════
+
+    fun surpriseMe() {
+        val prompts = when (_uiState.value.language) {
+            AppLanguage.SPANISH -> surprisePromptsEs
+            AppLanguage.ENGLISH -> surprisePromptsEn
+        }
+        val prompt = prompts.random()
+        sendMessage(prompt)
+    }
+
+    // ═══════════════════════════════════════
+    //  ATTACHMENT
+    // ═══════════════════════════════════════
+
+    fun setPendingAttachment(fileName: String) {
+        _uiState.value = _uiState.value.copy(pendingAttachment = fileName)
+    }
+
+    fun clearPendingAttachment() {
+        _uiState.value = _uiState.value.copy(pendingAttachment = null)
+    }
+
+    // ═══════════════════════════════════════
+    //  SESSION MANAGEMENT
     // ═══════════════════════════════════════
 
     fun createNewSession() {
@@ -590,14 +647,20 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendMessage(text: String? = null) {
         val content = text ?: _uiState.value.inputText.trim()
-        if (content.isBlank()) return
+        if (content.isBlank() && _uiState.value.pendingAttachment == null) return
 
-        // Rate limiting
         val now = System.currentTimeMillis()
         if (now - lastSendTimestamp < sendCooldownMs) return
         lastSendTimestamp = now
 
-        val userMsg = Message(role = "user", content = content)
+        val attachmentName = _uiState.value.pendingAttachment
+        val fullContent = if (attachmentName != null) {
+            "📎 $attachmentName\n$content"
+        } else {
+            content
+        }
+
+        val userMsg = Message(role = "user", content = fullContent, attachmentName = attachmentName)
         val assistantId = "a-${System.currentTimeMillis()}"
 
         val session = _uiState.value.activeSession
@@ -616,7 +679,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null)
+        _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null, pendingAttachment = null)
 
         viewModelScope.launch {
             val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
@@ -646,7 +709,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     is StreamEvent.AuthExpired -> {
                         _uiState.value = _uiState.value.copy(
-                            error = "Sesión expirada. Inicia sesión de nuevo.",
+                            error = NexaStrings.get("session_expired", _uiState.value.language),
                             isThinking = false
                         )
                         logout()
@@ -699,6 +762,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(drawerOpen = false)
     }
 
+    fun setDrawerView(view: Int) {
+        _uiState.value = _uiState.value.copy(drawerView = view)
+    }
+
     // ═══════════════════════════════════════
     //  SETTINGS
     // ═══════════════════════════════════════
@@ -749,7 +816,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             val lines = message.content.split("\n")
             var y = 100f
             for (line in lines) {
-                // Simple text wrapping
                 val words = line.split(" ")
                 var currentLine = ""
                 for (word in words) {
@@ -767,7 +833,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     canvas.drawText(currentLine, 50f, y, paint)
                     y += 18f
                 }
-                y += 4f // line spacing
+                y += 4f
             }
 
             pdfDocument.finishPage(page)

@@ -83,9 +83,11 @@ fun NexaChatScreen(
     onDismissUpdate: () -> Unit,
     onOpenUpdatePage: () -> Unit,
     onCopyMessage: (String) -> Unit,
-    onExportMessage: (Message) -> Unit
+    onExportMessage: (Message) -> Unit,
+    onSurpriseMe: () -> Unit,
+    onSetDrawerView: (Int) -> Unit,
+    onAttachFile: () -> Unit
 ) {
-    // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
         UpdateDialog(
             updateInfo = uiState.updateInfo,
@@ -105,7 +107,8 @@ fun NexaChatScreen(
             onLogin = onLogin,
             onGoToRegister = onNavigateToRegister,
             onBack = onNavigateToChat,
-            isDarkTheme = uiState.isDarkTheme
+            isDarkTheme = uiState.isDarkTheme,
+            language = uiState.language
         )
         Screen.REGISTER -> RegisterScreen(
             name = uiState.registerName,
@@ -121,7 +124,8 @@ fun NexaChatScreen(
             onRegister = onRegister,
             onGoToLogin = onNavigateToLogin,
             onBack = onNavigateToChat,
-            isDarkTheme = uiState.isDarkTheme
+            isDarkTheme = uiState.isDarkTheme,
+            language = uiState.language
         )
         Screen.CHAT -> ChatMainScreen(
             uiState = uiState,
@@ -146,7 +150,10 @@ fun NexaChatScreen(
             onNavigateToLogin = onNavigateToLogin,
             onLogout = onLogout,
             onCopyMessage = onCopyMessage,
-            onExportMessage = onExportMessage
+            onExportMessage = onExportMessage,
+            onSurpriseMe = onSurpriseMe,
+            onSetDrawerView = onSetDrawerView,
+            onAttachFile = onAttachFile
         )
     }
 }
@@ -166,7 +173,8 @@ fun LoginScreen(
     onLogin: () -> Unit,
     onGoToRegister: () -> Unit,
     onBack: () -> Unit,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    language: AppLanguage
 ) {
     var showPassword by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -183,7 +191,6 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Back button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -193,7 +200,7 @@ fun LoginScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
+                        contentDescription = NexaStrings.get("back", language),
                         tint = if (isDarkTheme) Color.White else Color.Black
                     )
                 }
@@ -201,7 +208,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Logo
             Box(
                 modifier = Modifier
                     .size(72.dp)
@@ -215,7 +221,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(20.dp))
             Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
             Text(
-                "Inicia sesión",
+                NexaStrings.get("login_title", language),
                 fontSize = 14.sp,
                 color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666),
                 modifier = Modifier.padding(top = 4.dp)
@@ -223,11 +229,10 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Email
             OutlinedTextField(
                 value = email,
                 onValueChange = onEmailChange,
-                label = { Text("Email") },
+                label = { Text(NexaStrings.get("email", language)) },
                 placeholder = { Text("tu@email.com") },
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 singleLine = true,
@@ -246,18 +251,17 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Contraseña") },
+                label = { Text(NexaStrings.get("password", language)) },
                 placeholder = { Text("••••••••") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
                     IconButton(onClick = { showPassword = !showPassword }) {
                         Icon(
                             if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (showPassword) "Ocultar" else "Mostrar"
+                            contentDescription = null
                         )
                     }
                 },
@@ -280,7 +284,6 @@ fun LoginScreen(
                 )
             )
 
-            // Error
             if (error != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
@@ -299,7 +302,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Login button
             Button(
                 onClick = {
                     onLogin()
@@ -320,7 +322,7 @@ fun LoginScreen(
                     )
                 } else {
                     Text(
-                        "Iniciar sesión",
+                        NexaStrings.get("login", language),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
@@ -330,7 +332,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Divider
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -342,18 +343,17 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Register link
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "¿No tienes cuenta? ",
+                    NexaStrings.get("no_account", language) + " ",
                     fontSize = 14.sp,
                     color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666)
                 )
                 Text(
-                    "Regístrate",
+                    NexaStrings.get("register", language),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = NexaAccent,
@@ -385,7 +385,8 @@ fun RegisterScreen(
     onRegister: () -> Unit,
     onGoToLogin: () -> Unit,
     onBack: () -> Unit,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    language: AppLanguage
 ) {
     var showPassword by remember { mutableStateOf(false) }
     var showConfirm by remember { mutableStateOf(false) }
@@ -403,7 +404,6 @@ fun RegisterScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Back
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -413,7 +413,7 @@ fun RegisterScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
+                        contentDescription = NexaStrings.get("back", language),
                         tint = if (isDarkTheme) Color.White else Color.Black
                     )
                 }
@@ -434,7 +434,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(20.dp))
             Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
             Text(
-                "Crea tu cuenta",
+                NexaStrings.get("create_account", language),
                 fontSize = 14.sp,
                 color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666),
                 modifier = Modifier.padding(top = 4.dp)
@@ -442,12 +442,11 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Name
             OutlinedTextField(
                 value = name,
                 onValueChange = onNameChange,
-                label = { Text("Nombre") },
-                placeholder = { Text("Tu nombre") },
+                label = { Text(NexaStrings.get("name", language)) },
+                placeholder = { Text(NexaStrings.get("your_name", language)) },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -462,11 +461,10 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Email
             OutlinedTextField(
                 value = email,
                 onValueChange = onEmailChange,
-                label = { Text("Email") },
+                label = { Text(NexaStrings.get("email", language)) },
                 placeholder = { Text("tu@email.com") },
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 singleLine = true,
@@ -485,12 +483,11 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Password
             OutlinedTextField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Contraseña") },
-                placeholder = { Text("Mínimo 6 caracteres") },
+                label = { Text(NexaStrings.get("password", language)) },
+                placeholder = { Text(NexaStrings.get("min_6", language)) },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
                     IconButton(onClick = { showPassword = !showPassword }) {
@@ -517,12 +514,11 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Confirm password
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = onConfirmPasswordChange,
-                label = { Text("Confirmar contraseña") },
-                placeholder = { Text("Repite la contraseña") },
+                label = { Text(NexaStrings.get("confirm_password", language)) },
+                placeholder = { Text(NexaStrings.get("repeat_password", language)) },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
                     IconButton(onClick = { showConfirm = !showConfirm }) {
@@ -589,7 +585,7 @@ fun RegisterScreen(
                     )
                 } else {
                     Text(
-                        "Crear cuenta",
+                        NexaStrings.get("create_account_btn", language),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
@@ -604,12 +600,12 @@ fun RegisterScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "¿Ya tienes cuenta? ",
+                    NexaStrings.get("has_account", language) + " ",
                     fontSize = 14.sp,
                     color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666)
                 )
                 Text(
-                    "Inicia sesión",
+                    NexaStrings.get("login", language),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = NexaAccent,
@@ -651,7 +647,10 @@ fun ChatMainScreen(
     onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit,
     onCopyMessage: (String) -> Unit,
-    onExportMessage: (Message) -> Unit
+    onExportMessage: (Message) -> Unit,
+    onSurpriseMe: () -> Unit,
+    onSetDrawerView: (Int) -> Unit,
+    onAttachFile: () -> Unit
 ) {
     val drawerState = rememberDrawerState(
         initialValue = if (uiState.drawerOpen) DrawerValue.Open else DrawerValue.Closed
@@ -685,7 +684,8 @@ fun ChatMainScreen(
                 onSetVoiceType = onSetVoiceType,
                 onToggleTheme = onToggleTheme,
                 onToggleSettings = onToggleSettings,
-                onToggleAutoSpeak = onToggleAutoSpeak
+                onToggleAutoSpeak = onToggleAutoSpeak,
+                onSetDrawerView = onSetDrawerView
             )
         },
         gesturesEnabled = true
@@ -697,7 +697,8 @@ fun ChatMainScreen(
                     onToggleDrawer = onToggleDrawer,
                     onToggleAutoSpeak = onToggleAutoSpeak,
                     onStopSpeaking = onStopSpeaking,
-                    onClearChat = onClearChat
+                    onClearChat = onClearChat,
+                    onSurpriseMe = onSurpriseMe
                 )
             },
             containerColor = MaterialTheme.colorScheme.background
@@ -727,23 +728,22 @@ fun ChatMainScreen(
                     language = uiState.language,
                     isListening = uiState.isListening,
                     isSpeaking = uiState.isSpeaking,
+                    pendingAttachment = uiState.pendingAttachment,
                     onTextChange = onInputChange,
                     onSend = onSend,
                     onStartListening = onStartListening,
                     onStopListening = onStopListening,
-                    onStopSpeaking = onStopSpeaking
+                    onStopSpeaking = onStopSpeaking,
+                    onAttachFile = onAttachFile,
+                    onClearAttachment = { /* handled by parent */ }
                 )
             }
         }
     }
-
-    if (uiState.showSettings) {
-        // We will now handle settings inside the sidebar
-    }
 }
 
 // ═══════════════════════════════════════
-//  DRAWER
+//  DRAWER — Left sidebar with History + Settings
 // ═══════════════════════════════════════
 
 @Composable
@@ -759,19 +759,18 @@ fun DrawerContent(
     onSetVoiceType: (VoiceType) -> Unit,
     onToggleTheme: () -> Unit,
     onToggleSettings: () -> Unit,
-    onToggleAutoSpeak: () -> Unit
+    onToggleAutoSpeak: () -> Unit,
+    onSetDrawerView: (Int) -> Unit
 ) {
     val sessions = uiState.sessions
     val activeSessionId = uiState.activeSessionId
     val user = uiState.user
-    var showUserMenu by remember { mutableStateOf(false) }
-    var viewMode by remember { mutableStateOf(0) } // 0: History, 1: Settings
 
     ModalDrawerSheet(
         modifier = Modifier.width(300.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface
     ) {
-        // User section
+        // Header
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -807,9 +806,55 @@ fun DrawerContent(
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-        // Main Content Area
+        // Tab selector: History | Settings
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val lang = uiState.language
+            listOf(
+                Triple(0, Icons.Default.Chat, NexaStrings.get("history", lang)),
+                Triple(1, Icons.Default.Settings, NexaStrings.get("settings", lang))
+            ).forEach { (view, icon, label) ->
+                val selected = uiState.drawerView == view
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onSetDrawerView(view) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selected) NexaAccent.copy(alpha = 0.12f) else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+        // Content
         AnimatedContent(
-            targetState = viewMode,
+            targetState = uiState.drawerView,
             modifier = Modifier.weight(1f),
             transitionSpec = {
                 if (targetState > initialState) {
@@ -820,8 +865,9 @@ fun DrawerContent(
             }
         ) { mode ->
             if (mode == 0) {
+                // History view
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // New chat
+                    // New chat button
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -835,14 +881,13 @@ fun DrawerContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Nuevo", tint = NexaAccent, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = NexaAccent, modifier = Modifier.size(20.dp))
                             Text(NexaStrings.get("new_chat", uiState.language), color = NexaAccent, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Chat list
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 12.dp)
@@ -859,117 +904,22 @@ fun DrawerContent(
                     }
                 }
             } else {
-                // NEXA ULTRA SETTINGS VIEW
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text(
-                        "GENERAL",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NexaAccent.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                    
-                    UltraSettingRow(
-                        icon = Icons.Default.DarkMode,
-                        title = NexaStrings.get("theme", uiState.language)
-                    ) {
-                        // Segmented Theme Picker
-                        Row(
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .padding(2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            listOf(Icons.Default.LightMode, Icons.Default.DarkMode).forEach { icon ->
-                                val selected = if (icon == Icons.Default.DarkMode) uiState.isDarkTheme else !uiState.isDarkTheme
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (selected) NexaAccent else Color.Transparent)
-                                        .clickable { if (!selected) onToggleTheme() },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(icon, null, modifier = Modifier.size(14.dp), tint = if (selected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-
-                    UltraSettingRow(
-                        icon = Icons.Default.Language,
-                        title = NexaStrings.get("language", uiState.language),
-                        value = uiState.language.label,
-                        onClick = {
-                            val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
-                            onSetLanguage(next)
-                        }
-                    )
-
-                    UltraSettingRow(
-                        icon = if (uiState.voiceType == VoiceType.MALE_1 || uiState.voiceType == VoiceType.MALE_2) Icons.Default.Man else Icons.Default.Woman,
-                        title = NexaStrings.get("voice", uiState.language),
-                        value = NexaStrings.get(uiState.voiceType.name.lowercase(), uiState.language),
-                        onClick = {
-                            // Cycle through 4 voices
-                            val voices = VoiceType.entries.toList()
-                            val nextIndex = (voices.indexOf(uiState.voiceType) + 1) % voices.size
-                            onSetVoiceType(voices[nextIndex])
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "INTERFAZ",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NexaAccent.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-
-                    UltraSettingRow(
-                        icon = Icons.Default.VolumeUp,
-                        title = NexaStrings.get("auto_speak", uiState.language)
-                    ) {
-                        Switch(
-                            checked = uiState.autoSpeak,
-                            onCheckedChange = { onToggleAutoSpeak() },
-                            colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
-                            modifier = Modifier.scale(0.7f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "CUENTA",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NexaAccent.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-
-                    UltraSettingRow(
-                        icon = if (user.isLoggedIn) Icons.Default.Person else Icons.Default.PersonOutline,
-                        title = if (user.isLoggedIn) user.email else NexaStrings.get("login", uiState.language),
-                        value = if (user.isLoggedIn) NexaStrings.get("logout", uiState.language) else null,
-                        onClick = {
-                            if (user.isLoggedIn) onLogout() else onNavigateToLogin()
-                        }
-                    )
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
+                // Settings view
+                SettingsPanel(
+                    uiState = uiState,
+                    onSetLanguage = onSetLanguage,
+                    onSetVoiceType = onSetVoiceType,
+                    onToggleTheme = onToggleTheme,
+                    onToggleAutoSpeak = onToggleAutoSpeak,
+                    onNavigateToLogin = onNavigateToLogin,
+                    onLogout = onLogout
+                )
             }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-        
-        // Footer Row
+
+        // Footer
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -977,13 +927,6 @@ fun DrawerContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { viewMode = if (viewMode == 0) 1 else 0 }) {
-                Icon(
-                    if (viewMode == 0) Icons.Default.Settings else Icons.Default.History,
-                    contentDescription = null,
-                    tint = if (viewMode == 1) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
             Text(
                 "NEXA PRO v2.1",
                 fontSize = 10.sp,
@@ -995,7 +938,6 @@ fun DrawerContent(
             }
         }
 
-        // Version
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1003,7 +945,7 @@ fun DrawerContent(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "NEXA PRO v2.1 • ${sessions.size} chats",
+                "${sessions.size} ${NexaStrings.get("chats", uiState.language)}",
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
@@ -1011,31 +953,169 @@ fun DrawerContent(
     }
 }
 
+// ═══════════════════════════════════════
+//  SETTINGS PANEL (inside drawer)
+// ═══════════════════════════════════════
+
 @Composable
-fun DrawerSettingItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+fun SettingsPanel(
+    uiState: NexaUiState,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val lang = uiState.language
+    val user = uiState.user
+
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp, horizontal = 4.dp)
-            .width(56.dp)
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        Icon(
-            icon, 
-            contentDescription = label, 
-            modifier = Modifier.size(18.dp), 
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(4.dp))
+        // GENERAL section
         Text(
-            label, 
-            fontSize = 8.sp, 
-            color = MaterialTheme.colorScheme.onSurfaceVariant, 
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 1
+            NexaStrings.get("general", lang),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = NexaAccent.copy(alpha = 0.6f),
+            modifier = Modifier.padding(vertical = 12.dp)
         )
+
+        // Theme
+        UltraSettingRow(
+            icon = Icons.Default.DarkMode,
+            title = NexaStrings.get("theme", lang)
+        ) {
+            Row(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(Icons.Default.LightMode, Icons.Default.DarkMode).forEach { icon ->
+                    val selected = if (icon == Icons.Default.DarkMode) uiState.isDarkTheme else !uiState.isDarkTheme
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (selected) NexaAccent else Color.Transparent)
+                            .clickable { if (!selected) onToggleTheme() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, null, modifier = Modifier.size(14.dp), tint = if (selected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Language
+        UltraSettingRow(
+            icon = Icons.Default.Language,
+            title = NexaStrings.get("language", lang),
+            value = uiState.language.label,
+            onClick = {
+                val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
+                onSetLanguage(next)
+            }
+        )
+
+        // Voice (6 options)
+        UltraSettingRow(
+            icon = if (uiState.voiceType == VoiceType.MALE_1 || uiState.voiceType == VoiceType.MALE_2 || uiState.voiceType == VoiceType.MALE_3) Icons.Default.Man else Icons.Default.Woman,
+            title = NexaStrings.get("voice", lang),
+            value = NexaStrings.get(uiState.voiceType.name.lowercase(), lang),
+            onClick = {
+                val voices = VoiceType.entries.toList()
+                val nextIndex = (voices.indexOf(uiState.voiceType) + 1) % voices.size
+                onSetVoiceType(voices[nextIndex])
+            }
+        )
+
+        // Voice type selector grid (6 voices)
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.height(90.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(VoiceType.entries.toList()) { voice ->
+                val isMale = voice == VoiceType.MALE_1 || voice == VoiceType.MALE_2 || voice == VoiceType.MALE_3
+                val selected = uiState.voiceType == voice
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onSetVoiceType(voice) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selected) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    border = if (selected) BorderStroke(1.dp, NexaAccent) else null
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(if (isMale) "👨" else "👩", fontSize = 14.sp)
+                        Text(
+                            NexaStrings.get(voice.name.lowercase(), lang),
+                            fontSize = 9.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // INTERFAZ section
+        Text(
+            NexaStrings.get("interface_section", lang),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = NexaAccent.copy(alpha = 0.6f),
+            modifier = Modifier.padding(vertical = 12.dp)
+        )
+
+        // Auto speak
+        UltraSettingRow(
+            icon = if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+            title = NexaStrings.get("auto_speak", lang)
+        ) {
+            Switch(
+                checked = uiState.autoSpeak,
+                onCheckedChange = { onToggleAutoSpeak() },
+                colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
+                modifier = Modifier.scale(0.7f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // CUENTA section
+        Text(
+            NexaStrings.get("account_section", lang),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = NexaAccent.copy(alpha = 0.6f),
+            modifier = Modifier.padding(vertical = 12.dp)
+        )
+
+        UltraSettingRow(
+            icon = if (user.isLoggedIn) Icons.Default.Person else Icons.Default.PersonOutline,
+            title = if (user.isLoggedIn) user.email else NexaStrings.get("login", lang),
+            value = if (user.isLoggedIn) NexaStrings.get("logout", lang) else null,
+            onClick = {
+                if (user.isLoggedIn) onLogout() else onNavigateToLogin()
+            }
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -1093,7 +1173,7 @@ fun ChatSessionItem(
                 ) {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "Opciones",
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1103,7 +1183,7 @@ fun ChatSessionItem(
                     onDismissRequest = { showMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("🗑️ Borrar chat") },
+                        text = { Text("🗑️ ${NexaStrings.get("delete_chat", language)}") },
                         onClick = {
                             showMenu = false
                             onDelete()
@@ -1126,7 +1206,8 @@ fun ChatTopBar(
     onToggleDrawer: () -> Unit,
     onToggleAutoSpeak: () -> Unit,
     onStopSpeaking: () -> Unit,
-    onClearChat: () -> Unit
+    onClearChat: () -> Unit,
+    onSurpriseMe: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -1157,24 +1238,32 @@ fun ChatTopBar(
         },
         navigationIcon = {
             IconButton(onClick = onToggleDrawer) {
-                Icon(Icons.Default.Menu, contentDescription = "Menú", tint = MaterialTheme.colorScheme.onSurface)
+                Icon(Icons.Default.Menu, contentDescription = NexaStrings.get("menu", uiState.language), tint = MaterialTheme.colorScheme.onSurface)
             }
         },
         actions = {
+            // Surprise me button
+            IconButton(onClick = onSurpriseMe) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = NexaStrings.get("surprise_me", uiState.language),
+                    tint = NexaAccent
+                )
+            }
             IconButton(onClick = onToggleAutoSpeak) {
                 Icon(
                     if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                    contentDescription = if (uiState.autoSpeak) "Desactivar voz" else "Activar voz",
+                    contentDescription = if (uiState.autoSpeak) NexaStrings.get("disable_voice", uiState.language) else NexaStrings.get("enable_voice", uiState.language),
                     tint = if (uiState.autoSpeak) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (uiState.isSpeaking) {
                 IconButton(onClick = onStopSpeaking) {
-                    Icon(Icons.Default.StopCircle, contentDescription = "Detener", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.StopCircle, contentDescription = NexaStrings.get("stop", uiState.language), tint = MaterialTheme.colorScheme.error)
                 }
             }
             IconButton(onClick = onClearChat) {
-                Icon(Icons.Default.DeleteOutline, contentDescription = "Limpiar chat")
+                Icon(Icons.Default.DeleteOutline, contentDescription = NexaStrings.get("clear_chat", uiState.language))
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -1194,7 +1283,7 @@ fun ErrorBanner(error: String, onDismiss: () -> Unit) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("❌ $error", color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.weight(1f))
             IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -1237,6 +1326,7 @@ fun ChatMessages(
             MessageBubble(
                 message = msg,
                 isSpeaking = speakingMessageId == msg.id,
+                language = language,
                 onSpeak = { onSpeakMessage(msg.content, msg.id) },
                 onCopy = { onCopyMessage(msg.content) },
                 onExport = { onExportMessage(msg) }
@@ -1275,6 +1365,7 @@ fun EmptyState(lang: AppLanguage) {
 fun MessageBubble(
     message: Message,
     isSpeaking: Boolean,
+    language: AppLanguage,
     onSpeak: () -> Unit,
     onCopy: () -> Unit,
     onExport: () -> Unit
@@ -1301,7 +1392,30 @@ fun MessageBubble(
             shadowElevation = if (!isUser) 2.dp else 0.dp
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                if (message.isStreaming && message.content.isEmpty()) {
+                if (message.attachmentName != null && message.content.startsWith("📎")) {
+                    // Attachment indicator
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Attachment, null, modifier = Modifier.size(14.dp), tint = NexaAccent)
+                        Text(
+                            message.attachmentName,
+                            fontSize = 12.sp,
+                            color = NexaAccent,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    if (message.content.length > message.attachmentName.length + 3) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            message.content.removePrefix("📎 ${message.attachmentName}\n"),
+                            fontSize = 15.sp,
+                            lineHeight = 24.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()
                 } else {
                     Text(
@@ -1320,33 +1434,30 @@ fun MessageBubble(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Speaker Button
                 IconButton(onClick = onSpeak, modifier = Modifier.size(28.dp)) {
                     Icon(
                         if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
-                        contentDescription = if (isSpeaking) "Detener" else "Leer",
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Copy Button
                 IconButton(onClick = onCopy, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.ContentCopy,
-                        contentDescription = "Copiar",
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Three Dots Menu
                 var showMsgMenu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { showMsgMenu = true }, modifier = Modifier.size(28.dp)) {
                         Icon(
                             Icons.Default.MoreHoriz,
-                            contentDescription = "Más opciones",
+                            contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1358,9 +1469,9 @@ fun MessageBubble(
                         DropdownMenuItem(
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
-                                Text("Export to PDF")
+                                Text(NexaStrings.get("export_pdf", language))
                             }},
-                            onClick = { 
+                            onClick = {
                                 showMsgMenu = false
                                 onExport()
                             }
@@ -1368,9 +1479,9 @@ fun MessageBubble(
                         DropdownMenuItem(
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(18.dp))
-                                Text("Read aloud")
+                                Text(NexaStrings.get("read_aloud", language))
                             }},
-                            onClick = { 
+                            onClick = {
                                 showMsgMenu = false
                                 onSpeak()
                             }
@@ -1406,7 +1517,7 @@ fun DotsTyping() {
 }
 
 // ═══════════════════════════════════════
-//  INPUT BAR
+//  INPUT BAR — Cross left | Text center | Mic+Send right
 // ═══════════════════════════════════════
 
 @Composable
@@ -1415,11 +1526,14 @@ fun InputBar(
     language: AppLanguage,
     isListening: Boolean,
     isSpeaking: Boolean,
+    pendingAttachment: String?,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
-    onStopSpeaking: () -> Unit
+    onStopSpeaking: () -> Unit,
+    onAttachFile: () -> Unit,
+    onClearAttachment: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var showMenu by remember { mutableStateOf(false) }
@@ -1432,6 +1546,35 @@ fun InputBar(
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            // Attachment preview
+            if (pendingAttachment != null) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = NexaAccent.copy(alpha = 0.08f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Attachment, null, modifier = Modifier.size(16.dp), tint = NexaAccent)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            pendingAttachment,
+                            fontSize = 12.sp,
+                            color = NexaAccent,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(onClick = onClearAttachment, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
             Surface(
                 shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -1443,7 +1586,7 @@ fun InputBar(
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Cross/X button with menu
+                    // Left: Cross menu button
                     Box {
                         IconButton(
                             onClick = { showMenu = true },
@@ -1454,7 +1597,7 @@ fun InputBar(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Menú",
+                                contentDescription = NexaStrings.get("menu", language),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -1467,25 +1610,36 @@ fun InputBar(
                         ) {
                             DropdownMenuItem(
                                 text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🧹", fontSize = 18.sp)
-                                    Text(NexaStrings.get("clear_chat", language), fontSize = 14.sp)
+                                    Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = NexaAccent)
+                                    Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp)
                                 }},
                                 onClick = {
                                     showMenu = false
+                                    onAttachFile()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(20.dp), tint = NexaAccent)
+                                    Text(NexaStrings.get("upload_pdf", language), fontSize = 14.sp)
+                                }},
+                                onClick = {
+                                    showMenu = false
+                                    onAttachFile()
                                 }
                             )
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                             DropdownMenuItem(
                                 text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("⚙️", fontSize = 18.sp)
-                                    Text(NexaStrings.get("settings", language), fontSize = 14.sp)
+                                    Text("🧹", fontSize = 18.sp)
+                                    Text(NexaStrings.get("clear_chat", language), fontSize = 14.sp)
                                 }},
                                 onClick = { showMenu = false }
                             )
                         }
                     }
 
-                    // Text input
+                    // Center: Text input
                     TextField(
                         value = text,
                         onValueChange = onTextChange,
@@ -1515,7 +1669,7 @@ fun InputBar(
                         textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
                     )
 
-                    // Mic button
+                    // Right: Mic + Send
                     IconButton(
                         onClick = { if (isListening) onStopListening() else onStartListening() },
                         modifier = Modifier
@@ -1528,13 +1682,12 @@ fun InputBar(
                     ) {
                         Icon(
                             if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                            contentDescription = if (isListening) "Detener" else "Hablar",
+                            contentDescription = null,
                             tint = if (isListening) MaterialTheme.colorScheme.error else NexaAccent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    // Stop TTS
                     if (isSpeaking) {
                         IconButton(
                             onClick = onStopSpeaking,
@@ -1545,32 +1698,31 @@ fun InputBar(
                         ) {
                             Icon(
                                 Icons.Default.StopCircle,
-                                contentDescription = "Detener lectura",
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
-                    // Send button
                     IconButton(
                         onClick = {
                             onSend()
                             keyboardController?.hide()
                         },
-                        enabled = text.isNotBlank(),
+                        enabled = text.isNotBlank() || pendingAttachment != null,
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(
-                                if (text.isNotBlank()) NexaAccent
+                                if (text.isNotBlank() || pendingAttachment != null) NexaAccent
                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
                             )
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Enviar",
-                            tint = if (text.isNotBlank()) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                            contentDescription = NexaStrings.get("send", language),
+                            tint = if (text.isNotBlank() || pendingAttachment != null) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1591,180 +1743,6 @@ fun InputBar(
                 )
             }
         }
-    }
-}
-
-
-// ═══════════════════════════════════════
-//  SETTINGS SHEET
-// ═══════════════════════════════════════
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsSheet(
-    uiState: NexaUiState,
-    onDismiss: () -> Unit,
-    onSetLanguage: (AppLanguage) -> Unit,
-    onSetVoiceType: (VoiceType) -> Unit,
-    onToggleTheme: () -> Unit,
-    onToggleAutoSpeak: () -> Unit
-) {
-    val lang = uiState.language
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            Text("⚙️ ${NexaStrings.get("settings", lang)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 16.dp))
-
-            // Row 1: Theme & Language (Compact)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CompactSettingCard(
-                    modifier = Modifier.weight(1f),
-                    title = NexaStrings.get("theme", lang),
-                    icon = if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode
-                ) {
-                    Switch(
-                        checked = uiState.isDarkTheme,
-                        onCheckedChange = { onToggleTheme() },
-                        colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
-                        modifier = Modifier.scale(0.8f)
-                    )
-                }
-                CompactSettingCard(
-                    modifier = Modifier.weight(1f),
-                    title = NexaStrings.get("language", lang),
-                    icon = Icons.Default.Language
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        AppLanguage.entries.forEach { l ->
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onSetLanguage(l) },
-                                color = if (uiState.language == l) NexaAccent.copy(alpha = 0.2f) else Color.Transparent,
-                                border = if (uiState.language == l) BorderStroke(1.dp, NexaAccent) else null
-                            ) {
-                                Text(
-                                    l.code.uppercase(),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (uiState.language == l) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Row 2: Voice Selection (4 Voices Grid)
-            Text(NexaStrings.get("voice", lang), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier.height(120.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(VoiceType.entries.toList()) { voice ->
-                    val isMale = voice == VoiceType.MALE_1 || voice == VoiceType.MALE_2
-                    val labelKey = voice.name.lowercase()
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onSetVoiceType(voice) },
-                        color = if (uiState.voiceType == voice) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        border = if (uiState.voiceType == voice) BorderStroke(1.5.dp, NexaAccent) else null
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
-                            Text(
-                                NexaStrings.get(labelKey, lang),
-                                fontSize = 11.sp,
-                                fontWeight = if (uiState.voiceType == voice) FontWeight.Bold else FontWeight.Normal,
-                                color = if (uiState.voiceType == voice) NexaAccent else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Row 3: Auto Speak
-            CompactSettingCard(
-                modifier = Modifier.fillMaxWidth(),
-                title = NexaStrings.get("auto_speak", lang),
-                subtitle = if (uiState.autoSpeak) NexaStrings.get("auto_speak_desc", lang) else NexaStrings.get("text_only", lang),
-                icon = if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff
-            ) {
-                Switch(
-                    checked = uiState.autoSpeak,
-                    onCheckedChange = { onToggleAutoSpeak() },
-                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
-                    modifier = Modifier.scale(0.8f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
-}
-
-@Composable
-fun CompactSettingCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    subtitle: String? = null,
-    icon: ImageVector,
-    content: @Composable () -> Unit
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = NexaAccent)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                if (subtitle != null) {
-                    Text(subtitle, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            content()
-        }
-    }
-}
-
-@Composable
-fun SettingRow(title: String, subtitle: String, content: @Composable () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        content()
     }
 }
 
@@ -1834,80 +1812,150 @@ fun UpdateDialog(
 object NexaStrings {
     fun get(key: String, lang: AppLanguage): String {
         return when (lang) {
-            AppLanguage.SPANISH -> when (key) {
-                "new_chat" -> "Nuevo chat"
-                "settings" -> "Ajustes"
-                "language" -> "Idioma"
-                "voice" -> "Voz"
-                "theme" -> "Tema"
-                "dark" -> "Oscuro"
-                "light" -> "Claro"
-                "male_1" -> "Hombre 1"
-                "male_2" -> "Hombre 2"
-                "female_1" -> "Mujer 1"
-                "female_2" -> "Mujer 2"
-                "login" -> "Iniciar sesión"
-                "logout" -> "Cerrar sesión"
-                "register" -> "Registrarse"
-                "email" -> "Email"
-                "password" -> "Contraseña"
-                "thinking" -> "pensando..."
-                "input_hint" -> "Escribe un mensaje..."
-                "listening" -> "🎙️ Escuchando..."
-                "mic_hint" -> "🎙️ hablar • ↵ enviar"
-                "messages_count" -> "mensajes"
-                "delete_chat" -> "Borrar chat"
-                "auto_speak" -> "Lectura automática"
-                "auto_speak_desc" -> "NEXA habla las respuestas"
-                "text_only" -> "Solo texto"
-                "welcome_msg" -> "Toca el micrófono y habla,\no escribe tu mensaje."
-                "clear_chat" -> "Limpiar chat"
-                "attach" -> "Adjuntar archivo"
-                "send_img" -> "Enviar imagen"
-                "back" -> "Volver"
-                "update_available" -> "Actualización disponible"
-                "update_now" -> "Actualizar"
-                "later" -> "Después"
-                else -> key
-            }
-            AppLanguage.ENGLISH -> when (key) {
-                "new_chat" -> "New Chat"
-                "settings" -> "Settings"
-                "language" -> "Language"
-                "voice" -> "Voice"
-                "theme" -> "Theme"
-                "dark" -> "Dark"
-                "light" -> "Light"
-                "male_1" -> "Male 1"
-                "male_2" -> "Male 2"
-                "female_1" -> "Female 1"
-                "female_2" -> "Female 2"
-                "login" -> "Login"
-                "logout" -> "Logout"
-                "register" -> "Register"
-                "email" -> "Email"
-                "password" -> "Password"
-                "thinking" -> "thinking..."
-                "input_hint" -> "Type a message..."
-                "listening" -> "🎙️ Listening..."
-                "mic_hint" -> "🎙️ speak • ↵ send"
-                "messages_count" -> "messages"
-                "delete_chat" -> "Delete chat"
-                "auto_speak" -> "Auto-speak"
-                "auto_speak_desc" -> "NEXA speaks responses"
-                "text_only" -> "Text only"
-                "welcome_msg" -> "Tap the mic and speak,\nor type your message."
-                "clear_chat" -> "Clear chat"
-                "attach" -> "Attach file"
-                "send_img" -> "Send image"
-                "back" -> "Back"
-                "update_available" -> "Update Available"
-                "update_now" -> "Update"
-                "later" -> "Later"
-                else -> key
-            }
+            AppLanguage.SPANISH -> spanish[key] ?: key
+            AppLanguage.ENGLISH -> english[key] ?: key
         }
     }
+
+    private val spanish = mapOf(
+        "new_chat" to "Nuevo chat",
+        "settings" to "Ajustes",
+        "language" to "Idioma",
+        "voice" to "Voz",
+        "theme" to "Tema",
+        "dark" to "Oscuro",
+        "light" to "Claro",
+        "male_1" to "Hombre 1",
+        "male_2" to "Hombre 2",
+        "male_3" to "Hombre 3",
+        "female_1" to "Mujer 1",
+        "female_2" to "Mujer 2",
+        "female_3" to "Mujer 3",
+        "login" to "Iniciar sesión",
+        "logout" to "Cerrar sesión",
+        "register" to "Registrarse",
+        "email" to "Email",
+        "password" to "Contraseña",
+        "thinking" to "pensando...",
+        "input_hint" to "Escribe un mensaje...",
+        "listening" to "🎙️ Escuchando...",
+        "mic_hint" to "🎙️ hablar • ↵ enviar",
+        "messages_count" to "mensajes",
+        "delete_chat" to "Borrar chat",
+        "auto_speak" to "Lectura automática",
+        "auto_speak_desc" to "NEXA habla las respuestas",
+        "text_only" to "Solo texto",
+        "welcome_msg" to "Toca el micrófono y habla,\no escribe tu mensaje.",
+        "clear_chat" to "Limpiar chat",
+        "attach" to "Adjuntar archivo",
+        "send_img" to "Enviar imagen",
+        "back" to "Volver",
+        "update_available" to "Actualización disponible",
+        "update_now" to "Actualizar",
+        "later" to "Después",
+        "menu" to "Menú",
+        "surprise_me" to "Sorpréndeme",
+        "disable_voice" to "Desactivar voz",
+        "enable_voice" to "Activar voz",
+        "stop" to "Detener",
+        "history" to "Historial",
+        "chats" to "chats",
+        "general" to "GENERAL",
+        "interface_section" to "INTERFAZ",
+        "account_section" to "CUENTA",
+        "upload_photo" to "Subir foto",
+        "upload_pdf" to "Subir PDF",
+        "send" to "Enviar",
+        "export_pdf" to "Exportar PDF",
+        "read_aloud" to "Leer en voz alta",
+        "login_title" to "Inicia sesión",
+        "create_account" to "Crea tu cuenta",
+        "no_account" to "¿No tienes cuenta?",
+        "has_account" to "¿Ya tienes cuenta?",
+        "create_account_btn" to "Crear cuenta",
+        "name" to "Nombre",
+        "your_name" to "Tu nombre",
+        "min_6" to "Mínimo 6 caracteres",
+        "confirm_password" to "Confirmar contraseña",
+        "repeat_password" to "Repite la contraseña",
+        "fill_all" to "Completa todos los campos",
+        "invalid_email" to "Email no válido",
+        "min_chars" to "Mínimo 6 caracteres",
+        "passwords_no_match" to "Las contraseñas no coinciden",
+        "email_taken" to "Este email ya está registrado",
+        "session_expired" to "Sesión expirada. Inicia sesión de nuevo.",
+        "voice_unavailable" to "Reconocimiento de voz no disponible"
+    )
+
+    private val english = mapOf(
+        "new_chat" to "New Chat",
+        "settings" to "Settings",
+        "language" to "Language",
+        "voice" to "Voice",
+        "theme" to "Theme",
+        "dark" to "Dark",
+        "light" to "Light",
+        "male_1" to "Male 1",
+        "male_2" to "Male 2",
+        "male_3" to "Male 3",
+        "female_1" to "Female 1",
+        "female_2" to "Female 2",
+        "female_3" to "Female 3",
+        "login" to "Login",
+        "logout" to "Logout",
+        "register" to "Register",
+        "email" to "Email",
+        "password" to "Password",
+        "thinking" to "thinking...",
+        "input_hint" to "Type a message...",
+        "listening" to "🎙️ Listening...",
+        "mic_hint" to "🎙️ speak • ↵ send",
+        "messages_count" to "messages",
+        "delete_chat" to "Delete chat",
+        "auto_speak" to "Auto-speak",
+        "auto_speak_desc" to "NEXA speaks responses",
+        "text_only" to "Text only",
+        "welcome_msg" to "Tap the mic and speak,\nor type your message.",
+        "clear_chat" to "Clear chat",
+        "attach" to "Attach file",
+        "send_img" to "Send image",
+        "back" to "Back",
+        "update_available" to "Update Available",
+        "update_now" to "Update",
+        "later" to "Later",
+        "menu" to "Menu",
+        "surprise_me" to "Surprise me",
+        "disable_voice" to "Disable voice",
+        "enable_voice" to "Enable voice",
+        "stop" to "Stop",
+        "history" to "History",
+        "chats" to "chats",
+        "general" to "GENERAL",
+        "interface_section" to "INTERFACE",
+        "account_section" to "ACCOUNT",
+        "upload_photo" to "Upload photo",
+        "upload_pdf" to "Upload PDF",
+        "send" to "Send",
+        "export_pdf" to "Export PDF",
+        "read_aloud" to "Read aloud",
+        "login_title" to "Sign in",
+        "create_account" to "Create account",
+        "no_account" to "Don't have an account?",
+        "has_account" to "Already have an account?",
+        "create_account_btn" to "Create account",
+        "name" to "Name",
+        "your_name" to "Your name",
+        "min_6" to "Minimum 6 characters",
+        "confirm_password" to "Confirm password",
+        "repeat_password" to "Repeat password",
+        "fill_all" to "Fill in all fields",
+        "invalid_email" to "Invalid email",
+        "min_chars" to "Minimum 6 characters",
+        "passwords_no_match" to "Passwords don't match",
+        "email_taken" to "This email is already registered",
+        "session_expired" to "Session expired. Please sign in again.",
+        "voice_unavailable" to "Voice recognition not available"
+    )
 }
 
 @Composable
