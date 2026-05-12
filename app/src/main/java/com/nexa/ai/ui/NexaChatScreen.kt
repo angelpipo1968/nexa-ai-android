@@ -1332,22 +1332,20 @@ fun ChatMessages(
 
 @Composable
 fun EmptyState(lang: AppLanguage) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 60.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxHeight()
+            .padding(bottom = 80.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text("🧬", fontSize = 56.sp)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
             NexaStrings.get("welcome_msg", lang),
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 15.sp,
+            color = Color(0xFF3A3A3A),
             textAlign = TextAlign.Center,
-            lineHeight = 22.sp
+            lineHeight = 24.sp,
+            fontWeight = FontWeight.Light
         )
     }
 }
