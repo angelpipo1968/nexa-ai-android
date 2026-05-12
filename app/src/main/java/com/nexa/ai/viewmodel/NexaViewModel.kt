@@ -11,14 +11,11 @@ import android.speech.tts.UtteranceProgressListener
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
-import com.nexa.ai.data.ChatMessage
-import com.nexa.ai.data.NexaRepository
-import com.nexa.ai.data.StreamEvent
-import com.nexa.ai.data.UpdateChecker
-import com.nexa.ai.data.UpdateInfo
+import com.nexa.ai.data.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.UUID
@@ -104,17 +101,78 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = NexaRepository()
     private val updateChecker = UpdateChecker()
+    private val sessionStore = SessionStore(application)
+    private val userStore = UserStore(application)
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
-    // Simulated user storage (replace with real backend later)
-    private val userDatabase = mutableMapOf<String, Pair<String, String>>() // email -> (name, password)
-
     init {
         initTTS()
-        createNewSession()
-        checkForUpdates()
+        restoreState()
+    }
+
+    // ═══════════════════════════════════════
+    //  STATE PERSISTENCE
+    // ═══════════════════════════════════════
+
+    private fun restoreState() {
+        viewModelScope.launch {
+            // Restore user session
+            val savedUser = userStore.currentUser.first()
+            if (savedUser != null) {
+                _uiState.value = _uiState.value.copy(
+                    user = UserData(
+                        email = savedUser.email,
+                        displayName = savedUser.displayName,
+                        isLoggedIn = true
+                    )
+                )
+            }
+
+            // Restore chat sessions
+            val savedSessions = sessionStore.sessions.first()
+            val savedActiveId = sessionStore.activeSessionId.first()
+
+            if (savedSessions.isNotEmpty()) {
+                val sessions = savedSessions.map { ps ->
+                    ChatSession(
+                        id = ps.id,
+                        title = ps.title,
+                        messages = ps.messages.map { pm ->
+                            Message(id = pm.id, role = pm.role, content = pm.content)
+                        },
+                        createdAt = ps.createdAt,
+                        updatedAt = ps.updatedAt
+                    )
+                }
+                _uiState.value = _uiState.value.copy(
+                    sessions = sessions,
+                    activeSessionId = savedActiveId ?: sessions.firstOrNull()?.id
+                )
+            } else {
+                createNewSession()
+            }
+
+            checkForUpdates()
+        }
+    }
+
+    private fun persistSessions() {
+        viewModelScope.launch {
+            val sessions = _uiState.value.sessions.map { s ->
+                PersistedSession(
+                    id = s.id,
+                    title = s.title,
+                    messages = s.messages.map { m ->
+                        PersistedMessage(id = m.id, role = m.role, content = m.content)
+                    },
+                    createdAt = s.createdAt,
+                    updatedAt = s.updatedAt
+                )
+            }
+            sessionStore.save(sessions, _uiState.value.activeSessionId)
+        }
     }
 
     // ═══════════════════════════════════════
@@ -147,7 +205,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ═══════════════════════════════════════
-    //  LOGIN / REGISTER
+    //  LOGIN / REGISTER (PERSISTENT)
     // ═══════════════════════════════════════
 
     fun navigateToLogin() {
@@ -214,28 +272,22 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.value = _uiState.value.copy(isLoggingIn = true, loginError = null)
 
-        // Simulate network delay
         viewModelScope.launch {
-            kotlinx.coroutines.delay(800)
+            kotlinx.coroutines.delay(600)
 
-            val stored = userDatabase[email]
-            if (stored != null && stored.second == password) {
+            try {
+                val displayName = userStore.loginOrAutoRegister(email, password)
+                val user = UserData(email = email, displayName = displayName, isLoggedIn = true)
+                userStore.saveUser(PersistedUser(email, displayName))
+
                 _uiState.value = _uiState.value.copy(
-                    user = UserData(email = email, displayName = stored.first, isLoggedIn = true),
+                    user = user,
                     currentScreen = Screen.CHAT,
                     isLoggingIn = false
                 )
-            } else if (stored != null) {
+            } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    loginError = "Contraseña incorrecta",
-                    isLoggingIn = false
-                )
-            } else {
-                // Auto-register on first login attempt
-                userDatabase[email] = Pair(email.substringBefore("@"), password)
-                _uiState.value = _uiState.value.copy(
-                    user = UserData(email = email, displayName = email.substringBefore("@"), isLoggedIn = true),
-                    currentScreen = Screen.CHAT,
+                    loginError = "Error: ${e.message}",
                     isLoggingIn = false
                 )
             }
@@ -271,18 +323,28 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(isRegistering = true, registerError = null)
 
         viewModelScope.launch {
-            kotlinx.coroutines.delay(800)
+            kotlinx.coroutines.delay(600)
 
-            if (userDatabase.containsKey(email)) {
+            try {
+                val success = userStore.register(name, email, password)
+                if (success) {
+                    val user = UserData(email = email, displayName = name, isLoggedIn = true)
+                    userStore.saveUser(PersistedUser(email, name))
+
+                    _uiState.value = _uiState.value.copy(
+                        user = user,
+                        currentScreen = Screen.CHAT,
+                        isRegistering = false
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        registerError = "Este email ya está registrado",
+                        isRegistering = false
+                    )
+                }
+            } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    registerError = "Este email ya está registrado",
-                    isRegistering = false
-                )
-            } else {
-                userDatabase[email] = Pair(name, password)
-                _uiState.value = _uiState.value.copy(
-                    user = UserData(email = email, displayName = name, isLoggedIn = true),
-                    currentScreen = Screen.CHAT,
+                    registerError = "Error: ${e.message}",
                     isRegistering = false
                 )
             }
@@ -291,6 +353,9 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         stopSpeaking()
+        viewModelScope.launch {
+            userStore.clearUser()
+        }
         _uiState.value = _uiState.value.copy(
             user = UserData(),
             currentScreen = Screen.CHAT,
@@ -339,15 +404,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val voiceType = _uiState.value.voiceType
         val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2
         val isSecond = voiceType == VoiceType.MALE_2 || voiceType == VoiceType.FEMALE_2
-        
+
         val genderTag = if (isMale) "male" else "female"
-        
-        // Filter by gender if possible
         val genderVoices = voices.filter { it.name.lowercase().contains(genderTag) }
-        
         val candidates = if (genderVoices.isNotEmpty()) genderVoices else voices
-        
-        // Pick the 1st or 2nd available candidate
+
         val selectedVoice = if (isSecond && candidates.size > 1) {
             candidates[1]
         } else {
@@ -462,7 +523,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ═══════════════════════════════════════
-    //  SESSION MANAGEMENT
+    //  SESSION MANAGEMENT (PERSISTENT)
     // ═══════════════════════════════════════
 
     fun createNewSession() {
@@ -472,6 +533,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             activeSessionId = session.id,
             drawerOpen = false
         )
+        persistSessions()
     }
 
     fun switchSession(sessionId: String) {
@@ -481,6 +543,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             drawerOpen = false,
             error = null
         )
+        persistSessions()
     }
 
     fun deleteSession(sessionId: String) {
@@ -498,6 +561,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
         if (updated.isEmpty()) {
             createNewSession()
+        } else {
+            persistSessions()
         }
     }
 
@@ -507,6 +572,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         if (idx >= 0) {
             sessions[idx] = transform(sessions[idx])
             _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessions()
         }
     }
 
@@ -641,66 +707,74 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun copyToClipboard(text: String) {
         val context = getApplication<Application>()
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("Nexa Message", text)
+        val clip = android.content.ClipData.newPlainText("NEXA PRO", text)
         clipboard.setPrimaryClip(clip)
-        
-        // Show confirmation toast
-        android.widget.Toast.makeText(context, "Copiado al portapapeles", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, "Copiado ✓", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     fun exportToPdf(message: Message) {
         val context = getApplication<Application>()
-        
+
         try {
-            // Create a PDF document
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
+            val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
             val page = pdfDocument.startPage(pageInfo)
             val canvas = page.canvas
             val paint = android.graphics.Paint()
-            
-            // Draw title
+
             paint.textSize = 18f
             paint.isFakeBoldText = true
-            canvas.drawText("NEXA PRO - Chat Export", 50f, 50f, paint)
-            
-            // Draw content
+            canvas.drawText("NEXA PRO — Chat Export", 50f, 50f, paint)
+
             paint.textSize = 12f
             paint.isFakeBoldText = false
-            
+
             val lines = message.content.split("\n")
             var y = 100f
             for (line in lines) {
-                // Basic text wrapping (simplified for this implementation)
-                if (y > 800f) break // Stop if page is full
-                canvas.drawText(line.take(80), 50f, y, paint)
-                y += 20f
+                // Simple text wrapping
+                val words = line.split(" ")
+                var currentLine = ""
+                for (word in words) {
+                    val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+                    if (paint.measureText(testLine) > 495f) {
+                        if (y > 800f) break
+                        canvas.drawText(currentLine, 50f, y, paint)
+                        y += 18f
+                        currentLine = word
+                    } else {
+                        currentLine = testLine
+                    }
+                }
+                if (currentLine.isNotEmpty() && y <= 800f) {
+                    canvas.drawText(currentLine, 50f, y, paint)
+                    y += 18f
+                }
+                y += 4f // line spacing
             }
-            
+
             pdfDocument.finishPage(page)
-            
-            // Save to a temporary file and share
-            val file = java.io.File(context.cacheDir, "nexa_message_${System.currentTimeMillis()}.pdf")
+
+            val file = java.io.File(context.cacheDir, "nexa_export_${System.currentTimeMillis()}.pdf")
             pdfDocument.writeTo(java.io.FileOutputStream(file))
             pdfDocument.close()
-            
-            // Share the generated PDF
+
             val uri = androidx.core.content.FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
                 file
             )
-            
+
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/pdf"
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            
-            val shareIntent = Intent.createChooser(intent, "Guardar PDF")
+
+            val shareIntent = Intent.createChooser(intent, "Exportar PDF")
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(shareIntent)
-            
+
         } catch (e: Exception) {
             android.util.Log.e("NEXA", "PDF Error: ${e.message}")
             android.widget.Toast.makeText(context, "Error al generar PDF", android.widget.Toast.LENGTH_SHORT).show()

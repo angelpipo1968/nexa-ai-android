@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Nexa OS Core Palette -->
+    <color name="nexa_green">#00E5A0</color>
     <color name="nexa_purple">#6d28d9</color>
     <color name="nexa_purple_light">#8b5cf6</color>
     <color name="nexa_blue">#2563eb</color>

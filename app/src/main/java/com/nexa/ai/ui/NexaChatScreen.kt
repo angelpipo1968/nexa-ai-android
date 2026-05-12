@@ -985,7 +985,7 @@ fun DrawerContent(
                 )
             }
             Text(
-                "NEXA v2.2 ULTRA",
+                "NEXA PRO v2.1",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -1467,24 +1467,12 @@ fun InputBar(
                         ) {
                             DropdownMenuItem(
                                 text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("📎", fontSize = 18.sp)
-                                    Text("Adjuntar archivo", fontSize = 14.sp)
-                                }},
-                                onClick = { showMenu = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🖼️", fontSize = 18.sp)
-                                    Text("Enviar imagen", fontSize = 14.sp)
-                                }},
-                                onClick = { showMenu = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text("🧹", fontSize = 18.sp)
                                     Text(NexaStrings.get("clear_chat", language), fontSize = 14.sp)
                                 }},
-                                onClick = { showMenu = false }
+                                onClick = {
+                                    showMenu = false
+                                }
                             )
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                             DropdownMenuItem(
