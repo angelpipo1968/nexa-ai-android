@@ -42,10 +42,10 @@ class NexaRepository {
         baseUrl: String,
         provider: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val request = ChatRequest(messages, provider)
-        val body = gson.toJsonTree(request).asJsonObject
+        val chatRequest = ChatRequest(messages, provider)
+        val body = gson.toJsonTree(chatRequest).asJsonObject
 
-        val request = Request.Builder()
+        val httpRequest = Request.Builder()
             .url("$baseUrl/api/chat")
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
@@ -114,7 +114,7 @@ class NexaRepository {
             }
         }
 
-        val eventSource = EventSources.createFactory(client).newEventSource(request, listener)
+        val eventSource = EventSources.createFactory(client).newEventSource(httpRequest, listener)
 
         awaitClose {
             eventSource.cancel()
