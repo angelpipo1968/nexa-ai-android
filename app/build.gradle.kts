@@ -15,7 +15,7 @@ android {
         versionName = "2.1"
 
         // URL de tu API en Vercel
-        buildConfigField("String", "API_BASE_URL", "\"https://nexa-ai.dev\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
 
     buildTypes {
