@@ -21,6 +21,11 @@ data class ChatMessage(
     val content: String
 )
 
+data class ChatRequest(
+    val messages: List<ChatMessage>,
+    val provider: String? = null
+)
+
 class NexaRepository {
 
     private val client = OkHttpClient.Builder()
@@ -34,13 +39,11 @@ class NexaRepository {
 
     fun sendMessage(
         messages: List<ChatMessage>,
-        baseUrl: String
+        baseUrl: String,
+        provider: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val body = JsonObject().apply {
-            add("messages", gson.toJsonTree(messages.map {
-                mapOf("role" to it.role, "content" to it.content)
-            }))
-        }
+        val request = ChatRequest(messages, provider)
+        val body = gson.toJsonTree(request).asJsonObject
 
         val request = Request.Builder()
             .url("$baseUrl/api/chat")
