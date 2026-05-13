@@ -30,7 +30,7 @@ jobs:
       run: chmod +x gradlew
 
     - name: Decode Keystore
-      if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      if: env.KEYSTORE_BASE64 != ''
       env:
         KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       run: |
@@ -40,7 +40,7 @@ jobs:
       run: ./gradlew assembleDebug
 
     - name: Build Release APK (Signed)
-      if: ${{ secrets.KEYSTORE_PASSWORD != '' }}
+      if: env.KEYSTORE_PASSWORD != ''
       env:
         KEYSTORE_FILE: release.keystore.jks
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -56,7 +56,7 @@ jobs:
         retention-days: 30
 
     - name: Upload Release APK
-      if: ${{ secrets.KEYSTORE_PASSWORD != '' }}
+      if: env.KEYSTORE_PASSWORD != ''
       uses: actions/upload-artifact@v4
       with:
         name: nexa-pro-release
