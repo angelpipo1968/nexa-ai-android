@@ -1445,26 +1445,27 @@ fun MessageBubble(
 ) {
     val isUser = message.role == "user"
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
-        // Label for bot messages
-        if (!isUser && !message.isStreaming) {
-            Row(
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(NexaAccent.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) { Text("⚡", fontSize = 8.sp) }
-                Text("NEXA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.sp)
-            }
-        }
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
             color = if (isUser) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             shadowElevation = if (!isUser) 2.dp else 0.dp,
             border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)) else null
         ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                // NEXA label inside the bubble for bot messages
+                if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(NexaAccent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) { Text("⚡", fontSize = 7.sp) }
+                        Text("NEXA", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    }
+                }
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (message.attachmentName != null && message.content.startsWith("📎")) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
