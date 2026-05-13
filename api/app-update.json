@@ -1,7 +1,0 @@
-{
-  "versionCode": 2,
-  "versionName": "2.1",
-  "downloadUrl": "https://github.com/angelpipo1968/nexa-ai-android/releases/latest",
-  "changelog": "✅ Login con email y contraseña\n✅ Registro de nuevos usuarios\n✅ Sidebar con historial de chats\n✅ Tema oscuro/claro\n✅ Selección de voz hombre/mujer\n✅ Idioma Español/English\n✅ Auto-actualización desde nexa-ai.dev",
-  "forceUpdate": false
-}
