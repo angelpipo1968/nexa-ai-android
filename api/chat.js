@@ -360,6 +360,146 @@ function formatFlightContext(flights) {
 }
 
 // ═══════════════════════════════════════
+//  STACKOVERFLOW DETECTION & FETCHING
+// ═══════════════════════════════════════
+
+const PROGRAMMING_KEYWORDS = [
+  'javascript', 'python', 'java', 'c++', 'c#', 'ruby', 'php', 'swift', 'kotlin',
+  'typescript', 'react', 'angular', 'vue', 'node', 'django', 'flask', 'spring',
+  'laravel', 'rails', 'express', 'nextjs', 'nuxt', 'svelte', 'flutter', 'react native',
+  'android', 'ios', 'html', 'css', 'sql', 'mongodb', 'postgresql', 'mysql',
+  'git', 'docker', 'kubernetes', 'aws', 'azure', 'linux', 'bash', 'regex',
+  'api', 'rest', 'graphql', 'json', 'xml', 'http', 'https',
+  'error', 'bug', 'exception', 'debug', 'compile', 'runtime',
+  'función', 'variable', 'array', 'objeto', 'clase', 'método',
+  'loop', 'bucle', 'condicional', 'if', 'else', 'for', 'while',
+  'instalar', 'configurar', 'importar', 'exportar', 'deploy',
+  'framework', 'librería', 'biblioteca', 'paquete', 'dependencia',
+  'como hacer', 'cómo hacer', 'how to', 'how do', 'qué es', 'what is',
+  'por qué', 'why does', 'error en', 'error al', 'no funciona',
+  'difference between', 'diferencia entre', 'ejemplo de', 'example of',
+];
+
+function detectProgrammingQuery(userMessage) {
+  const msg = userMessage.toLowerCase();
+
+  // Check if message has programming keywords
+  const hasKeyword = PROGRAMMING_KEYWORDS.some(kw => msg.includes(kw));
+
+  // Check for question patterns
+  const questionPatterns = [
+    /\bhow\s+(to|do|can)\b/i,
+    /\bwhat\s+(is|are|does)\b/i,
+    /\bwhy\s+(does|is|do)\b/i,
+    /\b(cómo|como)\s+(hago|hacer|puedo|funciona)\b/i,
+    /\b(qué|que)\s+(es|son|significa)\b/i,
+    /\bpor\s+qué\b/i,
+    /\berror\b/i,
+    /\bno\s+funciona\b/i,
+    /\bbug\b/i,
+  ];
+
+  const hasQuestion = questionPatterns.some(p => p.test(msg));
+
+  if (!hasKeyword && !hasQuestion) return null;
+
+  // Extract the main search query
+  // Remove common filler words and keep the technical terms
+  let query = msg
+    .replace(/\b(por favor|please|gracias|thanks|hey|hola|hi|hello|oye|dime|dame|explícame|explica|ayuda|help)\b/gi, '')
+    .replace(/\b(como|cómo|puedo|hacer|how|to|do|can|is|the|a|an|el|la|los|las|un|una|de|del|en|que|what|why|por|for|with|with|using)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  // If query is too short, use original
+  if (query.length < 5) query = msg;
+
+  // Limit query length for API
+  query = query.slice(0, 200);
+
+  return { query, originalMessage: msg };
+}
+
+async function fetchStackOverflowData(progQuery) {
+  try {
+    const encodedQuery = encodeURIComponent(progQuery.query);
+    const url = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodedQuery}&site=stackoverflow&pagesize=3&filter=withbody`;
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.items || data.items.length === 0) return null;
+
+    return data.items.map(item => ({
+      title: item.title,
+      score: item.score,
+      answers: item.answer_count,
+      accepted: item.is_answered,
+      url: item.link,
+      tags: item.tags?.slice(0, 5) || [],
+      // Get the top answer if available
+      topAnswer: null,
+    }));
+  } catch (err) {
+    console.error('StackOverflow API error:', err);
+    return null;
+  }
+}
+
+async function fetchTopAnswer(questionId) {
+  try {
+    const url = `https://api.stackexchange.com/2.3/questions/${questionId}/answers?order=desc&sort=votes&site=stackoverflow&pagesize=1&filter=withbody`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.items || data.items.length === 0) return null;
+
+    const answer = data.items[0];
+    // Strip HTML tags for a cleaner text
+    const body = answer.body
+      .replace(/<code>([\s\S]*?)<\/code>/g, '`$1`')
+      .replace(/<pre>([\s\S]*?)<\/pre>/g, '\n```\n$1\n```\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+      .slice(0, 800); // Limit length
+
+    return {
+      score: answer.score,
+      accepted: answer.is_accepted,
+      body,
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+function formatStackOverflowContext(questions) {
+  if (!questions || questions.length === 0) return '';
+
+  let ctx = '\n\n[RESULTADOS DE STACKOVERFLOW]\n';
+  questions.forEach((q, i) => {
+    ctx += `\nPregunta ${i + 1}: ${q.title}\n`;
+    ctx += `  Votos: ${q.score} | Respuestas: ${q.answers}`;
+    if (q.accepted) ctx += ' | ✅ Tiene respuesta aceptada';
+    ctx += '\n';
+    if (q.tags.length > 0) ctx += `  Tags: ${q.tags.join(', ')}\n`;
+    if (q.topAnswer) {
+      ctx += `  Mejor respuesta (${q.topAnswer.score} votos${q.topAnswer.accepted ? ', aceptada' : ''}):\n`;
+      ctx += `  ${q.topAnswer.body}\n`;
+    }
+    ctx += `  Link: ${q.url}\n`;
+  });
+  ctx += '[FIN STACKOVERFLOW]\n';
+  return ctx;
+}
+
+// ═══════════════════════════════════════
 //  HANDLER
 // ═══════════════════════════════════════
 
@@ -430,12 +570,37 @@ export default async function handler(req) {
         const flightData = await fetchFlightData(flightQuery);
         if (flightData && flightData.length > 0) {
           const flightContext = formatFlightContext(flightData);
-          // Inject flight data into the system prompt
           const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
           if (sysIdx >= 0) {
             sanitizedMessages[sysIdx] = {
               ...sanitizedMessages[sysIdx],
               content: sanitizedMessages[sysIdx].content + flightContext,
+            };
+          }
+        }
+      }
+
+      // Detect programming queries and fetch StackOverflow data
+      const progQuery = detectProgrammingQuery(lastUserMsg.content);
+      if (progQuery) {
+        const soQuestions = await fetchStackOverflowData(progQuery);
+        if (soQuestions && soQuestions.length > 0) {
+          // Fetch top answer for the first (most relevant) question
+          const firstQ = soQuestions[0];
+          if (firstQ.url) {
+            // Extract question ID from URL
+            const qIdMatch = firstQ.url.match(/\/questions\/(\d+)/);
+            if (qIdMatch) {
+              const topAnswer = await fetchTopAnswer(qIdMatch[1]);
+              if (topAnswer) soQuestions[0].topAnswer = topAnswer;
+            }
+          }
+          const soContext = formatStackOverflowContext(soQuestions);
+          const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+          if (sysIdx >= 0) {
+            sanitizedMessages[sysIdx] = {
+              ...sanitizedMessages[sysIdx],
+              content: sanitizedMessages[sysIdx].content + soContext,
             };
           }
         }
