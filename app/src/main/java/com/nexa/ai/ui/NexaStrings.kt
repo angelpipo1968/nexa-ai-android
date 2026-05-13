@@ -12,7 +12,7 @@ object NexaStrings {
 
     private val spanish = mapOf(
         "new_chat" to "Nuevo chat", "settings" to "Ajustes", "language" to "Idioma", "voice" to "Voz", "theme" to "Tema",
-        "dark" to "Oscuro", "light" to "Claro", "male_1" to "Hombre 1", "male_2" to "Hombre 2", "male_3" to "Hombre 3",
+        "dark" to "Oscuro", "light" to "Claro", "system" to "Sistema", "male_1" to "Hombre 1", "male_2" to "Hombre 2", "male_3" to "Hombre 3",
         "female_1" to "Mujer 1", "female_2" to "Mujer 2", "female_3" to "Mujer 3", "login" to "Iniciar sesión",
         "logout" to "Cerrar sesión", "register" to "Registrarse", "email" to "Email", "password" to "Contraseña",
         "thinking" to "pensando...", "input_hint" to "Escribe un mensaje...", "listening" to "🎙️ Escuchando...",
@@ -40,7 +40,7 @@ object NexaStrings {
 
     private val english = mapOf(
         "new_chat" to "New Chat", "settings" to "Settings", "language" to "Language", "voice" to "Voice", "theme" to "Theme",
-        "dark" to "Dark", "light" to "Light", "male_1" to "Male 1", "male_2" to "Male 2", "male_3" to "Male 3",
+        "dark" to "Dark", "light" to "Light", "system" to "System", "male_1" to "Male 1", "male_2" to "Male 2", "male_3" to "Male 3",
         "female_1" to "Female 1", "female_2" to "Female 2", "female_3" to "Female 3", "login" to "Login",
         "logout" to "Logout", "register" to "Register", "email" to "Email", "password" to "Password",
         "thinking" to "thinking...", "input_hint" to "Type a message...", "listening" to "🎙️ Listening...",

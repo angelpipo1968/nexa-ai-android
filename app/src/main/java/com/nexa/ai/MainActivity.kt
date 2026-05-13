@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val uiState by viewModel.uiState.collectAsState()
 
-            NexaTheme(darkTheme = uiState.isDarkTheme) {
+            NexaTheme(themeMode = uiState.themeMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     NexaChatScreen(
                         uiState = uiState,
@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
                         onToggleSettings = { viewModel.toggleSettings() },
                         onSetLanguage = { viewModel.setLanguage(it) },
                         onSetVoiceType = { viewModel.setVoiceType(it) },
-                        onToggleTheme = { viewModel.toggleTheme() },
+                        onCycleTheme = { viewModel.cycleTheme() },
                         onNavigateToLogin = { viewModel.navigateToLogin() },
                         onNavigateToRegister = { viewModel.navigateToRegister() },
                         onNavigateToChat = { viewModel.navigateToChat() },

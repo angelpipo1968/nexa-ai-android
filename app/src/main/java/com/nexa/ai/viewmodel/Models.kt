@@ -30,6 +30,9 @@ enum class AppLanguage(val code: String, val label: String) {
     ENGLISH("en", "English")
 }
 
+/** Theme mode: DARK, LIGHT, or SYSTEM (follow device setting). */
+enum class ThemeMode { DARK, LIGHT, SYSTEM }
+
 data class UserData(
     val email: String = "",
     val displayName: String = "",
@@ -59,7 +62,7 @@ data class NexaUiState(
     // Settings
     val language: AppLanguage = AppLanguage.SPANISH,
     val voiceType: VoiceType = VoiceType.FEMALE_1,
-    val isDarkTheme: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.DARK,
     val drawerOpen: Boolean = false,
     val showSettings: Boolean = false,
     val drawerView: Int = 0,
@@ -85,4 +88,11 @@ data class NexaUiState(
 
     val messages: List<Message>
         get() = activeSession?.messages ?: emptyList()
+
+    /** Whether the app should currently use dark colors. */
+    fun isDark(isSystemDark: Boolean): Boolean = when (themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> isSystemDark
+    }
 }

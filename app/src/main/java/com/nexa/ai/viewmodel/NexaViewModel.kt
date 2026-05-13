@@ -556,8 +556,17 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.setVoiceType(type)
     }
 
-    fun toggleTheme() {
-        _uiState.value = _uiState.value.copy(isDarkTheme = !_uiState.value.isDarkTheme)
+    fun setThemeMode(mode: ThemeMode) {
+        _uiState.value = _uiState.value.copy(themeMode = mode)
+    }
+
+    fun cycleTheme() {
+        val next = when (_uiState.value.themeMode) {
+            ThemeMode.DARK -> ThemeMode.LIGHT
+            ThemeMode.LIGHT -> ThemeMode.SYSTEM
+            ThemeMode.SYSTEM -> ThemeMode.DARK
+        }
+        _uiState.value = _uiState.value.copy(themeMode = next)
     }
 
     fun copyToClipboard(text: String) {

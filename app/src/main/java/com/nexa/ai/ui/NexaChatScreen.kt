@@ -1,7 +1,8 @@
 package com.nexa.ai.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.nexa.ai.viewmodel.*
@@ -30,7 +31,8 @@ fun NexaChatScreen(
     onToggleSettings: () -> Unit,
     onSetLanguage: (AppLanguage) -> Unit,
     onSetVoiceType: (VoiceType) -> Unit,
-    onToggleTheme: () -> Unit,
+    onCycleTheme: () -> Unit,
+    onSetThemeMode: (ThemeMode) -> Unit = {},
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToChat: () -> Unit,
@@ -58,6 +60,10 @@ fun NexaChatScreen(
             onUpdate = onOpenUpdatePage, language = uiState.language)
     }
 
+    // Resolve dark mode from theme setting + system
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = uiState.isDark(isSystemDark)
+
     // Screen navigation
     when (uiState.currentScreen) {
         Screen.LOGIN -> LoginScreen(
@@ -65,7 +71,7 @@ fun NexaChatScreen(
             error = uiState.loginError, isLoading = uiState.isLoggingIn,
             onEmailChange = onUpdateLoginEmail, onPasswordChange = onUpdateLoginPassword,
             onLogin = onLogin, onGoToRegister = onNavigateToRegister, onBack = onNavigateToChat,
-            isDarkTheme = uiState.isDarkTheme, language = uiState.language)
+            isDarkTheme = isDark, language = uiState.language)
         Screen.REGISTER -> RegisterScreen(
             name = uiState.registerName, email = uiState.registerEmail,
             password = uiState.registerPassword, confirmPassword = uiState.registerConfirmPassword,
@@ -73,9 +79,10 @@ fun NexaChatScreen(
             onNameChange = onUpdateRegisterName, onEmailChange = onUpdateRegisterEmail,
             onPasswordChange = onUpdateRegisterPassword, onConfirmPasswordChange = onUpdateRegisterConfirmPassword,
             onRegister = onRegister, onGoToLogin = onNavigateToLogin, onBack = onNavigateToChat,
-            isDarkTheme = uiState.isDarkTheme, language = uiState.language)
+            isDarkTheme = isDark, language = uiState.language)
         Screen.CHAT -> ChatMainScreen(
-            uiState = uiState, onSend = onSend, onInputChange = onInputChange,
+            uiState = uiState, isDarkTheme = isDark,
+            onSend = onSend, onInputChange = onInputChange,
             onStartListening = onStartListening, onStopListening = onStopListening,
             onToggleAutoSpeak = onToggleAutoSpeak, onStopSpeaking = onStopSpeaking,
             onSpeakMessage = onSpeakMessage, onClearChat = onClearChat,
@@ -83,7 +90,8 @@ fun NexaChatScreen(
             onCloseDrawer = onCloseDrawer, onCreateSession = onCreateSession,
             onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
             onToggleSettings = onToggleSettings, onSetLanguage = onSetLanguage,
-            onSetVoiceType = onSetVoiceType, onToggleTheme = onToggleTheme,
+            onSetVoiceType = onSetVoiceType, onCycleTheme = onCycleTheme,
+            onSetThemeMode = onSetThemeMode,
             onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
             onCopyMessage = onCopyMessage, onExportMessage = onExportMessage,
             onSurpriseMe = onSurpriseMe, onSetDrawerView = onSetDrawerView,
@@ -92,9 +100,12 @@ fun NexaChatScreen(
 
     // Settings dialog
     if (uiState.showSettings) {
-        GeneralSettingsDialog(uiState = uiState, onDismiss = onToggleSettings,
+        GeneralSettingsDialog(
+            uiState = uiState, isDarkTheme = isDark,
+            onDismiss = onToggleSettings,
             onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
-            onToggleTheme = onToggleTheme, onToggleAutoSpeak = onToggleAutoSpeak,
+            onSetThemeMode = onSetThemeMode,
+            onToggleAutoSpeak = onToggleAutoSpeak,
             onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout)
     }
 }

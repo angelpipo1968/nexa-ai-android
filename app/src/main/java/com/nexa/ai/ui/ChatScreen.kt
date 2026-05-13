@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatMainScreen(
     uiState: NexaUiState,
+    isDarkTheme: Boolean,
     onSend: () -> Unit,
     onInputChange: (String) -> Unit,
     onStartListening: () -> Unit,
@@ -52,7 +53,8 @@ fun ChatMainScreen(
     onToggleSettings: () -> Unit,
     onSetLanguage: (AppLanguage) -> Unit,
     onSetVoiceType: (VoiceType) -> Unit,
-    onToggleTheme: () -> Unit,
+    onCycleTheme: () -> Unit,
+    onSetThemeMode: (ThemeMode) -> Unit = {},
     onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit,
     onCopyMessage: (String) -> Unit,
@@ -88,7 +90,7 @@ fun ChatMainScreen(
                 onClose = { coroutineScope.launch { drawerState.close() } },
                 onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
                 onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
-                onToggleTheme = onToggleTheme, onToggleSettings = onToggleSettings,
+                onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
                 onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView
             )
         },

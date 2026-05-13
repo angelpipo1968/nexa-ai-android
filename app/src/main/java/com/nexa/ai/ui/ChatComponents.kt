@@ -274,9 +274,18 @@ fun UpdateDialog(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdate: () -> 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GeneralSettingsDialog(uiState: NexaUiState, onDismiss: () -> Unit, onSetLanguage: (AppLanguage) -> Unit,
-    onSetVoiceType: (VoiceType) -> Unit, onToggleTheme: () -> Unit, onToggleAutoSpeak: () -> Unit,
-    onClearChat: () -> Unit, onNavigateToLogin: () -> Unit, onLogout: () -> Unit) {
+fun GeneralSettingsDialog(
+    uiState: NexaUiState,
+    isDarkTheme: Boolean,
+    onDismiss: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onSetThemeMode: (ThemeMode) -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onClearChat: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onLogout: () -> Unit
+) {
     AlertDialog(onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -324,19 +333,47 @@ fun GeneralSettingsDialog(uiState: NexaUiState, onDismiss: () -> Unit, onSetLang
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-                // Toggles
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(NexaStrings.get("auto_speak", uiState.language), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            Text(NexaStrings.get("auto_speak_desc", uiState.language), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                // Theme — 3 options as chips
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(NexaStrings.get("theme", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            ThemeMode.DARK to NexaStrings.get("dark", uiState.language),
+                            ThemeMode.LIGHT to NexaStrings.get("light", uiState.language),
+                            ThemeMode.SYSTEM to NexaStrings.get("system", uiState.language)
+                        ).forEach { (mode, label) ->
+                            val selected = uiState.themeMode == mode
+                            FilterChip(
+                                selected = selected,
+                                onClick = { onSetThemeMode(mode) },
+                                label = {
+                                    Text(
+                                        when (mode) {
+                                            ThemeMode.DARK -> "🌙 $label"
+                                            ThemeMode.LIGHT -> "☀️ $label"
+                                            ThemeMode.SYSTEM -> "⚙️ $label"
+                                        },
+                                        fontSize = 13.sp
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
+                                    selectedLabelColor = NexaAccent
+                                ),
+                                border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f))
+                                else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            )
                         }
-                        Switch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() }, colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent.copy(alpha = 0.4f), checkedThumbColor = NexaAccent))
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(NexaStrings.get("theme", uiState.language), modifier = Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        Switch(checked = uiState.isDarkTheme, onCheckedChange = { onToggleTheme() }, colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent.copy(alpha = 0.4f), checkedThumbColor = NexaAccent))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+                // Auto-speak toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(NexaStrings.get("auto_speak", uiState.language), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(NexaStrings.get("auto_speak_desc", uiState.language), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                     }
+                    Switch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() }, colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent.copy(alpha = 0.4f), checkedThumbColor = NexaAccent))
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
                 // Actions
