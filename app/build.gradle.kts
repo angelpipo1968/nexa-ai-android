@@ -46,6 +46,10 @@ android {
         jvmTarget = "17"
     }
 
+    lint {
+        disable += "ObsoleteLintCustomCheck"
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
