@@ -122,11 +122,21 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 var showMsgMenu by remember { mutableStateOf(false) }
                 Box {
                     Surface(onClick = { showMsgMenu = true }, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(28.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.MoreHoriz, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
                     }
                     DropdownMenu(expanded = showMsgMenu, onDismissRequest = { showMsgMenu = false }) {
-                        DropdownMenuItem(text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("export_pdf", language)) } }, onClick = { showMsgMenu = false; onExport() })
-                        DropdownMenuItem(text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("read_aloud", language)) } }, onClick = { showMsgMenu = false; onSpeak() })
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("copy", language)) } },
+                            onClick = { showMsgMenu = false; onCopy() }
+                        )
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("read_aloud", language)) } },
+                            onClick = { showMsgMenu = false; onSpeak() }
+                        )
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("export_pdf", language)) } },
+                            onClick = { showMsgMenu = false; onExport() }
+                        )
                     }
                 }
             }
