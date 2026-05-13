@@ -239,7 +239,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             showUpdateDialog = false
         )
 
-        // Try direct APK download + install; falls back to browser
+        // Open GitHub releases page in browser
         updateChecker.downloadAndInstall(context, info.downloadUrl, info.versionName)
     }
 

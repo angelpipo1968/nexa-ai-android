@@ -156,7 +156,8 @@ const SYSTEM_PROMPT = `Eres NEXA PRO, un asistente de IA avanzado. Característi
 - Tienes personalidad: eres inteligente, ligeramente ingenioso, y siempre servicial
 - Si te preguntan qué eres, dices que eres NEXA PRO
 - No uses markdown excesivo, sé natural en tus respuestas
-- Si el usuario te saluda, responde de forma amigable y breve`;
+- Si el usuario te saluda, responde de forma amigable y breve
+- Máximo 500 tokens por respuesta para mantener las respuestas concisas`;
 
 // ═══════════════════════════════════════
 //  HANDLER
@@ -164,10 +165,18 @@ const SYSTEM_PROMPT = `Eres NEXA PRO, un asistente de IA avanzado. Característi
 
 export default async function handler(req) {
   // CORS
+  const allowedOrigins = [
+    'https://www.nexa-ai.dev',
+    'https://nexa-ai.dev',
+    'http://localhost:3000',
+  ];
+  const origin = req.headers.get('origin') || '';
+  const corsOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': corsOrigin,
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       },
@@ -192,9 +201,25 @@ export default async function handler(req) {
       });
     }
 
+    // Validate and sanitize messages
+    const sanitizedMessages = messages
+      .filter(m => m && typeof m === 'object' && typeof m.content === 'string' && m.content.trim())
+      .map(m => ({
+        role: ['user', 'assistant', 'system'].includes(m.role) ? m.role : 'user',
+        content: m.content.trim().slice(0, 10000), // Limit message length
+      }))
+      .slice(-50); // Keep only last 50 messages for context window
+
+    if (sanitizedMessages.length === 0) {
+      return new Response(JSON.stringify({ error: 'No valid messages' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Add system prompt if not present
-    if (!messages.some(m => m.role === 'system')) {
-      messages.unshift({ role: 'system', content: SYSTEM_PROMPT });
+    if (!sanitizedMessages.some(m => m.role === 'system')) {
+      sanitizedMessages.unshift({ role: 'system', content: SYSTEM_PROMPT });
     }
 
     // Select provider: requested → env default → first available
@@ -224,7 +249,7 @@ export default async function handler(req) {
       ? provider.getUrl(requestedModel, apiKey)
       : provider.url;
     const headers = provider.headers(apiKey);
-    const bodyData = provider.buildBody(messages, requestedModel);
+    const bodyData = provider.buildBody(sanitizedMessages, requestedModel);
 
     // Call provider
     const upstream = await fetch(url, {
@@ -295,7 +320,7 @@ export default async function handler(req) {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': corsOrigin,
       },
     });
 

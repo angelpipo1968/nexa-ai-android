@@ -22,7 +22,8 @@ data class PersistedUser(
 data class PersistedCredential(
     val email: String,
     val name: String,
-    val passwordHash: String
+    val passwordHash: String,
+    val salt: String = ""
 )
 
 class UserStore(private val context: Context) {
@@ -50,9 +51,17 @@ class UserStore(private val context: Context) {
         }
     }
 
-    /** Simple hash for local storage (not security-critical, just obfuscation) */
-    private fun hashPassword(password: String): String {
-        val bytes = password.toByteArray()
+    /** Generate a random salt */
+    private fun generateSalt(): String {
+        val salt = ByteArray(16)
+        java.security.SecureRandom().nextBytes(salt)
+        return salt.joinToString("") { "%02x".format(it) }
+    }
+
+    /** Salted SHA-256 hash for local storage */
+    private fun hashPassword(password: String, salt: String): String {
+        val saltedPassword = salt + password
+        val bytes = saltedPassword.toByteArray()
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(bytes)
         return hash.joinToString("") { "%02x".format(it) }
@@ -75,7 +84,9 @@ class UserStore(private val context: Context) {
         val existing = getCredentials()
         if (existing.any { it.email.equals(email, ignoreCase = true) }) return false
 
-        val updated = existing + PersistedCredential(email, name, hashPassword(password))
+        val salt = generateSalt()
+        val hash = hashPassword(password, salt)
+        val updated = existing + PersistedCredential(email, name, hash, salt)
         saveCredentials(updated)
         return true
     }
@@ -84,7 +95,7 @@ class UserStore(private val context: Context) {
     suspend fun validateLogin(email: String, password: String): String? {
         val existing = getCredentials()
         val cred = existing.find {
-            it.email.equals(email, ignoreCase = true) && it.passwordHash == hashPassword(password)
+            it.email.equals(email, ignoreCase = true) && it.passwordHash == hashPassword(password, it.salt)
         }
         return cred?.name
     }
@@ -93,13 +104,15 @@ class UserStore(private val context: Context) {
     suspend fun loginOrAutoRegister(email: String, password: String): String {
         val existing = getCredentials()
         val cred = existing.find {
-            it.email.equals(email, ignoreCase = true) && it.passwordHash == hashPassword(password)
+            it.email.equals(email, ignoreCase = true) && it.passwordHash == hashPassword(password, it.salt)
         }
         if (cred != null) return cred.name
 
         // Auto-register
         val name = email.substringBefore("@")
-        val updated = existing + PersistedCredential(email, name, hashPassword(password))
+        val salt = generateSalt()
+        val hash = hashPassword(password, salt)
+        val updated = existing + PersistedCredential(email, name, hash, salt)
         saveCredentials(updated)
         return name
     }

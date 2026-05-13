@@ -9,3 +9,25 @@
 .cxx
 local.properties
 /app/build
+
+# Signing
+*.jks
+*.keystore
+!debug.keystore
+
+# APK outputs
+*.apk
+*.aab
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Node (Vercel backend)
+node_modules/
+.vercel/
+
+# OS
+Thumbs.db
+.DS_Store
