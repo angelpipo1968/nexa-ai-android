@@ -1,13 +1,6 @@
 package com.nexa.ai.viewmodel
 
 import android.app.Application
-import android.content.Intent
-import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
@@ -18,100 +11,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.Locale
-import java.util.UUID
-
-// ═══════════════════════════════════════
-//  DATA MODELS
-// ═══════════════════════════════════════
-
-data class Message(
-    val id: String = System.currentTimeMillis().toString(),
-    val role: String,
-    val content: String,
-    val isStreaming: Boolean = false,
-    val attachmentName: String? = null
-)
-
-data class ChatSession(
-    val id: String = UUID.randomUUID().toString(),
-    val title: String = "",
-    val messages: List<Message> = emptyList(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
-)
-
-enum class VoiceType { MALE_1, MALE_2, MALE_3, FEMALE_1, FEMALE_2, FEMALE_3 }
-enum class AppLanguage(val code: String, val label: String) {
-    SPANISH("es", "Español"),
-    ENGLISH("en", "English")
-}
-
-data class UserData(
-    val email: String = "",
-    val displayName: String = "",
-    val isLoggedIn: Boolean = false
-)
-
-enum class Screen { CHAT, LOGIN, REGISTER }
-
-data class NexaUiState(
-    val sessions: List<ChatSession> = emptyList(),
-    val activeSessionId: String? = null,
-    val inputText: String = "",
-    val isListening: Boolean = false,
-    val isThinking: Boolean = false,
-    val isSpeaking: Boolean = false,
-    val speakingMessageId: String? = null,
-    val currentProvider: String? = null,
-    val error: String? = null,
-    val autoSpeak: Boolean = true,
-    val language: AppLanguage = AppLanguage.SPANISH,
-    val voiceType: VoiceType = VoiceType.FEMALE_1,
-    val isDarkTheme: Boolean = true,
-    val drawerOpen: Boolean = false,
-    val showSettings: Boolean = false,
-    // Login
-    val currentScreen: Screen = Screen.CHAT,
-    val user: UserData = UserData(),
-    val loginEmail: String = "",
-    val loginPassword: String = "",
-    val loginError: String? = null,
-    val isLoggingIn: Boolean = false,
-    // Register
-    val registerName: String = "",
-    val registerEmail: String = "",
-    val registerPassword: String = "",
-    val registerConfirmPassword: String = "",
-    val registerError: String? = null,
-    val isRegistering: Boolean = false,
-    // Update
-    val updateInfo: UpdateInfo? = null,
-    val showUpdateDialog: Boolean = false,
-    // Attachment
-    val pendingAttachment: String? = null,
-    // Drawer view (0=history, 1=settings)
-    val drawerView: Int = 0
-) {
-    val activeSession: ChatSession?
-        get() = sessions.find { it.id == activeSessionId }
-
-    val messages: List<Message>
-        get() = activeSession?.messages ?: emptyList()
-}
 
 class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(NexaUiState())
     val uiState: StateFlow<NexaUiState> = _uiState.asStateFlow()
 
+    // Managers
+    private val speechManager = SpeechManager(application)
+    private val authManager = AuthManager(application)
     private val repository = NexaRepository()
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
-    private val userStore = UserStore(application)
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -143,8 +54,35 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
-        initTTS()
+        setupSpeechCallbacks()
+        speechManager.initialize()
         restoreState()
+    }
+
+    // ═══════════════════════════════════════
+    //  INITIALIZATION
+    // ═══════════════════════════════════════
+
+    private fun setupSpeechCallbacks() {
+        speechManager.onListeningStateChanged = { isListening ->
+            _uiState.value = _uiState.value.copy(isListening = isListening)
+        }
+        speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
+            _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
+        }
+        speechManager.onSpeechResult = { text ->
+            sendMessage(text)
+        }
+        speechManager.onSpeechPartial = { text ->
+            _uiState.value = _uiState.value.copy(inputText = text)
+        }
+        speechManager.onError = { errorKey ->
+            val lang = _uiState.value.language
+            _uiState.value = _uiState.value.copy(error = NexaStrings.get(errorKey, lang))
+        }
+        speechManager.onInputTextChanged = { text ->
+            _uiState.value = _uiState.value.copy(inputText = text)
+        }
     }
 
     // ═══════════════════════════════════════
@@ -153,17 +91,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun restoreState() {
         viewModelScope.launch {
-            val savedUser = userStore.currentUser.first()
-            if (savedUser != null) {
-                _uiState.value = _uiState.value.copy(
-                    user = UserData(
-                        email = savedUser.email,
-                        displayName = savedUser.displayName,
-                        isLoggedIn = true
-                    )
-                )
+            // Restore user
+            val user = authManager.restoreUser()
+            if (user != null) {
+                _uiState.value = _uiState.value.copy(user = user)
             }
 
+            // Restore sessions
             val savedSessions = sessionStore.sessions.first()
             val savedActiveId = sessionStore.activeSessionId.first()
 
@@ -233,13 +167,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun openUpdatePage() {
         val info = _uiState.value.updateInfo ?: return
         val context = getApplication<Application>()
-
-        _uiState.value = _uiState.value.copy(
-            updateInfo = info.copy(changelog = info.changelog),
-            showUpdateDialog = false
-        )
-
-        // Open GitHub releases page in browser
+        _uiState.value = _uiState.value.copy(showUpdateDialog = false)
         updateChecker.downloadAndInstall(context, info.downloadUrl, info.versionName)
     }
 
@@ -298,37 +226,27 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun login() {
         val email = _uiState.value.loginEmail.trim()
         val password = _uiState.value.loginPassword
-
-        if (email.isBlank() || password.isBlank()) {
-            _uiState.value = _uiState.value.copy(loginError = NexaStrings.get("fill_all", _uiState.value.language))
-            return
-        }
-
-        if (!email.contains("@")) {
-            _uiState.value = _uiState.value.copy(loginError = NexaStrings.get("invalid_email", _uiState.value.language))
-            return
-        }
+        val lang = _uiState.value.language
 
         _uiState.value = _uiState.value.copy(isLoggingIn = true, loginError = null)
 
         viewModelScope.launch {
             kotlinx.coroutines.delay(600)
 
-            try {
-                val displayName = userStore.loginOrAutoRegister(email, password)
-                val user = UserData(email = email, displayName = displayName, isLoggedIn = true)
-                userStore.saveUser(PersistedUser(email, displayName))
-
-                _uiState.value = _uiState.value.copy(
-                    user = user,
-                    currentScreen = Screen.CHAT,
-                    isLoggingIn = false
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    loginError = "Error: ${e.message}",
-                    isLoggingIn = false
-                )
+            when (val result = authManager.login(email, password)) {
+                is LoginResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        user = result.user,
+                        currentScreen = Screen.CHAT,
+                        isLoggingIn = false
+                    )
+                }
+                is LoginResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        loginError = NexaStrings.get(result.messageKey, lang),
+                        isLoggingIn = false
+                    )
+                }
             }
         }
     }
@@ -338,62 +256,35 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val email = _uiState.value.registerEmail.trim()
         val password = _uiState.value.registerPassword
         val confirm = _uiState.value.registerConfirmPassword
-
-        if (name.isBlank() || email.isBlank() || password.isBlank()) {
-            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("fill_all", _uiState.value.language))
-            return
-        }
-
-        if (!email.contains("@")) {
-            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("invalid_email", _uiState.value.language))
-            return
-        }
-
-        if (password.length < 6) {
-            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("min_chars", _uiState.value.language))
-            return
-        }
-
-        if (password != confirm) {
-            _uiState.value = _uiState.value.copy(registerError = NexaStrings.get("passwords_no_match", _uiState.value.language))
-            return
-        }
+        val lang = _uiState.value.language
 
         _uiState.value = _uiState.value.copy(isRegistering = true, registerError = null)
 
         viewModelScope.launch {
             kotlinx.coroutines.delay(600)
 
-            try {
-                val success = userStore.register(name, email, password)
-                if (success) {
-                    val user = UserData(email = email, displayName = name, isLoggedIn = true)
-                    userStore.saveUser(PersistedUser(email, name))
-
+            when (val result = authManager.register(name, email, password, confirm)) {
+                is RegisterResult.Success -> {
                     _uiState.value = _uiState.value.copy(
-                        user = user,
+                        user = result.user,
                         currentScreen = Screen.CHAT,
                         isRegistering = false
                     )
-                } else {
+                }
+                is RegisterResult.Error -> {
                     _uiState.value = _uiState.value.copy(
-                        registerError = NexaStrings.get("email_taken", _uiState.value.language),
+                        registerError = NexaStrings.get(result.messageKey, lang),
                         isRegistering = false
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    registerError = "Error: ${e.message}",
-                    isRegistering = false
-                )
             }
         }
     }
 
     fun logout() {
-        stopSpeaking()
+        speechManager.stopSpeaking()
         viewModelScope.launch {
-            userStore.clearUser()
+            authManager.logout()
             sessionStore.clear()
         }
         _uiState.value = _uiState.value.copy(
@@ -407,211 +298,23 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ═══════════════════════════════════════
-    //  TTS — Text to Speech
+    //  SPEECH (delegated to SpeechManager)
     // ═══════════════════════════════════════
 
-    private fun initTTS() {
-        tts = TextToSpeech(getApplication()) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                ttsReady = true
-                applyVoiceSettings()
-                tts?.setSpeechRate(1.0f)
-
-                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        _uiState.value = _uiState.value.copy(isSpeaking = true, speakingMessageId = utteranceId)
-                    }
-                    override fun onDone(utteranceId: String?) {
-                        _uiState.value = _uiState.value.copy(isSpeaking = false, speakingMessageId = null)
-                    }
-                    @Deprecated("Deprecated")
-                    override fun onError(utteranceId: String?) {
-                        _uiState.value = _uiState.value.copy(isSpeaking = false, speakingMessageId = null)
-                    }
-                })
-            }
-        }
-    }
-
-    private fun applyVoiceSettings() {
-        if (!ttsReady) return
-        val locale = when (_uiState.value.language) {
-            AppLanguage.SPANISH -> Locale("es", "ES")
-            AppLanguage.ENGLISH -> Locale.US
-        }
-        tts?.language = locale
-
-        val allVoices = tts?.voices?.filter { it.locale.language == locale.language } ?: return
-        if (allVoices.isEmpty()) return
-
-        val voiceType = _uiState.value.voiceType
-        val isSpanish = _uiState.value.language == AppLanguage.SPANISH
-        
-        // Voice names per locale
-        val voiceName = if (isSpanish) {
-            when (voiceType) {
-                VoiceType.FEMALE_1 -> "es-es-x-eea-local"
-                VoiceType.FEMALE_2 -> "es-es-x-eec-local"
-                VoiceType.FEMALE_3 -> "es-us-x-esc-local"
-                VoiceType.MALE_1   -> "es-es-x-eed-local"
-                VoiceType.MALE_2   -> "es-es-x-eee-local"
-                VoiceType.MALE_3   -> "es-us-x-esd-local"
-            }
-        } else {
-            when (voiceType) {
-                VoiceType.FEMALE_1 -> "en-us-x-tpf-local"
-                VoiceType.FEMALE_2 -> "en-us-x-tpd-local"
-                VoiceType.FEMALE_3 -> "en-gb-x-gba-local"
-                VoiceType.MALE_1   -> "en-us-x-tpc-local"
-                VoiceType.MALE_2   -> "en-us-x-tpa-local"
-                VoiceType.MALE_3   -> "en-gb-x-gbb-local"
-            }
-        }
-
-        // Strategy: exact match → gender keyword match → first available
-        val isMale = voiceType == VoiceType.MALE_1 || voiceType == VoiceType.MALE_2 || voiceType == VoiceType.MALE_3
-        val selectedVoice = allVoices.find { it.name == voiceName }
-            ?: run {
-                val genderKeywords = if (isMale) listOf("male", "man", "hom") else listOf("female", "woman", "fem")
-                allVoices.find { v -> genderKeywords.any { v.name.lowercase().contains(it) } }
-            }
-            ?: allVoices.first()
-
-        tts?.voice = selectedVoice
-        
-        val pitch = when (voiceType) {
-            VoiceType.FEMALE_1 -> 1.1f
-            VoiceType.FEMALE_2 -> 1.0f
-            VoiceType.FEMALE_3 -> 0.9f
-            VoiceType.MALE_1   -> 0.8f
-            VoiceType.MALE_2   -> 1.0f
-            VoiceType.MALE_3   -> 1.2f
-        }
-        tts?.setPitch(pitch)
-        tts?.setSpeechRate(1.0f)
-    }
-
     fun speak(text: String, messageId: String? = null) {
-        if (!ttsReady) return
-
-        if (messageId != null && _uiState.value.speakingMessageId == messageId) {
-            stopSpeaking()
-            return
-        }
-
-        stopSpeaking()
-        val cleaned = cleanForSpeech(text)
-        if (cleaned.isBlank()) return
-
-        val params = Bundle().apply {
-            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-        }
-        tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, messageId ?: "msg")
+        speechManager.speak(text, messageId, _uiState.value.speakingMessageId)
     }
 
     fun stopSpeaking() {
-        tts?.stop()
-        _uiState.value = _uiState.value.copy(isSpeaking = false, speakingMessageId = null)
+        speechManager.stopSpeaking()
     }
-
-    private fun cleanForSpeech(text: String): String {
-        var cleaned = text
-            // URLs
-            .replace(Regex("https?://\\S+"), "")
-            // Markdown: headers, bold, italic
-            .replace(Regex("#{1,6}\\s*"), "")
-            .replace(Regex("\\*{1,3}(.+?)\\*{1,3}"), "$1")
-            .replace(Regex("_{1,3}(.+?)_{1,3}"), "$1")
-            // Stray asterisks (after markdown cleanup)
-            .replace(Regex("\\*+"), "")
-            // Code blocks → just the word "código"
-            .replace(Regex("```[\\s\\S]*?```"), "código")
-            .replace(Regex("`([^`]+)`"), "$1")
-            // Links: [text](url) → text
-            .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
-            .replace(Regex("!\\[[^]]*]\\([^)]+\\)"), "")
-            // Newlines → pause
-            .replace(Regex("\\n{2,}"), ". ")
-            .replace(Regex("\\n"), ". ")
-
-        // Remove ALL symbols, keep only: letters (incl. accented), numbers, spaces, and basic punctuation (. , ; : ! ? ¿ ¡)
-        cleaned = cleaned.replace(Regex("[^\\p{L}\\p{N}\\s.,;:!?¿¡]"), "")
-
-        // Clean up extra spaces
-        cleaned = cleaned
-            .replace(Regex("\\s{2,}"), " ")
-            .replace(Regex("\\s*([.,;:!?])\\s*"), "$1 ")
-            .trim()
-
-        return cleaned
-    }
-
-    // ═══════════════════════════════════════
-    //  SPEECH RECOGNITION
-    // ═══════════════════════════════════════
 
     fun startListening() {
-        val context = getApplication<Application>()
-
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            _uiState.value = _uiState.value.copy(error = NexaStrings.get("voice_unavailable", _uiState.value.language))
-            return
-        }
-
-        stopSpeaking()
-
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    _uiState.value = _uiState.value.copy(isListening = true, error = null)
-                }
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {
-                    _uiState.value = _uiState.value.copy(isListening = false)
-                }
-                override fun onError(error: Int) {
-                    _uiState.value = _uiState.value.copy(isListening = false)
-                    when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> {}
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {}
-                        else -> _uiState.value = _uiState.value.copy(error = "${NexaStrings.get("voice_error", _uiState.value.language)}: $error")
-                    }
-                }
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.firstOrNull() ?: return
-                    _uiState.value = _uiState.value.copy(inputText = text, isListening = false)
-                    sendMessage(text)
-                }
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.firstOrNull() ?: return
-                    _uiState.value = _uiState.value.copy(inputText = text)
-                }
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
-        }
-
-        val langCode = when (_uiState.value.language) {
-            AppLanguage.SPANISH -> "es-ES"
-            AppLanguage.ENGLISH -> "en-US"
-        }
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
-
-        speechRecognizer?.startListening(intent)
+        speechManager.startListening()
     }
 
     fun stopListening() {
-        speechRecognizer?.stopListening()
-        _uiState.value = _uiState.value.copy(isListening = false)
+        speechManager.stopListening()
     }
 
     // ═══════════════════════════════════════
@@ -623,8 +326,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             AppLanguage.SPANISH -> surprisePromptsEs
             AppLanguage.ENGLISH -> surprisePromptsEn
         }
-        val prompt = prompts.random()
-        sendMessage(prompt)
+        sendMessage(prompts.random())
     }
 
     // ═══════════════════════════════════════
@@ -654,7 +356,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun switchSession(sessionId: String) {
-        stopSpeaking()
+        speechManager.stopSpeaking()
         _uiState.value = _uiState.value.copy(
             activeSessionId = sessionId,
             drawerOpen = false,
@@ -811,11 +513,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleAutoSpeak() {
         _uiState.value = _uiState.value.copy(autoSpeak = !_uiState.value.autoSpeak)
-        if (!_uiState.value.autoSpeak) stopSpeaking()
+        if (!_uiState.value.autoSpeak) speechManager.stopSpeaking()
     }
 
     fun clearChat() {
-        stopSpeaking()
+        speechManager.stopSpeaking()
         updateActiveSession { it.copy(messages = emptyList()) }
         _uiState.value = _uiState.value.copy(error = null)
     }
@@ -846,12 +548,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLanguage(lang: AppLanguage) {
         _uiState.value = _uiState.value.copy(language = lang)
-        applyVoiceSettings()
+        speechManager.setLanguage(lang)
     }
 
     fun setVoiceType(type: VoiceType) {
         _uiState.value = _uiState.value.copy(voiceType = type)
-        applyVoiceSettings()
+        speechManager.setVoiceType(type)
     }
 
     fun toggleTheme() {
@@ -877,9 +579,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val paint = android.graphics.Paint().apply {
-                isAntiAlias = true
-            }
+            val paint = android.graphics.Paint().apply { isAntiAlias = true }
             var pageNum = 1
             var pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
             var page = pdfDocument.startPage(pageInfo)
@@ -897,12 +597,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
             canvas.drawText(dateStr, 50f, 62f, paint)
 
-            // Divider line
             paint.color = android.graphics.Color.parseColor("#00E5A0")
             paint.strokeWidth = 1f
             canvas.drawLine(50f, 72f, 545f, 72f, paint)
 
-            // Content
             paint.textSize = 12f
             paint.isFakeBoldText = false
             paint.color = android.graphics.Color.BLACK
@@ -962,7 +660,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 y += 4f
             }
 
-            // Footer
             paint.textSize = 8f
             paint.color = android.graphics.Color.LTGRAY
             canvas.drawText(NexaStrings.get("generated_by", _uiState.value.language), 50f, 820f, paint)
@@ -971,25 +668,21 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
             val fileName = "nexa_export_${System.currentTimeMillis()}.pdf"
             val file = java.io.File(context.cacheDir, fileName)
-            java.io.FileOutputStream(file).use { fos ->
-                pdfDocument.writeTo(fos)
-            }
+            java.io.FileOutputStream(file).use { fos -> pdfDocument.writeTo(fos) }
             pdfDocument.close()
 
             val uri = androidx.core.content.FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
+                context, "${context.packageName}.fileprovider", file
             )
 
-            val intent = Intent(Intent.ACTION_SEND).apply {
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                 type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
-            val shareIntent = Intent.createChooser(intent, NexaStrings.get("export_pdf_title", _uiState.value.language))
-            shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val shareIntent = android.content.Intent.createChooser(intent, NexaStrings.get("export_pdf_title", _uiState.value.language))
+            shareIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(shareIntent)
 
         } catch (e: Exception) {
@@ -1000,8 +693,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        speechRecognizer?.destroy()
-        tts?.stop()
-        tts?.shutdown()
+        speechManager.destroy()
     }
 }
