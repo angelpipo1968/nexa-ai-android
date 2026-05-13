@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -225,7 +226,7 @@ fun DrawerContent(
                 if (user.isLoggedIn) onLogout() else onNavigateToLogin()
             }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(if (user.isLoggedIn) Icons.Default.Logout else Icons.Default.Person, contentDescription = null,
+                Icon(if (user.isLoggedIn) Icons.AutoMirrored.Filled.ExitToApp else Icons.Default.Person, contentDescription = null,
                     tint = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.6f) else NexaAccent.copy(alpha = 0.5f),
                     modifier = Modifier.size(16.dp))
                 Text(if (user.isLoggedIn) NexaStrings.get("logout", lang) else NexaStrings.get("login", lang),
@@ -309,7 +310,7 @@ fun ChatTopBar(uiState: NexaUiState, onToggleDrawer: () -> Unit, onToggleAutoSpe
             }
             if (uiState.isSpeaking) {
                 IconButton(onClick = onStopSpeaking) {
-                    Icon(Icons.Default.StopCircle, contentDescription = null,
+                    Icon(Icons.Default.Stop, contentDescription = null,
                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
                 }
             }

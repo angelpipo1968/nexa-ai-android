@@ -78,10 +78,11 @@ class ModelsTest {
 
     @Test
     fun `Screen enum has all values`() {
-        assertEquals(3, Screen.entries.size)
+        assertEquals(4, Screen.entries.size)
         assertTrue(Screen.entries.contains(Screen.CHAT))
         assertTrue(Screen.entries.contains(Screen.LOGIN))
         assertTrue(Screen.entries.contains(Screen.REGISTER))
+        assertTrue(Screen.entries.contains(Screen.LOTTERY))
     }
 
     @Test
@@ -115,7 +116,8 @@ class ModelsTest {
         assertTrue(state.autoSpeak)
         assertEquals(AppLanguage.SPANISH, state.language)
         assertEquals(VoiceType.FEMALE_1, state.voiceType)
-        assertTrue(state.isDarkTheme)
+        assertEquals(ThemeMode.DARK, state.themeMode)
+        assertTrue(state.isDark(isSystemDark = false))
         assertFalse(state.drawerOpen)
         assertFalse(state.showSettings)
         assertEquals(Screen.CHAT, state.currentScreen)

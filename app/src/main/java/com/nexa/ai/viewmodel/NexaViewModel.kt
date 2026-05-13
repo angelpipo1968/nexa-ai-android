@@ -593,89 +593,85 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
             val pdfDocument = android.graphics.pdf.PdfDocument()
             val paint = android.graphics.Paint().apply { isAntiAlias = true }
-            var pageNum = 1
-            var pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
-            var page = pdfDocument.startPage(pageInfo)
-            var canvas = page.canvas
+            val pageWidth = 595
+            val pageHeight = 842
+            val marginLeft = 50f
+            val maxTextWidth = 495f
+            val maxY = 790f
+            val lineHeight = 18f
+            val paragraphGap = 4f
 
-            // Header
+            var pageNum = 0
+            var page: android.graphics.pdf.PdfDocument.Page
+            var canvas: android.graphics.Canvas
+            var y: Float
+
+            fun newPage(startY: Float = 50f): Float {
+                if (pageNum > 0) pdfDocument.finishPage(page)
+                pageNum++
+                val info = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
+                page = pdfDocument.startPage(info)
+                canvas = page.canvas
+                paint.textSize = 12f
+                paint.isFakeBoldText = false
+                paint.color = android.graphics.Color.BLACK
+                return startY
+            }
+
+            fun ensureSpace(currentY: Float, needed: Float = lineHeight): Float {
+                return if (currentY + needed > maxY) newPage() else currentY
+            }
+
+            // First page — header
+            y = newPage(95f)
+
             paint.textSize = 16f
             paint.isFakeBoldText = true
             paint.color = android.graphics.Color.parseColor("#00E5A0")
-            canvas.drawText("NEXA PRO", 50f, 45f, paint)
+            canvas.drawText("NEXA PRO", marginLeft, 45f, paint)
 
             paint.textSize = 10f
             paint.isFakeBoldText = false
             paint.color = android.graphics.Color.GRAY
             val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-            canvas.drawText(dateStr, 50f, 62f, paint)
+            canvas.drawText(dateStr, marginLeft, 62f, paint)
 
             paint.color = android.graphics.Color.parseColor("#00E5A0")
             paint.strokeWidth = 1f
-            canvas.drawLine(50f, 72f, 545f, 72f, paint)
+            canvas.drawLine(marginLeft, 72f, 545f, 72f, paint)
 
             paint.textSize = 12f
             paint.isFakeBoldText = false
             paint.color = android.graphics.Color.BLACK
 
-            val lines = content.split("\n")
-            var y = 95f
-            for (line in lines) {
-                if (y > 790f) {
-                    pdfDocument.finishPage(page)
-                    pageNum++
-                    pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
-                    page = pdfDocument.startPage(pageInfo)
-                    canvas = page.canvas
-                    paint.textSize = 12f
-                    paint.isFakeBoldText = false
-                    paint.color = android.graphics.Color.BLACK
-                    y = 50f
-                }
+            // Content
+            for (line in content.split("\n")) {
+                y = ensureSpace(y)
                 val words = line.split(" ")
                 var currentLine = ""
                 for (word in words) {
                     val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
-                    if (paint.measureText(testLine) > 495f) {
-                        if (y > 790f) {
-                            pdfDocument.finishPage(page)
-                            pageNum++
-                            pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
-                            page = pdfDocument.startPage(pageInfo)
-                            canvas = page.canvas
-                            paint.textSize = 12f
-                            paint.isFakeBoldText = false
-                            paint.color = android.graphics.Color.BLACK
-                            y = 50f
-                        }
-                        canvas.drawText(currentLine, 50f, y, paint)
-                        y += 18f
+                    if (paint.measureText(testLine) > maxTextWidth) {
+                        y = ensureSpace(y)
+                        canvas.drawText(currentLine, marginLeft, y, paint)
+                        y += lineHeight
                         currentLine = word
                     } else {
                         currentLine = testLine
                     }
                 }
                 if (currentLine.isNotEmpty()) {
-                    if (y > 790f) {
-                        pdfDocument.finishPage(page)
-                        pageNum++
-                        pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
-                        page = pdfDocument.startPage(pageInfo)
-                        canvas = page.canvas
-                        paint.textSize = 12f
-                        paint.isFakeBoldText = false
-                        paint.color = android.graphics.Color.BLACK
-                        y = 50f
-                    }
-                    canvas.drawText(currentLine, 50f, y, paint)
-                    y += 18f
+                    y = ensureSpace(y)
+                    canvas.drawText(currentLine, marginLeft, y, paint)
+                    y += lineHeight
                 }
-                y += 4f
+                y += paragraphGap
             }
 
+            // Footer
             paint.textSize = 8f
             paint.color = android.graphics.Color.LTGRAY
-            canvas.drawText(NexaStrings.get("generated_by", _uiState.value.language), 50f, 820f, paint)
+            canvas.drawText(NexaStrings.get("generated_by", _uiState.value.language), marginLeft, 820f, paint)
 
             pdfDocument.finishPage(page)
 
