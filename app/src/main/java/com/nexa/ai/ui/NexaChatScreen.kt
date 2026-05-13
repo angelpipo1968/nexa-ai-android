@@ -1289,7 +1289,7 @@ fun ChatTopBar(
                 val infiniteTransition = rememberInfiniteTransition(label = "logo")
                 val glowAlpha by infiniteTransition.animateFloat(
                     initialValue = 0.15f, targetValue = 0.35f,
-                    animationSpec = infiniteRepeatable(animation = tween(2000, easing = EaseInOutCubic), repeatMode = RepeatMode.Reverse),
+                    animationSpec = infiniteRepeatable(animation = tween(2000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
                     label = "glow"
                 )
                 Box(
@@ -1404,7 +1404,7 @@ fun EmptyState(lang: AppLanguage) {
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
         val scale by infiniteTransition.animateFloat(
             initialValue = 0.95f, targetValue = 1.05f,
-            animationSpec = infiniteRepeatable(animation = tween(2500, easing = EaseInOutCubic), repeatMode = RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(animation = tween(2500, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
             label = "pulse"
         )
         Box(
