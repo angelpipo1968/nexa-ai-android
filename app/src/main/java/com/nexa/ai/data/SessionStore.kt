@@ -6,12 +6,15 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.nexa.ai.data.local.MessageEntity
+import com.nexa.ai.data.local.NexaDatabase
+import com.nexa.ai.data.local.SessionEntity
+import com.nexa.ai.data.local.SessionWithMessages
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.sessionStore: DataStore<Preferences> by preferencesDataStore(name = "nexa_sessions")
+private val Context.activeSessionStore: DataStore<Preferences> by preferencesDataStore(name = "nexa_active_session")
 
 data class PersistedSession(
     val id: String,
@@ -27,36 +30,85 @@ data class PersistedMessage(
     val content: String
 )
 
+/**
+ * SessionStore now uses Room for session/message storage (no size limits)
+ * and DataStore only for the active session ID preference.
+ */
 class SessionStore(private val context: Context) {
 
-    private val gson = Gson()
-    private val KEY_SESSIONS = stringPreferencesKey("sessions_json")
+    private val db = NexaDatabase.getInstance(context)
+    private val dao = db.sessionDao()
+
     private val KEY_ACTIVE_ID = stringPreferencesKey("active_session_id")
 
-    val sessions: Flow<List<PersistedSession>> = context.sessionStore.data.map { prefs ->
-        val json = prefs[KEY_SESSIONS] ?: "[]"
-        val type = object : TypeToken<List<PersistedSession>>() {}.type
-        try {
-            gson.fromJson(json, type) ?: emptyList()
-        } catch (_: Exception) {
-            emptyList()
-        }
+    /** Observe all sessions with their messages. */
+    val sessions: Flow<List<PersistedSession>> = kotlinx.coroutines.flow.flow {
+        val data = dao.getAllSessions()
+        emit(data.map { it.toPersisted() })
     }
 
-    val activeSessionId: Flow<String?> = context.sessionStore.data.map { prefs ->
+    /** Observe the active session ID. */
+    val activeSessionId: Flow<String?> = context.activeSessionStore.data.map { prefs ->
         prefs[KEY_ACTIVE_ID]
     }
 
+    /** Save all sessions and the active session ID. Used for bulk updates. */
     suspend fun save(sessions: List<PersistedSession>, activeId: String?) {
-        context.sessionStore.edit { prefs ->
-            prefs[KEY_SESSIONS] = gson.toJson(sessions)
-            if (activeId != null) {
+        // Clear existing data
+        dao.deleteAll()
+
+        // Insert all sessions and messages
+        for (session in sessions) {
+            dao.insertSession(
+                SessionEntity(
+                    id = session.id,
+                    title = session.title,
+                    createdAt = session.createdAt,
+                    updatedAt = session.updatedAt
+                )
+            )
+            if (session.messages.isNotEmpty()) {
+                dao.insertMessages(
+                    session.messages.map { msg ->
+                        MessageEntity(
+                            sessionId = session.id,
+                            messageId = msg.id,
+                            role = msg.role,
+                            content = msg.content
+                        )
+                    }
+                )
+            }
+        }
+
+        // Save active session ID
+        if (activeId != null) {
+            context.activeSessionStore.edit { prefs ->
                 prefs[KEY_ACTIVE_ID] = activeId
             }
         }
     }
 
+    /** Clear all data (sessions, messages, active ID). */
     suspend fun clear() {
-        context.sessionStore.edit { it.clear() }
+        dao.deleteAll()
+        context.activeSessionStore.edit { it.clear() }
     }
+}
+
+/** Convert Room entity to domain model. */
+private fun SessionWithMessages.toPersisted(): PersistedSession {
+    return PersistedSession(
+        id = session.id,
+        title = session.title,
+        messages = messages.map { msg ->
+            PersistedMessage(
+                id = msg.messageId,
+                role = msg.role,
+                content = msg.content
+            )
+        },
+        createdAt = session.createdAt,
+        updatedAt = session.updatedAt
+    )
 }

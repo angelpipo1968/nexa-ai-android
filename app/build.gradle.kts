@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 34
-        versionName = "3.4"
+        versionCode = 35
+        versionName = "3.5"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
@@ -51,6 +52,12 @@ android {
     }
 }
 
+detekt {
+    config.setFrom("$rootDir/config/detekt/detekt.yml")
+    buildUponDefaultConfig = true
+    allRules = false
+}
+
 dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.16.0")
@@ -78,12 +85,26 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
-    // DataStore (persistence)
+    // DataStore (preferences only)
     implementation("androidx.datastore:datastore-preferences:1.1.7")
+
+    // Room (database for sessions)
+    implementation("androidx.room:room-runtime:2.7.1")
+    implementation("androidx.room:room-ktx:2.7.1")
+    annotationProcessor("androidx.room:room-compiler:2.7.1")
 
     // Lifecycle ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    testImplementation("app.cash.turbine:turbine:1.2.0")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

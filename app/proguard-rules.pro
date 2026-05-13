@@ -25,3 +25,8 @@
 -keep class com.nexa.ai.viewmodel.NexaUiState { *; }
 -keep class com.nexa.ai.viewmodel.Message { *; }
 -keep class com.nexa.ai.viewmodel.ChatSession { *; }
+
+# Room
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**

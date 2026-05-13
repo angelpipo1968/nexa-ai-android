@@ -1,0 +1,63 @@
+# Detekt configuration for NEXA PRO
+# https://detekt.github.io/detekt/
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+complexity:
+  LongMethod:
+    active: true
+    threshold: 60
+  LongParameterList:
+    active: true
+    functionThreshold: 10
+    constructorThreshold: 10
+  ComplexMethod:
+    active: true
+    threshold: 15
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 20
+    thresholdInClasses: 15
+  LargeClass:
+    active: true
+    threshold: 300
+
+style:
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: true
+    max: 3
+  NestedBlockDepth:
+    active: true
+    max: 4
+  ForbiddenComment:
+    active: false
+  WildcardImport:
+    active: false
+
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Za-z][_A-Za-z0-9]*'
+  ClassNaming:
+    active: true
+    classPattern: '[A-Z][a-zA-Z0-9]*'
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: true
+  EmptyWhenBlock:
+    active: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
