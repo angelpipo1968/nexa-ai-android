@@ -111,18 +111,34 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
             }
         }
         if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
-            Row(modifier = Modifier.padding(top = 6.dp, start = 2.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.padding(top = 6.dp, start = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Speak button
                 Surface(onClick = onSpeak, shape = RoundedCornerShape(8.dp),
-                    color = if (isSpeaking) NexaAccent.copy(alpha = 0.08f) else Color.Transparent, modifier = Modifier.size(28.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp), tint = if (isSpeaking) NexaAccent.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
+                    color = if (isSpeaking) NexaAccent.copy(alpha = 0.12f) else Color.Transparent,
+                    modifier = Modifier.size(32.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp, null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
-                Surface(onClick = onCopy, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(28.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
+                // Copy button
+                Surface(onClick = onCopy, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(32.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    }
                 }
+                // More menu
                 var showMsgMenu by remember { mutableStateOf(false) }
                 Box {
-                    Surface(onClick = { showMsgMenu = true }, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(28.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
+                    Surface(onClick = { showMsgMenu = true }, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(32.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        }
                     }
                     DropdownMenu(expanded = showMsgMenu, onDismissRequest = { showMsgMenu = false }) {
                         DropdownMenuItem(
