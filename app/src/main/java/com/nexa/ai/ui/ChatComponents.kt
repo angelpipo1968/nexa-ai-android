@@ -333,10 +333,10 @@ fun GeneralSettingsDialog(
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-                // Theme — 3 options as chips
+                // Theme — 3 equal-width chips
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(NexaStrings.get("theme", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
                             ThemeMode.DARK to NexaStrings.get("dark", uiState.language),
                             ThemeMode.LIGHT to NexaStrings.get("light", uiState.language),
@@ -346,14 +346,18 @@ fun GeneralSettingsDialog(
                             FilterChip(
                                 selected = selected,
                                 onClick = { onSetThemeMode(mode) },
+                                modifier = Modifier.weight(1f),
                                 label = {
                                     Text(
-                                        when (mode) {
+                                        text = when (mode) {
                                             ThemeMode.DARK -> "🌙 $label"
                                             ThemeMode.LIGHT -> "☀️ $label"
                                             ThemeMode.SYSTEM -> "⚙️ $label"
                                         },
-                                        fontSize = 13.sp
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
@@ -361,7 +365,7 @@ fun GeneralSettingsDialog(
                                     selectedLabelColor = NexaAccent
                                 ),
                                 border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f))
-                                else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                             )
                         }
                     }
