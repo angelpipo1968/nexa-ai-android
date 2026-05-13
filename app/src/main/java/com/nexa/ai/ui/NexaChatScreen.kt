@@ -1495,7 +1495,6 @@ fun MessageBubble(
         }
     }
 }
-}
 
 @Composable
 fun ThinkingIndicator(lang: AppLanguage) {
