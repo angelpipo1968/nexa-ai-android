@@ -28,21 +28,24 @@ class UpdateChecker {
 
     private val gson = Gson()
 
+    companion object {
+        // Check GitHub releases directly — no server needed
+        private const val GITHUB_RELEASES_URL =
+            "https://api.github.com/repos/angelpipo1968/nexa-ai-android/releases/latest"
+        private const val FALLBACK_DOWNLOAD_URL =
+            "https://github.com/angelpipo1968/nexa-ai-android/releases/latest"
+    }
+
     /**
-     * Checks https://www.nexa-ai.dev/api/app-update for new versions.
-     * The endpoint should return JSON:
-     * {
-     *   "versionCode": 2,
-     *   "versionName": "2.1",
-     *   "downloadUrl": "https://github.com/angelpipo1968/nexa-ai-android/releases/latest",
-     *   "changelog": "Login, mejoras de UI...",
-     *   "forceUpdate": false
-     * }
+     * Checks GitHub Releases for new versions.
+     * Compares tag_name (e.g. "v3.1") against current versionCode.
+     * When a new release is found, returns UpdateInfo with the APK download URL.
      */
     suspend fun checkForUpdate(currentVersionCode: Int): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
-                .url("https://www.nexa-ai.dev/api/app-update")
+                .url(GITHUB_RELEASES_URL)
+                .addHeader("Accept", "application/vnd.github+json")
                 .build()
 
             val response = client.newCall(request).execute()
@@ -51,16 +54,40 @@ class UpdateChecker {
             val body = response.body?.string() ?: return@withContext null
             val obj = gson.fromJson(body, JsonObject::class.java)
 
-            val remoteVersion = obj.get("versionCode")?.asInt ?: return@withContext null
+            // Parse tag: "v3.1" → extract version code from name or use tag
+            val tagName = obj.get("tag_name")?.asString ?: return@withContext null
+            val versionName = tagName.removePrefix("v")
 
-            if (remoteVersion > currentVersionCode) {
+            // Try to get versionCode from the release body or use a numeric parse
+            // The versionCode is in app/build.gradle.kts — we compare by versionName
+            val remoteParts = versionName.split(".")
+            val remoteMajor = remoteParts.getOrNull(0)?.toIntOrNull() ?: 0
+            val remoteMinor = remoteParts.getOrNull(1)?.toIntOrNull() ?: 0
+            val remoteVersionCode = remoteMajor * 100 + remoteMinor
+
+            if (remoteVersionCode > currentVersionCode) {
+                // Find APK download URL from assets
+                val assets = obj.getAsJsonArray("assets")
+                var apkUrl = FALLBACK_DOWNLOAD_URL
+                if (assets != null) {
+                    for (asset in assets) {
+                        val assetObj = asset.asJsonObject
+                        val name = assetObj.get("name")?.asString ?: ""
+                        if (name.endsWith(".apk")) {
+                            apkUrl = assetObj.get("browser_download_url")?.asString ?: FALLBACK_DOWNLOAD_URL
+                            break
+                        }
+                    }
+                }
+
+                val changelog = obj.get("body")?.asString ?: "Nueva versión disponible"
+
                 UpdateInfo(
-                    versionCode = remoteVersion,
-                    versionName = obj.get("versionName")?.asString ?: "$remoteVersion",
-                    downloadUrl = obj.get("downloadUrl")?.asString
-                        ?: "https://github.com/angelpipo1968/nexa-ai-android/releases/latest",
-                    changelog = obj.get("changelog")?.asString ?: "Nueva versión disponible",
-                    forceUpdate = obj.get("forceUpdate")?.asBoolean ?: false
+                    versionCode = remoteVersionCode,
+                    versionName = versionName,
+                    downloadUrl = apkUrl,
+                    changelog = changelog.take(500),
+                    forceUpdate = false
                 )
             } else {
                 null
