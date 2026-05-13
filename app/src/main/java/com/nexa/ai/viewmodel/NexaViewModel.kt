@@ -947,7 +947,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
             // Footer
             paint.textSize = 8f
-            paint.color = android.graphics.Color.LT_GRAY
+            paint.color = android.graphics.Color.LTGRAY
             canvas.drawText("Generado por NEXA PRO", 50f, 820f, paint)
 
             pdfDocument.finishPage(page)

@@ -1085,33 +1085,6 @@ fun DrawerContent(
             }
         }
 
-        // Account
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { if (user.isLoggedIn) onLogout() else onNavigateToLogin() }.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else NexaAccent.copy(alpha = 0.12f),
-                modifier = Modifier.size(30.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(if (user.isLoggedIn) Icons.Default.Logout else Icons.Default.Person, null, modifier = Modifier.size(16.dp), tint = if (user.isLoggedIn) MaterialTheme.colorScheme.error else NexaAccent)
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (user.isLoggedIn) NexaStrings.get("logout", lang) else NexaStrings.get("login", lang),
-                    fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = if (user.isLoggedIn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                )
-                if (user.isLoggedIn) {
-                    Text(user.email, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                }
-            }
-        }
-        }
 
         Spacer(modifier = Modifier.weight(1f))
 
