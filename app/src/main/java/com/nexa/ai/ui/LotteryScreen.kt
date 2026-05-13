@@ -1,6 +1,5 @@
 package com.nexa.ai.ui
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -22,8 +21,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nexa.ai.BuildConfig
+import com.nexa.ai.data.*
 import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.viewmodel.AppLanguage
+import kotlinx.coroutines.launch
 
 // ═══════════════════════════════════════
 //  LOTTERY SCREEN
@@ -36,12 +38,19 @@ fun LotteryScreen(
     isDarkTheme: Boolean,
     onBack: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val repository = remember { LotteryRepository() }
+    val baseUrl = BuildConfig.API_BASE_URL
+
     var selectedGame by remember { mutableStateOf("melate") }
     var isLoading by remember { mutableStateOf(false) }
     var resultNumbers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var generatedTickets by remember { mutableStateOf<List<List<String>>>(emptyList()) }
-    var lastDrawInfo by remember { mutableStateOf<String?>(null) }
-    var nextDrawInfo by remember { mutableStateOf<String?>(null) }
+    var extraNumbers by remember { mutableStateOf<List<String>>(emptyList()) }
+    var generatedTickets by remember { mutableStateOf<List<LotteryTicket>>(emptyList()) }
+    var lastDrawDate by remember { mutableStateOf<String?>(null) }
+    var nextDrawDate by remember { mutableStateOf<String?>(null) }
+    var nextJackpot by remember { mutableStateOf<String?>(null) }
+    var recommendedNumbers by remember { mutableStateOf<List<String>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var activeTab by remember { mutableStateOf(0) } // 0=results, 1=generate
 
@@ -55,6 +64,49 @@ fun LotteryScreen(
         "megamillions" to "🇺🇸 Mega Millions",
         "baloto" to "🇨🇴 Baloto"
     )
+
+    fun loadResults() {
+        scope.launch {
+            isLoading = true; errorMessage = null
+            when (val result = repository.getResults(baseUrl, selectedGame)) {
+                is ApiResult.Success -> {
+                    resultNumbers = result.data.numbers
+                    extraNumbers = result.data.extraNumbers
+                    lastDrawDate = result.data.drawDate
+                }
+                is ApiResult.Error -> errorMessage = result.message
+            }
+            // Also load next draw info
+            when (val next = repository.getNextDraw(baseUrl, selectedGame)) {
+                is ApiResult.Success -> {
+                    nextDrawDate = next.data.date
+                    nextJackpot = next.data.jackpot
+                }
+                is ApiResult.Error -> {} // Silently fail for next draw
+            }
+            isLoading = false
+        }
+    }
+
+    fun loadTickets() {
+        scope.launch {
+            isLoading = true; errorMessage = null
+            when (val result = repository.getTickets(baseUrl, selectedGame, 5)) {
+                is ApiResult.Success -> generatedTickets = result.data
+                is ApiResult.Error -> errorMessage = result.message
+            }
+            isLoading = false
+        }
+    }
+
+    fun loadRecommended() {
+        scope.launch {
+            when (val result = repository.getRecommendedNumbers(baseUrl, selectedGame)) {
+                is ApiResult.Success -> recommendedNumbers = result.data
+                is ApiResult.Error -> {} // Silently fail
+            }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -89,7 +141,12 @@ fun LotteryScreen(
                     val selected = selectedGame == key
                     FilterChip(
                         selected = selected,
-                        onClick = { selectedGame = key; resultNumbers = emptyList(); generatedTickets = emptyList() },
+                        onClick = {
+                            selectedGame = key
+                            resultNumbers = emptyList(); extraNumbers = emptyList()
+                            generatedTickets = emptyList(); recommendedNumbers = emptyList()
+                            lastDrawDate = null; nextDrawDate = null; nextJackpot = null
+                        },
                         label = { Text(label, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
@@ -103,21 +160,11 @@ fun LotteryScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Tabs: Results / Generate
+            // Tabs
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TabButton(
-                    text = "📊 Resultados",
-                    selected = activeTab == 0,
-                    onClick = { activeTab = 0 },
-                    modifier = Modifier.weight(1f)
-                )
-                TabButton(
-                    text = "🎲 Generar",
-                    selected = activeTab == 1,
-                    onClick = { activeTab = 1 },
-                    modifier = Modifier.weight(1f)
-                )
+                TabButton(text = "📊 Resultados", selected = activeTab == 0, onClick = { activeTab = 0 }, modifier = Modifier.weight(1f))
+                TabButton(text = "🎲 Generar", selected = activeTab == 1, onClick = { activeTab = 1 }, modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -135,62 +182,55 @@ fun LotteryScreen(
                             text = "Ver último resultado",
                             icon = Icons.Default.Refresh,
                             isLoading = isLoading,
-                            onClick = {
-                                isLoading = true; errorMessage = null
-                                // TODO: Call /api/lottery?action=results&game=$selectedGame
-                                // For now, show placeholder
-                                isLoading = false
-                                resultNumbers = listOf("07", "12", "23", "34", "41", "52")
-                                lastDrawInfo = "Sorteo: 13 Mayo 2026"
-                            }
+                            onClick = { loadResults() }
                         )
                     }
 
                     if (errorMessage != null) {
-                        item {
-                            ErrorCard(errorMessage!!)
-                        }
+                        item { ErrorCard(errorMessage!!) }
                     }
 
                     if (resultNumbers.isNotEmpty()) {
                         item {
                             ResultCard(
                                 numbers = resultNumbers,
-                                drawInfo = lastDrawInfo,
-                                nextDraw = nextDrawInfo
+                                extraNumbers = extraNumbers,
+                                drawDate = lastDrawDate,
+                                nextDrawDate = nextDrawDate,
+                                jackpot = nextJackpot
                             )
                         }
                     }
+
+                    // Recommended numbers
+                    if (recommendedNumbers.isNotEmpty()) {
+                        item {
+                            RecommendedCard(numbers = recommendedNumbers)
+                        }
+                    }
+
+                    // Load recommended on first view
+                    item {
+                        LaunchedEffect(selectedGame) { loadRecommended() }
+                    }
+
                 } else {
                     // Generate tab
                     item {
                         ActionButton(
-                            text = "Generar 5 boletos",
+                            text = "Generar 5 boletos recomendados",
                             icon = Icons.Default.Casino,
                             isLoading = isLoading,
-                            onClick = {
-                                isLoading = true; errorMessage = null
-                                // TODO: Call /api/lottery?action=tickets&game=$selectedGame&tickets=5
-                                // For now, generate locally
-                                isLoading = false
-                                generatedTickets = (1..5).map {
-                                    (1..6).map { (1..50).random().toString().padStart(2, '0') }
-                                }
-                            }
+                            onClick = { loadTickets() }
                         )
                     }
 
                     if (errorMessage != null) {
-                        item {
-                            ErrorCard(errorMessage!!)
-                        }
+                        item { ErrorCard(errorMessage!!) }
                     }
 
                     items(generatedTickets.size) { index ->
-                        TicketCard(
-                            ticketNumber = index + 1,
-                            numbers = generatedTickets[index]
-                        )
+                        TicketCard(ticketNumber = index + 1, ticket = generatedTickets[index])
                     }
                 }
             }
@@ -205,33 +245,21 @@ fun LotteryScreen(
 @Composable
 private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        onClick = onClick, modifier = modifier, shape = RoundedCornerShape(12.dp),
         color = if (selected) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
         border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f))
         else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(vertical = 12.dp),
-            textAlign = TextAlign.Center,
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
+        Text(text = text, modifier = Modifier.padding(vertical = 12.dp), textAlign = TextAlign.Center,
+            fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
     }
 }
 
 @Composable
 private fun ActionButton(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, isLoading: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = NexaAccent),
-        enabled = !isLoading
-    ) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = NexaAccent), enabled = !isLoading) {
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
         } else {
@@ -243,87 +271,95 @@ private fun ActionButton(text: String, icon: androidx.compose.ui.graphics.vector
 }
 
 @Composable
-private fun ResultCard(numbers: List<String>, drawInfo: String?, nextDraw: String?) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            if (drawInfo != null) {
-                Text(drawInfo, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+private fun ResultCard(numbers: List<String>, extraNumbers: List<String>, drawDate: String?, nextDrawDate: String?, jackpot: String?) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
+        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (drawDate != null) {
+                Text("Sorteo: $drawDate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
             }
 
-            // Number balls
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                numbers.forEach { num ->
-                    Ball(number = num)
+            // Main numbers
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                numbers.forEach { num -> Ball(number = num) }
+            }
+
+            // Extra/bonus numbers
+            if (extraNumbers.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    extraNumbers.forEach { num -> Ball(number = num, isBonus = true) }
                 }
             }
 
-            if (nextDraw != null) {
+            // Next draw info
+            if (nextDrawDate != null || jackpot != null) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-                Text("Próximo sorteo: $nextDraw", fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f))
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (nextDrawDate != null) {
+                        Text("Próximo sorteo: $nextDrawDate", fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f))
+                    }
+                    if (jackpot != null) {
+                        Text("Premio: $jackpot", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = NexaAccent)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun Ball(number: String) {
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(
-                Brush.radialGradient(
-                    listOf(NexaAccent.copy(alpha = 0.2f), NexaAccent.copy(alpha = 0.05f))
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = number,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = NexaAccent
-        )
+private fun RecommendedCard(numbers: List<String>) {
+    Surface(shape = RoundedCornerShape(14.dp), color = NexaAccent.copy(alpha = 0.04f),
+        border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.1f))) {
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("⭐ Números recomendados", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                color = NexaAccent.copy(alpha = 0.6f))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                numbers.forEach { num -> Ball(number = num) }
+            }
+        }
     }
 }
 
 @Composable
-private fun TicketCard(ticketNumber: Int, numbers: List<String>) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Boleto #$ticketNumber",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = NexaAccent.copy(alpha = 0.6f)
+private fun Ball(number: String, isBonus: Boolean = false) {
+    Box(
+        modifier = Modifier.size(42.dp).clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    if (isBonus) listOf(Color(0xFFFFD700).copy(alpha = 0.2f), Color(0xFFFFD700).copy(alpha = 0.05f))
+                    else listOf(NexaAccent.copy(alpha = 0.2f), NexaAccent.copy(alpha = 0.05f))
                 )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = number, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+            color = if (isBonus) Color(0xFFFFD700) else NexaAccent)
+    }
+}
+
+@Composable
+private fun TicketCard(ticketNumber: Int, ticket: LotteryTicket) {
+    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("Boleto #$ticketNumber", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    color = NexaAccent.copy(alpha = 0.6f))
                 Icon(Icons.Default.Casino, null, modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                numbers.forEach { num ->
-                    Ball(number = num)
+                ticket.numbers.forEach { num -> Ball(number = num) }
+            }
+            if (ticket.extraNumbers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ticket.extraNumbers.forEach { num -> Ball(number = num, isBonus = true) }
                 }
             }
         }
@@ -332,11 +368,8 @@ private fun TicketCard(ticketNumber: Int, numbers: List<String>) {
 
 @Composable
 private fun ErrorCard(message: String) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
-    ) {
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.1f))) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Default.ErrorOutline, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
