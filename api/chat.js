@@ -157,7 +157,207 @@ const SYSTEM_PROMPT = `Eres NEXA PRO, un asistente de IA avanzado. Característi
 - Si te preguntan qué eres, dices que eres NEXA PRO
 - No uses markdown excesivo, sé natural en tus respuestas
 - Si el usuario te saluda, responde de forma amigable y breve
-- Máximo 500 tokens por respuesta para mantener las respuestas concisas`;
+- Máximo 500 tokens por respuesta para mantener las respuestas concisas
+
+CAPACIDADES ESPECIALES:
+- LOTERÍA: Puedes consultar resultados de loterías (Melate, EuroMillones, Powerball, etc.) y generar números recomendados.
+- VUELOS: Cuando el usuario pregunte por vuelos, rutas aéreas, o el estado de un vuelo, SIEMPRE incluye la información de vuelos que te proporciono en el contexto. Si no hay datos de vuelos disponibles, sugiérele al usuario que proporcione más detalles (ciudad origen, destino, fecha).
+
+FORMATO DE RESPUESTA PARA VUELOS:
+- Muestra aerolínea, número de vuelo, horario de salida y llegada
+- Indica el estado del vuelo (a tiempo, retrasado, etc.)
+- Si hay retraso, menciona cuántos minutos
+- Sé conciso pero informativo`;
+
+// ═══════════════════════════════════════
+//  FLIGHT DETECTION & DATA FETCHING
+// ═══════════════════════════════════════
+
+// Common airport codes mapping
+const AIRPORT_CODES = {
+  // México
+  'ciudad de mexico': 'MEX', 'cdmx': 'MEX', 'mexico city': 'MEX', 'guadalajara': 'GDL',
+  'monterrey': 'MTY', 'cancun': 'CUN', 'tijuana': 'TIJ', 'puebla': 'PBC',
+  'queretaro': 'QRO', 'mazatlan': 'MZT', 'puerto vallarta': 'PVR', 'los cabos': 'SJD',
+  'merida': 'MID', 'oaxaca': 'OAX', 'acapulco': 'ACA', 'leon': 'BJX',
+  // España
+  'madrid': 'MAD', 'barcelona': 'BCN', 'malaga': 'AGP', 'sevilla': 'SVQ',
+  'valencia': 'VLC', 'palma': 'PMI', 'bilbao': 'BIO', 'ibiza': 'IBZ',
+  // USA
+  'new york': 'JFK', 'nueva york': 'JFK', 'los angeles': 'LAX', 'miami': 'MIA',
+  'chicago': 'ORD', 'houston': 'IAH', 'dallas': 'DFW', 'san francisco': 'SFO',
+  'las vegas': 'LAS', 'orlando': 'MCO', 'atlanta': 'ATL', 'denver': 'DEN',
+  'washington': 'IAD', 'boston': 'BOS', 'seattle': 'SEA',
+  // Colombia
+  'bogota': 'BOG', 'medellin': 'MDE', 'cali': 'CLO', 'cartagena': 'CTG',
+  // Argentina
+  'buenos aires': 'EZE', 'cordoba': 'COR',
+  // Otros
+  'london': 'LHR', 'londres': 'LHR', 'paris': 'CDG', 'roma': 'FCO',
+  'tokyo': 'NRT', 'tokio': 'NRT', 'dubai': 'DXB', 'sao paulo': 'GRU',
+  'lima': 'LIM', 'santiago': 'SCL', 'quito': 'UIO',
+};
+
+function detectFlightQuery(userMessage) {
+  const msg = userMessage.toLowerCase();
+
+  // Flight keywords
+  const flightKeywords = [
+    'vuelo', 'vuelos', 'volar', 'flight', 'flights', 'fly',
+    'aeropuerto', 'airport', 'aerolinea', 'airline',
+    'salida', 'llegada', 'departure', 'arrival',
+    'boleto', 'boleto de avion', 'ticket', 'boarding',
+    'retrasado', 'delayed', 'a tiempo', 'on time',
+  ];
+
+  const hasFlightKeyword = flightKeywords.some(kw => msg.includes(kw));
+
+  // Route pattern: "de X a Y" or "X to Y" or "X - Y"
+  const routePattern = /(?:de|from)\s+(\w[\w\s]*?)\s+(?:a|to|hasta)\s+(\w[\w\s]*?)(?:\s|$|,|\?|\.)/i;
+  const routeMatch = msg.match(routePattern);
+
+  // Flight number pattern: "AA100", "IB3200", "AM123"
+  const flightNumPattern = /\b([A-Z]{2}\d{1,4})\b/i;
+  const flightNumMatch = msg.match(flightNumPattern);
+
+  // Date pattern
+  const datePattern = /(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/;
+  const dateMatch = msg.match(datePattern);
+
+  if (!hasFlightKeyword && !routeMatch && !flightNumMatch) return null;
+
+  const result = { type: null, dep: null, arr: null, date: null, flight: null };
+
+  if (flightNumMatch) {
+    result.type = 'track';
+    result.flight = flightNumMatch[1].toUpperCase();
+    return result;
+  }
+
+  if (routeMatch) {
+    result.type = 'search';
+    const fromCity = routeMatch[1].trim().toLowerCase();
+    const toCity = routeMatch[2].trim().toLowerCase();
+
+    // Try to find airport codes
+    result.dep = findAirportCode(fromCity);
+    result.arr = findAirportCode(toCity);
+  } else if (hasFlightKeyword) {
+    // Try to extract any city names mentioned
+    result.type = 'search';
+    for (const [city, code] of Object.entries(AIRPORT_CODES)) {
+      if (msg.includes(city)) {
+        if (!result.dep) result.dep = code;
+        else if (!result.arr) result.arr = code;
+      }
+    }
+  }
+
+  // Extract date
+  if (dateMatch) {
+    const day = dateMatch[1].padStart(2, '0');
+    const month = dateMatch[2].padStart(2, '0');
+    const year = dateMatch[3] || new Date().getFullYear();
+    result.date = `${year}-${month}-${day}`;
+  }
+
+  // Only return if we have at least departure or flight number
+  if (result.dep || result.flight) return result;
+  return null;
+}
+
+function findAirportCode(city) {
+  // Exact match first
+  if (AIRPORT_CODES[city]) return AIRPORT_CODES[city];
+  // Partial match
+  for (const [key, code] of Object.entries(AIRPORT_CODES)) {
+    if (city.includes(key) || key.includes(city)) return code;
+  }
+  // Check if it's already an IATA code
+  if (/^[A-Z]{3}$/i.test(city)) return city.toUpperCase();
+  return null;
+}
+
+async function fetchFlightData(flightQuery) {
+  const apiKey = process.env.AVIATIONSTACK_KEY;
+  if (!apiKey) return null;
+
+  try {
+    let url;
+    if (flightQuery.type === 'track' && flightQuery.flight) {
+      url = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flightQuery.flight}&limit=5`;
+    } else if (flightQuery.type === 'search' && flightQuery.dep) {
+      url = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&dep_iata=${flightQuery.dep}&limit=5`;
+      if (flightQuery.arr) url += `&arr_iata=${flightQuery.arr}`;
+      if (flightQuery.date) url += `&flight_date=${flightQuery.date}`;
+    } else {
+      return null;
+    }
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.data || data.data.length === 0) return null;
+
+    return data.data.map(f => ({
+      airline: f.airline?.name || 'N/A',
+      flight: f.flight?.iata || 'N/A',
+      from: f.departure?.airport || f.departure?.iata || 'N/A',
+      fromCode: f.departure?.iata || 'N/A',
+      to: f.arrival?.airport || f.arrival?.iata || 'N/A',
+      toCode: f.arrival?.iata || 'N/A',
+      scheduledDep: f.departure?.scheduled || null,
+      estimatedDep: f.departure?.estimated || null,
+      scheduledArr: f.arrival?.scheduled || null,
+      estimatedArr: f.arrival?.estimated || null,
+      depDelay: f.departure?.delay || null,
+      arrDelay: f.arrival?.delay || null,
+      status: f.flight_status || 'unknown',
+      terminal: f.departure?.terminal || null,
+      gate: f.departure?.gate || null,
+    }));
+  } catch (err) {
+    console.error('Flight API error:', err);
+    return null;
+  }
+}
+
+function formatFlightContext(flights) {
+  if (!flights || flights.length === 0) return '';
+
+  let ctx = '\n\n[DATOS DE VUELOS EN TIEMPO REAL]\n';
+  flights.forEach((f, i) => {
+    ctx += `\nVuelo ${i + 1}: ${f.airline} ${f.flight}\n`;
+    ctx += `  Ruta: ${f.from} (${f.fromCode}) → ${f.to} (${f.toCode})\n`;
+    if (f.scheduledDep) {
+      const depTime = new Date(f.scheduledDep).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      ctx += `  Salida: ${depTime}`;
+      if (f.depDelay) ctx += ` (retraso: ${f.depDelay} min)`;
+      ctx += '\n';
+    }
+    if (f.scheduledArr) {
+      const arrTime = new Date(f.scheduledArr).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      ctx += `  Llegada: ${arrTime}`;
+      if (f.arrDelay) ctx += ` (retraso: ${f.arrDelay} min)`;
+      ctx += '\n';
+    }
+    const statusMap = {
+      'scheduled': 'Programado',
+      'active': 'En vuelo',
+      'landed': 'Aterrizado',
+      'cancelled': 'Cancelado',
+      'delayed': 'Retrasado',
+      'diverted': 'Desviado',
+      'incident': 'Incidente',
+      'unknown': 'Desconocido',
+    };
+    ctx += `  Estado: ${statusMap[f.status] || f.status}\n`;
+    if (f.terminal) ctx += `  Terminal: ${f.terminal}\n`;
+    if (f.gate) ctx += `  Puerta: ${f.gate}\n`;
+  });
+  ctx += '[FIN DATOS DE VUELOS]\n';
+  return ctx;
+}
 
 // ═══════════════════════════════════════
 //  HANDLER
@@ -220,6 +420,26 @@ export default async function handler(req) {
     // Add system prompt if not present
     if (!sanitizedMessages.some(m => m.role === 'system')) {
       sanitizedMessages.unshift({ role: 'system', content: SYSTEM_PROMPT });
+    }
+
+    // Detect flight queries and fetch real data
+    const lastUserMsg = [...sanitizedMessages].reverse().find(m => m.role === 'user');
+    if (lastUserMsg) {
+      const flightQuery = detectFlightQuery(lastUserMsg.content);
+      if (flightQuery) {
+        const flightData = await fetchFlightData(flightQuery);
+        if (flightData && flightData.length > 0) {
+          const flightContext = formatFlightContext(flightData);
+          // Inject flight data into the system prompt
+          const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+          if (sysIdx >= 0) {
+            sanitizedMessages[sysIdx] = {
+              ...sanitizedMessages[sysIdx],
+              content: sanitizedMessages[sysIdx].content + flightContext,
+            };
+          }
+        }
+      }
     }
 
     // Select provider: requested → env default → first available
