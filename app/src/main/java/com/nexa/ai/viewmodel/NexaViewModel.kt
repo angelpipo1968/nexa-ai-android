@@ -199,6 +199,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(currentScreen = Screen.CHAT)
     }
 
+    fun navigateToLottery() {
+        _uiState.value = _uiState.value.copy(currentScreen = Screen.LOTTERY, drawerOpen = false)
+    }
+
     fun updateLoginEmail(email: String) {
         _uiState.value = _uiState.value.copy(loginEmail = email)
     }

@@ -62,7 +62,8 @@ fun ChatMainScreen(
     onSurpriseMe: () -> Unit,
     onSetDrawerView: (Int) -> Unit,
     onAttachFile: () -> Unit,
-    onClearAttachment: () -> Unit = {}
+    onClearAttachment: () -> Unit = {},
+    onNavigateToLottery: () -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -91,7 +92,8 @@ fun ChatMainScreen(
                 onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
                 onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
                 onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
-                onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView
+                onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
+                onNavigateToLottery = onNavigateToLottery
             )
         },
         gesturesEnabled = true
@@ -136,7 +138,7 @@ fun DrawerContent(
     onDeleteSession: (String) -> Unit, onClose: () -> Unit, onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit, onSetLanguage: (AppLanguage) -> Unit, onSetVoiceType: (VoiceType) -> Unit,
     onToggleTheme: () -> Unit, onToggleSettings: () -> Unit, onToggleAutoSpeak: () -> Unit,
-    onSetDrawerView: (Int) -> Unit
+    onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {}
 ) {
     val sessions = uiState.sessions
     val activeSessionId = uiState.activeSessionId
@@ -187,6 +189,23 @@ fun DrawerContent(
             items(sessions, key = { it.id }) { session ->
                 ChatSessionItem(session = session, language = lang, isActive = session.id == activeSessionId,
                     onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) })
+            }
+        }
+
+        // Lottery button
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                .clickable { onNavigateToLottery(); onClose() },
+            shape = RoundedCornerShape(12.dp),
+            color = NexaAccent.copy(alpha = 0.04f),
+            border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.08f))
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("🎰", fontSize = 16.sp)
+                Text("Lotería", fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                    color = NexaAccent.copy(alpha = 0.7f))
             }
         }
 

@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
                         onNavigateToLogin = { viewModel.navigateToLogin() },
                         onNavigateToRegister = { viewModel.navigateToRegister() },
                         onNavigateToChat = { viewModel.navigateToChat() },
+                        onNavigateToLottery = { viewModel.navigateToLottery() },
                         onUpdateLoginEmail = { viewModel.updateLoginEmail(it) },
                         onUpdateLoginPassword = { viewModel.updateLoginPassword(it) },
                         onLogin = { viewModel.login() },

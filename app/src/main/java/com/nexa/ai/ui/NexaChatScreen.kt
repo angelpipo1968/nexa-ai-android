@@ -36,6 +36,7 @@ fun NexaChatScreen(
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToChat: () -> Unit,
+    onNavigateToLottery: () -> Unit = {},
     onUpdateLoginEmail: (String) -> Unit,
     onUpdateLoginPassword: (String) -> Unit,
     onLogin: () -> Unit,
@@ -95,7 +96,13 @@ fun NexaChatScreen(
             onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
             onCopyMessage = onCopyMessage, onExportMessage = onExportMessage,
             onSurpriseMe = onSurpriseMe, onSetDrawerView = onSetDrawerView,
-            onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
+            onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
+            onNavigateToLottery = onNavigateToLottery)
+        Screen.LOTTERY -> LotteryScreen(
+            language = uiState.language,
+            isDarkTheme = isDark,
+            onBack = onNavigateToChat
+        )
     }
 
     // Settings dialog
