@@ -858,7 +858,7 @@ fun DrawerContent(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // New chat button
         Surface(
@@ -935,17 +935,23 @@ fun DrawerContent(
                 }
                 Text(NexaStrings.get("language", lang), fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(AppLanguage.SPANISH to "🇪🇸", AppLanguage.ENGLISH to "🇺🇸").forEach { (l, flag) ->
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (lang == l) NexaAccent.copy(alpha = 0.15f) else Color.Transparent,
-                            border = if (lang == l) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.4f)) else null,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable { onSetLanguage(l) }
-                        ) {
-                            Text(flag, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                        }
+                    // Spanish flag
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (lang == AppLanguage.SPANISH) NexaAccent.copy(alpha = 0.15f) else Color.Transparent,
+                        border = if (lang == AppLanguage.SPANISH) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.4f)) else null,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onSetLanguage(AppLanguage.SPANISH) }
+                    ) {
+                        Text("\uD83C\uDDEA\uD83C\uDDF8", fontSize = 14.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                    // English flag
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (lang == AppLanguage.ENGLISH) NexaAccent.copy(alpha = 0.15f) else Color.Transparent,
+                        border = if (lang == AppLanguage.ENGLISH) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.4f)) else null,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onSetLanguage(AppLanguage.ENGLISH) }
+                    ) {
+                        Text("\uD83C\uDDFA\uD83C\uDDF8", fontSize = 14.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
                 }
             }
@@ -1107,9 +1113,30 @@ fun DrawerContent(
             }
         }
 
-        // Footer
+        // Settings gear at bottom
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            IconButton(
+                onClick = {
+                    onToggleSettings()
+                    onClose()
+                },
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = NexaStrings.get("settings", lang),
+                    tint = NexaAccent.copy(alpha = 0.6f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        // Footer with more spacing
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp, bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("${sessions.size} ${NexaStrings.get("chats", lang)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
@@ -1414,10 +1441,25 @@ fun MessageBubble(
 ) {
     val isUser = message.role == "user"
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
+        // Label for bot messages
+        if (!isUser && !message.isStreaming) {
+            Row(
+                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(NexaAccent.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) { Text("⚡", fontSize = 8.sp) }
+                Text("NEXA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.sp)
+            }
+        }
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
-            color = if (isUser) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            shadowElevation = if (!isUser) 1.dp else 0.dp
+            color = if (isUser) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shadowElevation = if (!isUser) 2.dp else 0.dp,
+            border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)) else null
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (message.attachmentName != null && message.content.startsWith("📎")) {
