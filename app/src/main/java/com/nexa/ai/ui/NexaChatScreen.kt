@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nexa.ai.BuildConfig
+
 import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.viewmodel.*
 import kotlinx.coroutines.launch
@@ -1160,14 +1160,6 @@ fun EmptyState(lang: AppLanguage) {
                 .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.02f), Color.Transparent))),
             contentAlignment = Alignment.Center
         ) { Text("⚡", fontSize = 32.sp) }
-        Spacer(modifier = Modifier.height(28.dp))
-        Text("NEXA PRO", fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = 6.sp, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(modifier = Modifier.height(6.dp))
-        Surface(shape = RoundedCornerShape(16.dp), color = NexaAccent.copy(alpha = 0.08f)) {
-            Text("v${BuildConfig.VERSION_NAME}", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.5.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(NexaStrings.get("welcome_msg", lang), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), textAlign = TextAlign.Center, lineHeight = 24.sp, letterSpacing = 0.3.sp)
     }
 }
 

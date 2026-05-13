@@ -522,6 +522,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             .replace(Regex("#{1,6}\\s*"), "")
             .replace(Regex("\\*{1,3}(.+?)\\*{1,3}"), "$1")
             .replace(Regex("_{1,3}(.+?)_{1,3}"), "$1")
+            // Stray asterisks (after markdown cleanup)
+            .replace(Regex("\\*+"), "")
             // Code blocks → just the word "código"
             .replace(Regex("```[\\s\\S]*?```"), "código")
             .replace(Regex("`([^`]+)`"), "$1")
