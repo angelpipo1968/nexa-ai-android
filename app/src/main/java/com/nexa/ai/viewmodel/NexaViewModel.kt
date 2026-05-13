@@ -518,6 +518,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             .replace(Regex("`([^`]+)`"), "$1")
             .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
             .replace(Regex("!\\[[^]]*]\\([^)]+\\)"), "")
+            // Remove emojis and symbols
+            .replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), "")
+            .replace(Regex("[\\u2600-\\u27BF\\uFE00-\\uFE0F\\u200D\\u20E3\\u2000-\\u206F\\u2190-\\u21FF\\u2300-\\u23FF\\u25A0-\\u25FF\\u2700-\\u27BF\\u2B50-\\u2B55\\u2934-\\u2935\\u3030\\u303D\\u3297\\u3299]+"), "")
+            .replace(Regex("[🎤🔄🎙️📎🚫✅❌💡🔍📊🎯⚡🚀✨💬🤔📝🛠️🔗🏠👤🔒📧🎵🔔📱💻🎉❤️👍😊🤖👋🔥💪✨️☑️⭐]+"), "")
+            .replace(Regex("[•➤→←↑↓►▸▹‣⁃]+"), "")
+            .replace(Regex("[─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬]+"), "")
             .replace(Regex("\\n{2,}"), ". ")
             .replace(Regex("\\n"), ". ")
             .replace(Regex("\\s{2,}"), " ")
