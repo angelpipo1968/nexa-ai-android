@@ -1084,8 +1084,6 @@ fun DrawerContent(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-
         // Account
         Row(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { if (user.isLoggedIn) onLogout() else onNavigateToLogin() }.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -1111,16 +1109,6 @@ fun DrawerContent(
                     Text(user.email, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                 }
             }
-        }
-
-        // Footer: chats count + version
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("${sessions.size} ${NexaStrings.get("chats", lang)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
-            Spacer(modifier = Modifier.height(2.dp))
-            Text("NEXA PRO v3.0", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f), letterSpacing = 1.sp)
         }
 
         Spacer(modifier = Modifier.weight(0.1f))
