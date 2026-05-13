@@ -500,6 +500,254 @@ function formatStackOverflowContext(questions) {
 }
 
 // ═══════════════════════════════════════
+//  GITHUB API — Search repos & code
+// ═══════════════════════════════════════
+
+function detectGitHubQuery(userMessage) {
+  const msg = userMessage.toLowerCase();
+  const ghKeywords = ['github', 'repositorio', 'repo', 'repository', 'código fuente', 'source code',
+    'open source', 'librería para', 'library for', 'paquete npm', 'npm package', 'pip package',
+    'framework para', 'framework for', 'alternativa a', 'alternative to'];
+
+  const hasKeyword = ghKeywords.some(kw => msg.includes(kw));
+  if (!hasKeyword) return null;
+
+  // Extract search terms
+  let query = msg
+    .replace(/\b(buscar|search|find|encontrar|dame|muestra|show|find|look|up|for|me|the|a|an|el|la|los|las|un|una|de|del|en|que|github|repositorio|repo|código|source|open|library|librería|paquete|npm|framework|alternativa|alternative)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 100);
+
+  if (query.length < 3) query = msg.slice(0, 100);
+  return query;
+}
+
+async function fetchGitHubData(query) {
+  try {
+    const encodedQuery = encodeURIComponent(query);
+    const url = `https://api.github.com/search/repositories?q=${encodedQuery}&sort=stars&order=desc&per_page=3`;
+
+    const resp = await fetch(url, {
+      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'NexaProBot' }
+    });
+    const data = await resp.json();
+
+    if (!data.items || data.items.length === 0) return null;
+
+    return data.items.map(repo => ({
+      name: repo.full_name,
+      description: repo.description?.slice(0, 200) || 'Sin descripción',
+      stars: repo.stargazers_count,
+      language: repo.language || 'N/A',
+      url: repo.html_url,
+      updated: repo.updated_at?.split('T')[0] || 'N/A',
+      topics: repo.topics?.slice(0, 5) || [],
+    }));
+  } catch (err) {
+    console.error('GitHub API error:', err);
+    return null;
+  }
+}
+
+function formatGitHubContext(repos) {
+  if (!repos || repos.length === 0) return '';
+  let ctx = '\n\n[RESULTADOS DE GITHUB]\n';
+  repos.forEach((r, i) => {
+    ctx += `\n${i + 1}. ${r.name} ⭐ ${r.stars}\n`;
+    ctx += `   ${r.description}\n`;
+    ctx += `   Lenguaje: ${r.language}`;
+    if (r.topics.length > 0) ctx += ` | Tags: ${r.topics.join(', ')}`;
+    ctx += `\n   ${r.url}\n`;
+  });
+  ctx += '[FIN GITHUB]\n';
+  return ctx;
+}
+
+// ═══════════════════════════════════════
+//  MDN WEB DOCS — Search web documentation
+// ═══════════════════════════════════════
+
+function detectMDNQuery(userMessage) {
+  const msg = userMessage.toLowerCase();
+  const mdnKeywords = ['mdn', 'documentación', 'documentation', 'web api', 'dom', 'css property',
+    'html tag', 'javascript method', 'fetch api', 'promise', 'async await', 'addEventListener',
+    'querySelector', 'flexbox', 'grid', 'position', 'display', 'margin', 'padding',
+    'qué es css', 'qué es html', 'qué es javascript', 'qué es dom',
+    'propiedad css', 'atributo html', 'método javascript'];
+
+  const hasKeyword = mdnKeywords.some(kw => msg.includes(kw));
+  if (!hasKeyword) return null;
+
+  let query = msg
+    .replace(/\b(buscar|search|find|encontrar|dame|muestra|show|me|the|a|an|el|la|de|del|en|que|qué|es|documentación|documentation|web|api|propiedad|método|attribute|tag)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 100);
+
+  if (query.length < 3) return null;
+  return query;
+}
+
+async function fetchMDNData(query) {
+  try {
+    const encodedQuery = encodeURIComponent(query);
+    const url = `https://developer.mozilla.org/api/v1/search?q=${encodedQuery}&locale=en-US&size=3`;
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.documents || data.documents.length === 0) return null;
+
+    return data.documents.map(doc => ({
+      title: doc.title,
+      summary: doc.summary?.slice(0, 250) || 'Sin resumen',
+      url: `https://developer.mozilla.org${doc.mdn_url}`,
+      popularity: doc.popularity || 0,
+    }));
+  } catch (err) {
+    console.error('MDN API error:', err);
+    return null;
+  }
+}
+
+function formatMDNContext(docs) {
+  if (!docs || docs.length === 0) return '';
+  let ctx = '\n\n[DOCUMENTACIÓN MDN]\n';
+  docs.forEach((d, i) => {
+    ctx += `\n${i + 1}. ${d.title}\n`;
+    ctx += `   ${d.summary}\n`;
+    ctx += `   ${d.url}\n`;
+  });
+  ctx += '[FIN MDN]\n';
+  return ctx;
+}
+
+// ═══════════════════════════════════════
+//  ROADMAP.SH — Learning roadmaps
+// ═══════════════════════════════════════
+
+const ROADMAPS = {
+  'frontend': { name: 'Frontend', url: 'https://roadmap.sh/frontend', desc: 'HTML, CSS, JavaScript, React, Vue, Angular' },
+  'backend': { name: 'Backend', url: 'https://roadmap.sh/backend', desc: 'Node.js, Python, Java, bases de datos, APIs' },
+  'devops': { name: 'DevOps', url: 'https://roadmap.sh/devops', desc: 'Docker, Kubernetes, CI/CD, AWS, Linux' },
+  'fullstack': { name: 'Full Stack', url: 'https://roadmap.sh/full-stack', desc: 'Frontend + Backend completo' },
+  'android': { name: 'Android', url: 'https://roadmap.sh/android', desc: 'Kotlin, Java, Jetpack Compose' },
+  'ios': { name: 'iOS', url: 'https://roadmap.sh/ios', desc: 'Swift, UIKit, SwiftUI' },
+  'python': { name: 'Python', url: 'https://roadmap.sh/python', desc: 'Django, Flask, FastAPI, data science' },
+  'react': { name: 'React', url: 'https://roadmap.sh/react', desc: 'Hooks, Redux, Next.js, TypeScript' },
+  'nodejs': { name: 'Node.js', url: 'https://roadmap.sh/nodejs', desc: 'Express, Nest.js, APIs REST' },
+  'typescript': { name: 'TypeScript', url: 'https://roadmap.sh/typescript', desc: 'Tipos, interfaces, generics' },
+  'sql': { name: 'SQL', url: 'https://roadmap.sh/sql', desc: 'MySQL, PostgreSQL, queries' },
+  'ai': { name: 'AI & Data Science', url: 'https://roadmap.sh/ai-data-scientist', desc: 'ML, Python, TensorFlow' },
+  'cybersecurity': { name: 'Cybersecurity', url: 'https://roadmap.sh/cyber-security', desc: 'Redes, ethical hacking' },
+  'ux': { name: 'UX Design', url: 'https://roadmap.sh/ux-design', desc: 'Investigación, prototipos, testing' },
+  'blockchain': { name: 'Blockchain', url: 'https://roadmap.sh/blockchain', desc: 'Solidity, Web3, smart contracts' },
+  'game': { name: 'Game Dev', url: 'https://roadmap.sh/game-developer', desc: 'Unity, Unreal, Godot' },
+  'flutter': { name: 'Flutter', url: 'https://roadmap.sh/flutter', desc: 'Dart, widgets, state management' },
+  'java': { name: 'Java', url: 'https://roadmap.sh/java', desc: 'Spring Boot, Maven, microservicios' },
+  'golang': { name: 'Go', url: 'https://roadmap.sh/golang', desc: 'Goroutines, APIs, microservicios' },
+  'rust': { name: 'Rust', url: 'https://roadmap.sh/rust', desc: 'Ownership, sistemas, WebAssembly' },
+};
+
+function detectRoadmapQuery(userMessage) {
+  const msg = userMessage.toLowerCase();
+  const roadmapKeywords = ['roadmap', 'aprender', 'learn', 'estudiar', 'study', 'guía', 'guide',
+    'por dónde empezar', 'where to start', 'qué aprender', 'what to learn',
+    'ruta de aprendizaje', 'learning path', 'cómo ser', 'how to become',
+    'principiante', 'beginner', 'paso a paso', 'step by step'];
+
+  const hasKeyword = roadmapKeywords.some(kw => msg.includes(kw));
+  if (!hasKeyword) return null;
+
+  // Find matching roadmap
+  for (const [key, roadmap] of Object.entries(ROADMAPS)) {
+    if (msg.includes(key) || msg.includes(roadmap.name.toLowerCase())) {
+      return { key, ...roadmap };
+    }
+  }
+
+  // Generic roadmap request
+  return { key: 'all', name: 'General', url: 'https://roadmap.sh', desc: 'Roadmaps de todas las tecnologías' };
+}
+
+function formatRoadmapContext(roadmap) {
+  if (!roadmap) return '';
+  let ctx = '\n\n[ROADMAP DE APRENDIZAJE]\n';
+  ctx += `\n🗺️ ${roadmap.name}\n`;
+  ctx += `   ${roadmap.desc}\n`;
+  ctx += `   Ver roadmap completo: ${roadmap.url}\n`;
+  ctx += '[FIN ROADMAP]\n';
+  return ctx;
+}
+
+// ═══════════════════════════════════════
+//  DEVDOCS — Documentation lookup
+// ═══════════════════════════════════════
+
+const DEVDOCS_DOCS = {
+  'javascript': 'javascript', 'js': 'javascript', 'python': 'python~3.12',
+  'react': 'react', 'vue': 'vue~3', 'angular': 'angular~17',
+  'node': 'node', 'nodejs': 'node', 'express': 'express',
+  'typescript': 'typescript', 'ts': 'typescript',
+  'html': 'html', 'css': 'css', 'sass': 'sass',
+  'git': 'git', 'docker': 'docker~4', 'kubernetes': 'kubernetes',
+  'sql': 'postgresql~16', 'postgres': 'postgresql~16', 'mysql': 'mysql~8.0',
+  'mongodb': 'mongodb~7', 'redis': 'redis~7.2',
+  'php': 'php~8.3', 'laravel': 'laravel~11', 'ruby': 'ruby~3.3',
+  'swift': 'swift~5.9', 'kotlin': 'kotlin', 'java': 'openjdk~21',
+  'go': 'go', 'golang': 'go', 'rust': 'rust',
+  'tailwind': 'tailwindcss', 'bootstrap': 'bootstrap~5.3',
+  'nextjs': 'next', 'nuxt': 'nuxt~3', 'svelte': 'svelte~4',
+  'graphql': 'graphql', 'rest': 'http',
+  'numpy': 'numpy~1.26', 'pandas': 'pandas~2.2',
+  'tensorflow': 'tensorflow~2.16', 'pytorch': 'torch~2.2',
+};
+
+function detectDevDocsQuery(userMessage) {
+  const msg = userMessage.toLowerCase();
+
+  // Check for specific doc requests
+  const patterns = [
+    /documentación\s+(?:de\s+)?(\w+)/i,
+    /docs?\s+(?:for\s+|of\s+|de\s+)?(\w+)/i,
+    /(?:cómo|como)\s+usar\s+(\w+)/i,
+    /(?:how\s+to\s+use)\s+(\w+)/i,
+    /sintaxis\s+(?:de\s+)?(\w+)/i,
+    /syntax\s+(?:of\s+|for\s+)?(\w+)/i,
+    /referencia\s+(?:de\s+)?(\w+)/i,
+    /reference\s+(?:for\s+|of\s+)?(\w+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = msg.match(pattern);
+    if (match) {
+      const tech = match[1].toLowerCase();
+      if (DEVDOCS_DOCS[tech]) {
+        return { tech, docSlug: DEVDOCS_DOCS[tech] };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function fetchDevDocsData(docSlug) {
+  try {
+    const url = `https://devdocs.io/${docSlug}/`;
+    // DevDocs doesn't have a search API, but we can provide the link
+    return { url, slug: docSlug };
+  } catch (err) {
+    return null;
+  }
+}
+
+function formatDevDocsContext(devdocs) {
+  if (!devdocs) return '';
+  return `\n\n[DOCUMENTACIÓN DEVDOCS]\n📖 Documentación disponible en: ${devdocs.url}\n[FIN DEVDOCS]\n`;
+}
+
+// ═══════════════════════════════════════
 //  HANDLER
 // ═══════════════════════════════════════
 
@@ -601,6 +849,67 @@ export default async function handler(req) {
             sanitizedMessages[sysIdx] = {
               ...sanitizedMessages[sysIdx],
               content: sanitizedMessages[sysIdx].content + soContext,
+            };
+          }
+        }
+      }
+
+      // Detect GitHub queries
+      const ghQuery = detectGitHubQuery(lastUserMsg.content);
+      if (ghQuery) {
+        const ghRepos = await fetchGitHubData(ghQuery);
+        if (ghRepos && ghRepos.length > 0) {
+          const ghContext = formatGitHubContext(ghRepos);
+          const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+          if (sysIdx >= 0) {
+            sanitizedMessages[sysIdx] = {
+              ...sanitizedMessages[sysIdx],
+              content: sanitizedMessages[sysIdx].content + ghContext,
+            };
+          }
+        }
+      }
+
+      // Detect MDN queries
+      const mdnQuery = detectMDNQuery(lastUserMsg.content);
+      if (mdnQuery) {
+        const mdnDocs = await fetchMDNData(mdnQuery);
+        if (mdnDocs && mdnDocs.length > 0) {
+          const mdnContext = formatMDNContext(mdnDocs);
+          const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+          if (sysIdx >= 0) {
+            sanitizedMessages[sysIdx] = {
+              ...sanitizedMessages[sysIdx],
+              content: sanitizedMessages[sysIdx].content + mdnContext,
+            };
+          }
+        }
+      }
+
+      // Detect roadmap queries
+      const roadmapQuery = detectRoadmapQuery(lastUserMsg.content);
+      if (roadmapQuery) {
+        const roadmapContext = formatRoadmapContext(roadmapQuery);
+        const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+        if (sysIdx >= 0) {
+          sanitizedMessages[sysIdx] = {
+            ...sanitizedMessages[sysIdx],
+            content: sanitizedMessages[sysIdx].content + roadmapContext,
+          };
+        }
+      }
+
+      // Detect DevDocs queries
+      const devdocsQuery = detectDevDocsQuery(lastUserMsg.content);
+      if (devdocsQuery) {
+        const devdocsData = await fetchDevDocsData(devdocsQuery.docSlug);
+        if (devdocsData) {
+          const devdocsContext = formatDevDocsContext(devdocsData);
+          const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+          if (sysIdx >= 0) {
+            sanitizedMessages[sysIdx] = {
+              ...sanitizedMessages[sysIdx],
+              content: sanitizedMessages[sysIdx].content + devdocsContext,
             };
           }
         }
