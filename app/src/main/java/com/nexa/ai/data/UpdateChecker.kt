@@ -38,10 +38,10 @@ class UpdateChecker {
 
     /**
      * Checks GitHub Releases for new versions.
-     * Compares tag_name (e.g. "v3.1") against current versionCode.
+     * Compares remote versionName (e.g. "3.2") against current versionName (e.g. "3.1").
      * When a new release is found, returns UpdateInfo with the APK download URL.
      */
-    suspend fun checkForUpdate(currentVersionCode: Int): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdate(currentVersionCode: Int, currentVersionName: String = ""): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url(GITHUB_RELEASES_URL)
@@ -54,18 +54,23 @@ class UpdateChecker {
             val body = response.body?.string() ?: return@withContext null
             val obj = gson.fromJson(body, JsonObject::class.java)
 
-            // Parse tag: "v3.1" → extract version code from name or use tag
             val tagName = obj.get("tag_name")?.asString ?: return@withContext null
-            val versionName = tagName.removePrefix("v")
+            val remoteVersionName = tagName.removePrefix("v")
 
-            // Try to get versionCode from the release body or use a numeric parse
-            // The versionCode is in app/build.gradle.kts — we compare by versionName
-            val remoteParts = versionName.split(".")
-            val remoteMajor = remoteParts.getOrNull(0)?.toIntOrNull() ?: 0
-            val remoteMinor = remoteParts.getOrNull(1)?.toIntOrNull() ?: 0
-            val remoteVersionCode = remoteMajor * 100 + remoteMinor
+            // Compare version strings: "3.2" > "3.1", "4.0" > "3.9"
+            val remoteParts = remoteVersionName.split(".").map { it.toIntOrNull() ?: 0 }
+            val localParts = currentVersionName.split(".").map { it.toIntOrNull() ?: 0 }
+            val maxLen = maxOf(remoteParts.size, localParts.size)
 
-            if (remoteVersionCode > currentVersionCode) {
+            var isNewer = false
+            for (i in 0 until maxLen) {
+                val r = remoteParts.getOrElse(i) { 0 }
+                val l = localParts.getOrElse(i) { 0 }
+                if (r > l) { isNewer = true; break }
+                if (r < l) { break }
+            }
+
+            if (isNewer) {
                 // Find APK download URL from assets
                 val assets = obj.getAsJsonArray("assets")
                 var apkUrl = FALLBACK_DOWNLOAD_URL
@@ -83,8 +88,8 @@ class UpdateChecker {
                 val changelog = obj.get("body")?.asString ?: "Nueva versión disponible"
 
                 UpdateInfo(
-                    versionCode = remoteVersionCode,
-                    versionName = versionName,
+                    versionCode = currentVersionCode + 1,
+                    versionName = remoteVersionName,
                     downloadUrl = apkUrl,
                     changelog = changelog.take(500),
                     forceUpdate = false

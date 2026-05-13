@@ -215,7 +215,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private fun checkForUpdates() {
         viewModelScope.launch {
             try {
-                val info = updateChecker.checkForUpdate(BuildConfig.VERSION_CODE)
+                val info = updateChecker.checkForUpdate(BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME)
                 if (info != null) {
                     _uiState.value = _uiState.value.copy(
                         updateInfo = info,
@@ -847,22 +847,45 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val context = getApplication<Application>()
 
         try {
+            val content = message.content.trim()
+            if (content.isEmpty()) {
+                android.widget.Toast.makeText(context, "No hay contenido para exportar", android.widget.Toast.LENGTH_SHORT).show()
+                return
+            }
+
             val pdfDocument = android.graphics.pdf.PdfDocument()
-            val paint = android.graphics.Paint()
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+            }
             var pageNum = 1
             var pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, pageNum).create()
             var page = pdfDocument.startPage(pageInfo)
             var canvas = page.canvas
 
-            paint.textSize = 18f
+            // Header
+            paint.textSize = 16f
             paint.isFakeBoldText = true
-            canvas.drawText("NEXA PRO — Chat Export", 50f, 50f, paint)
+            paint.color = android.graphics.Color.parseColor("#00E5A0")
+            canvas.drawText("NEXA PRO", 50f, 45f, paint)
 
+            paint.textSize = 10f
+            paint.isFakeBoldText = false
+            paint.color = android.graphics.Color.GRAY
+            val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+            canvas.drawText(dateStr, 50f, 62f, paint)
+
+            // Divider line
+            paint.color = android.graphics.Color.parseColor("#00E5A0")
+            paint.strokeWidth = 1f
+            canvas.drawLine(50f, 72f, 545f, 72f, paint)
+
+            // Content
             paint.textSize = 12f
             paint.isFakeBoldText = false
+            paint.color = android.graphics.Color.BLACK
 
-            val lines = message.content.split("\n")
-            var y = 100f
+            val lines = content.split("\n")
+            var y = 95f
             for (line in lines) {
                 if (y > 790f) {
                     pdfDocument.finishPage(page)
@@ -872,6 +895,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     canvas = page.canvas
                     paint.textSize = 12f
                     paint.isFakeBoldText = false
+                    paint.color = android.graphics.Color.BLACK
                     y = 50f
                 }
                 val words = line.split(" ")
@@ -887,6 +911,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                             canvas = page.canvas
                             paint.textSize = 12f
                             paint.isFakeBoldText = false
+                            paint.color = android.graphics.Color.BLACK
                             y = 50f
                         }
                         canvas.drawText(currentLine, 50f, y, paint)
@@ -905,6 +930,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                         canvas = page.canvas
                         paint.textSize = 12f
                         paint.isFakeBoldText = false
+                        paint.color = android.graphics.Color.BLACK
                         y = 50f
                     }
                     canvas.drawText(currentLine, 50f, y, paint)
@@ -913,10 +939,18 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 y += 4f
             }
 
+            // Footer
+            paint.textSize = 8f
+            paint.color = android.graphics.Color.LT_GRAY
+            canvas.drawText("Generado por NEXA PRO", 50f, 820f, paint)
+
             pdfDocument.finishPage(page)
 
-            val file = java.io.File(context.cacheDir, "nexa_export_${System.currentTimeMillis()}.pdf")
-            pdfDocument.writeTo(java.io.FileOutputStream(file))
+            val fileName = "nexa_export_${System.currentTimeMillis()}.pdf"
+            val file = java.io.File(context.cacheDir, fileName)
+            java.io.FileOutputStream(file).use { fos ->
+                pdfDocument.writeTo(fos)
+            }
             pdfDocument.close()
 
             val uri = androidx.core.content.FileProvider.getUriForFile(
@@ -936,8 +970,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             context.startActivity(shareIntent)
 
         } catch (e: Exception) {
-            android.util.Log.e("NEXA", "PDF Error: ${e.message}")
-            android.widget.Toast.makeText(context, "Error al generar PDF", android.widget.Toast.LENGTH_SHORT).show()
+            android.util.Log.e("NEXA", "PDF Error: ${e.message}", e)
+            android.widget.Toast.makeText(context, "Error al generar PDF: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 

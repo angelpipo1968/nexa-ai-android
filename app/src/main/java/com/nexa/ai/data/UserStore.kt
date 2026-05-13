@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.userStore: DataStore<Preferences> by preferencesDataStore(name = "nexa_user")
@@ -104,8 +105,7 @@ class UserStore(private val context: Context) {
     }
 
     private suspend fun getCredentials(): List<PersistedCredential> {
-        var result: List<PersistedCredential> = emptyList()
-        context.userStore.data.map { prefs ->
+        return context.userStore.data.map { prefs ->
             val json = prefs[KEY_CREDENTIALS] ?: "[]"
             val type = object : TypeToken<List<PersistedCredential>>() {}.type
             try {
@@ -113,11 +113,7 @@ class UserStore(private val context: Context) {
             } catch (_: Exception) {
                 emptyList()
             }
-        }.collect {
-            result = it
-            return@collect
-        }
-        return result
+        }.first()
     }
 
     private suspend fun saveCredentials(creds: List<PersistedCredential>) {

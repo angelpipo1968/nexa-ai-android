@@ -12,8 +12,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "3.1"
+        versionCode = 32
+        versionName = "3.2"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
@@ -27,7 +27,7 @@ android {
             val keyPassword = System.getenv("KEY_PASSWORD")
             if (keystorePassword != null && keyAlias != null && keyPassword != null) {
                 signingConfig = signingConfigs.create("release").apply {
-                    storeFile = file(System.getenv("KEYSTORE_FILE") ?: "../keystore.jks")
+                    storeFile = file(System.getenv("KEYSTORE_FILE") ?: "../release.keystore.jks")
                     storePassword = keystorePassword
                     this.keyAlias = keyAlias
                     this.keyPassword = keyPassword

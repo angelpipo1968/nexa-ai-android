@@ -1390,32 +1390,32 @@ fun ChatMessages(
 @Composable
 fun EmptyState(lang: AppLanguage) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 80.dp, bottom = 40.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 60.dp, bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
         val scale by infiniteTransition.animateFloat(
-            initialValue = 0.95f, targetValue = 1.05f,
-            animationSpec = infiniteRepeatable(animation = tween(2500, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            initialValue = 0.97f, targetValue = 1.03f,
+            animationSpec = infiniteRepeatable(animation = tween(3000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
             label = "pulse"
         )
         Box(
-            modifier = Modifier.size((72 * scale).dp).clip(RoundedCornerShape(20.dp)).background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.2f), NexaAccent.copy(alpha = 0.05f)))),
+            modifier = Modifier.size((56 * scale).dp).clip(RoundedCornerShape(16.dp)).background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.18f), NexaAccent.copy(alpha = 0.04f)))),
             contentAlignment = Alignment.Center
-        ) { Text("⚡", fontSize = 40.sp) }
-        Spacer(modifier = Modifier.height(24.dp))
-        Text("NEXA PRO", fontSize = 32.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+        ) { Text("⚡", fontSize = 30.sp) }
+        Spacer(modifier = Modifier.height(18.dp))
+        Text("NEXA PRO", fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
         Spacer(modifier = Modifier.height(4.dp))
         Surface(shape = RoundedCornerShape(20.dp), color = NexaAccent.copy(alpha = 0.1f)) {
-            Text("v3.0", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NexaAccent, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+            Text("v3.1", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
         }
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(NexaStrings.get("welcome_msg", lang), fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 24.sp)
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(NexaStrings.get("welcome_msg", lang), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 22.sp)
+        Spacer(modifier = Modifier.height(22.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("🎙️", "💡", "⚡").forEach { emoji ->
-                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(44.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text(emoji, fontSize = 18.sp) }
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text(emoji, fontSize = 16.sp) }
                 }
             }
         }
@@ -1454,7 +1454,6 @@ fun MessageBubble(
                         Text("NEXA", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
                     }
                 }
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (message.attachmentName != null && message.content.startsWith("📎")) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.15f), modifier = Modifier.size(28.dp)) {
