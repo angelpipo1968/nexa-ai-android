@@ -101,13 +101,13 @@ class NexaRepository {
                         trySend(StreamEvent.AuthExpired)
                     }
                     response?.code == 429 -> {
-                        trySend(StreamEvent.Error("Límite de mensajes alcanzado. Intenta más tarde."))
+                        trySend(StreamEvent.Error("rate_limit"))
                     }
                     t != null -> {
-                        trySend(StreamEvent.Error("Error de conexión: ${t.localizedMessage}"))
+                        trySend(StreamEvent.Error("connection_error:${t.localizedMessage}"))
                     }
                     else -> {
-                        trySend(StreamEvent.Error("Error desconocido en el servidor (${response?.code})"))
+                        trySend(StreamEvent.Error("server_error:${response?.code}"))
                     }
                 }
                 close(t)

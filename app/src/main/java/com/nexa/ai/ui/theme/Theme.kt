@@ -9,33 +9,46 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-val NexaAccent = Color(0xFF00E5A0)
-val NexaAccentDark = Color(0xFF00C98B)
+// ── Futuristic Accent: Cyan-Blue gradient feel ──
+val NexaAccent = Color(0xFF00D4AA)       // Primary teal-cyan
+val NexaAccentLight = Color(0xFF33FFD0)  // Lighter variant
+val NexaAccentDark = Color(0xFF00A882)   // Darker variant
+val NexaGlow = Color(0xFF00D4AA)         // Glow color
 
 private val DarkColorScheme = darkColorScheme(
     primary = NexaAccent,
     onPrimary = Color.Black,
-    background = Color(0xFF0A0A0A),
-    surface = Color(0xFF141414),
-    surfaceVariant = Color(0xFF1F1F1F),
-    onBackground = Color(0xFFF0F0F0),
-    onSurface = Color(0xFFF0F0F0),
-    onSurfaceVariant = Color(0xFF888888),
-    outline = Color(0xFF2A2A2A),
-    error = Color(0xFFEF4444),
+    background = Color(0xFF050508),        // Deeper black with blue tint
+    surface = Color(0xFF0D0D12),           // Subtle surface
+    surfaceVariant = Color(0xFF161620),    // Card/container bg
+    surfaceContainerLow = Color(0xFF0A0A0F),
+    surfaceContainer = Color(0xFF121218),
+    surfaceContainerHigh = Color(0xFF1A1A24),
+    onBackground = Color(0xFFE8E8EC),     // Slightly cool white
+    onSurface = Color(0xFFE8E8EC),
+    onSurfaceVariant = Color(0xFF6B6B80), // Muted cool gray
+    outline = Color(0xFF1E1E2A),          // Subtle borders
+    outlineVariant = Color(0xFF2A2A38),
+    error = Color(0xFFFF4D6A),            // Soft red
+    inverseSurface = Color(0xFFE8E8EC),
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = NexaAccent,
-    onPrimary = Color.Black,
-    background = Color(0xFFF5F5F5),
+    primary = NexaAccentDark,
+    onPrimary = Color.White,
+    background = Color(0xFFF8F9FC),       // Cool white
     surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFE8E8E8),
-    onBackground = Color(0xFF111111),
-    onSurface = Color(0xFF111111),
-    onSurfaceVariant = Color(0xFF666666),
-    outline = Color(0xFFDDDDDD),
-    error = Color(0xFFEF4444),
+    surfaceVariant = Color(0xFFF0F1F5),
+    surfaceContainerLow = Color(0xFFFAFBFE),
+    surfaceContainer = Color(0xFFF5F6FA),
+    surfaceContainerHigh = Color(0xFFECEEF4),
+    onBackground = Color(0xFF0A0A12),
+    onSurface = Color(0xFF0A0A12),
+    onSurfaceVariant = Color(0xFF5A5A70),
+    outline = Color(0xFFE0E2EA),
+    outlineVariant = Color(0xFFD0D2DA),
+    error = Color(0xFFE53E5A),
+    inverseSurface = Color(0xFF0A0A12),
 )
 
 @Composable

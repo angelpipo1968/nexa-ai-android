@@ -35,7 +35,7 @@ data class Message(
 
 data class ChatSession(
     val id: String = UUID.randomUUID().toString(),
-    val title: String = "Nuevo chat",
+    val title: String = "",
     val messages: List<Message> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
@@ -515,25 +515,33 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun cleanForSpeech(text: String): String {
-        return text
+        var cleaned = text
+            // URLs
             .replace(Regex("https?://\\S+"), "")
+            // Markdown: headers, bold, italic
             .replace(Regex("#{1,6}\\s*"), "")
             .replace(Regex("\\*{1,3}(.+?)\\*{1,3}"), "$1")
             .replace(Regex("_{1,3}(.+?)_{1,3}"), "$1")
+            // Code blocks → just the word "código"
             .replace(Regex("```[\\s\\S]*?```"), "código")
             .replace(Regex("`([^`]+)`"), "$1")
+            // Links: [text](url) → text
             .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
             .replace(Regex("!\\[[^]]*]\\([^)]+\\)"), "")
-            // Remove emojis and symbols
-            .replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), "")
-            .replace(Regex("[\\u2600-\\u27BF\\uFE00-\\uFE0F\\u200D\\u20E3\\u2000-\\u206F\\u2190-\\u21FF\\u2300-\\u23FF\\u25A0-\\u25FF\\u2700-\\u27BF\\u2B50-\\u2B55\\u2934-\\u2935\\u3030\\u303D\\u3297\\u3299]+"), "")
-            .replace(Regex("[🎤🔄🎙️📎🚫✅❌💡🔍📊🎯⚡🚀✨💬🤔📝🛠️🔗🏠👤🔒📧🎵🔔📱💻🎉❤️👍😊🤖👋🔥💪✨️☑️⭐]+"), "")
-            .replace(Regex("[•➤→←↑↓►▸▹‣⁃]+"), "")
-            .replace(Regex("[─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬]+"), "")
+            // Newlines → pause
             .replace(Regex("\\n{2,}"), ". ")
             .replace(Regex("\\n"), ". ")
+
+        // Remove ALL symbols, keep only: letters (incl. accented), numbers, spaces, and basic punctuation (. , ; : ! ? ¿ ¡)
+        cleaned = cleaned.replace(Regex("[^\\p{L}\\p{N}\\s.,;:!?¿¡]"), "")
+
+        // Clean up extra spaces
+        cleaned = cleaned
             .replace(Regex("\\s{2,}"), " ")
+            .replace(Regex("\\s*([.,;:!?])\\s*"), "$1 ")
             .trim()
+
+        return cleaned
     }
 
     // ═══════════════════════════════════════
@@ -566,7 +574,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     when (error) {
                         SpeechRecognizer.ERROR_NO_MATCH -> {}
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {}
-                        else -> _uiState.value = _uiState.value.copy(error = "Error de voz: $error")
+                        else -> _uiState.value = _uiState.value.copy(error = "${NexaStrings.get("voice_error", _uiState.value.language)}: $error")
                     }
                 }
                 override fun onResults(results: Bundle?) {
@@ -714,7 +722,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val title = if (isFirstMessage) {
             content.take(30) + if (content.length > 30) "..." else ""
         } else {
-            session?.title ?: "Nuevo chat"
+            session?.title ?: NexaStrings.get("new_chat", _uiState.value.language)
         }
 
         updateActiveSession { s ->
@@ -752,7 +760,14 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                             _uiState.value = _uiState.value.copy(currentProvider = event.name)
                         }
                         is StreamEvent.Error -> {
-                            _uiState.value = _uiState.value.copy(error = event.message, isThinking = false)
+                            val lang = _uiState.value.language
+                            val translatedError = when {
+                                event.message == "rate_limit" -> NexaStrings.get("rate_limit", lang)
+                                event.message.startsWith("connection_error:") -> "${NexaStrings.get("connection_error", lang)}: ${event.message.removePrefix("connection_error:")}"
+                                event.message.startsWith("server_error:") -> "${NexaStrings.get("server_error", lang)} (${event.message.removePrefix("server_error:")})"
+                                else -> event.message
+                            }
+                            _uiState.value = _uiState.value.copy(error = translatedError, isThinking = false)
                         }
                         is StreamEvent.AuthExpired -> {
                             _uiState.value = _uiState.value.copy(
@@ -781,7 +796,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    error = "Error de conexión: ${e.localizedMessage ?: "desconocido"}",
+                    error = "${NexaStrings.get("connection_error", _uiState.value.language)}: ${e.localizedMessage ?: NexaStrings.get("unknown", _uiState.value.language)}",
                     isThinking = false
                 )
             }
@@ -846,7 +861,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("NEXA PRO", text)
         clipboard.setPrimaryClip(clip)
-        android.widget.Toast.makeText(context, "Copiado ✓", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, NexaStrings.get("copied", _uiState.value.language), android.widget.Toast.LENGTH_SHORT).show()
     }
 
     fun exportToPdf(message: Message) {
@@ -855,7 +870,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val content = message.content.trim()
             if (content.isEmpty()) {
-                android.widget.Toast.makeText(context, "No hay contenido para exportar", android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, NexaStrings.get("nothing_to_export", _uiState.value.language), android.widget.Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -948,7 +963,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             // Footer
             paint.textSize = 8f
             paint.color = android.graphics.Color.LTGRAY
-            canvas.drawText("Generado por NEXA PRO", 50f, 820f, paint)
+            canvas.drawText(NexaStrings.get("generated_by", _uiState.value.language), 50f, 820f, paint)
 
             pdfDocument.finishPage(page)
 
@@ -971,7 +986,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
-            val shareIntent = Intent.createChooser(intent, "Exportar PDF")
+            val shareIntent = Intent.createChooser(intent, NexaStrings.get("export_pdf_title", _uiState.value.language))
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(shareIntent)
 

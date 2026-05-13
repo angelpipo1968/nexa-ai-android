@@ -15,9 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.draw.scale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -30,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -203,7 +200,7 @@ fun LoginScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = if (isDarkTheme) Color(0xFF0A0A0A) else Color(0xFFF5F5F5)
+        color = if (isDarkTheme) Color(0xFF050508) else Color(0xFFF8F9FC)
     ) {
         Column(
             modifier = Modifier
@@ -223,7 +220,7 @@ fun LoginScreen(
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = NexaStrings.get("back", language),
-                        tint = if (isDarkTheme) Color.White else Color.Black
+                        tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -233,20 +230,21 @@ fun LoginScreen(
             Box(
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(NexaAccent.copy(alpha = 0.12f)),
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.12f), NexaAccent.copy(alpha = 0.02f)))),
                 contentAlignment = Alignment.Center
             ) {
-                Text("⚡", fontSize = 36.sp)
+                Text("⚡", fontSize = 34.sp)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
             Text(
                 NexaStrings.get("login_title", language),
-                fontSize = 14.sp,
-                color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666),
-                modifier = Modifier.padding(top = 4.dp)
+                fontSize = 13.sp,
+                color = if (isDarkTheme) Color(0xFF6B6B80) else Color(0xFF5A5A70),
+                modifier = Modifier.padding(top = 6.dp),
+                letterSpacing = 0.5.sp
             )
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -418,7 +416,7 @@ fun RegisterScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = if (isDarkTheme) Color(0xFF0A0A0A) else Color(0xFFF5F5F5)
+        color = if (isDarkTheme) Color(0xFF050508) else Color(0xFFF8F9FC)
     ) {
         Column(
             modifier = Modifier
@@ -438,7 +436,7 @@ fun RegisterScreen(
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = NexaStrings.get("back", language),
-                        tint = if (isDarkTheme) Color.White else Color.Black
+                        tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -448,20 +446,21 @@ fun RegisterScreen(
             Box(
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(NexaAccent.copy(alpha = 0.12f)),
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.12f), NexaAccent.copy(alpha = 0.02f)))),
                 contentAlignment = Alignment.Center
             ) {
-                Text("⚡", fontSize = 36.sp)
+                Text("⚡", fontSize = 34.sp)
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
             Text(
                 NexaStrings.get("create_account", language),
-                fontSize = 14.sp,
-                color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666),
-                modifier = Modifier.padding(top = 4.dp)
+                fontSize = 13.sp,
+                color = if (isDarkTheme) Color(0xFF6B6B80) else Color(0xFF5A5A70),
+                modifier = Modifier.padding(top = 6.dp),
+                letterSpacing = 0.5.sp
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -731,7 +730,7 @@ fun ChatMainScreen(
                     onToggleSettings = onToggleSettings
                 )
             },
-            containerColor = if (uiState.isDarkTheme) Color.Black else Color.White
+            containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -773,7 +772,7 @@ fun ChatMainScreen(
 }
 
 // ═══════════════════════════════════════
-//  DRAWER — History + Quick Settings
+//  DRAWER — Clean: Header + New Chat + History
 // ═══════════════════════════════════════
 
 @Composable
@@ -798,14 +797,14 @@ fun DrawerContent(
     val lang = uiState.language
 
     ModalDrawerSheet(
-        modifier = Modifier.width(310.dp),
+        modifier = Modifier.width(300.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface
     ) {
-        // Header
+        // Header — minimal
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -814,19 +813,19 @@ fun DrawerContent(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(40.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(NexaAccent.copy(alpha = 0.15f)),
+                        .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.15f), NexaAccent.copy(alpha = 0.03f)))),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("⚡", fontSize = 22.sp)
+                    Text("⚡", fontSize = 20.sp)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "NEXA PRO",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp,
-                        letterSpacing = 1.5.sp
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp,
+                        letterSpacing = 3.sp
                     )
                     if (user.isLoggedIn) {
                         Row(
@@ -835,59 +834,60 @@ fun DrawerContent(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(6.dp)
+                                    .size(5.dp)
                                     .clip(CircleShape)
                                     .background(NexaAccent)
                             )
                             Text(
                                 user.displayName,
-                                fontSize = 11.sp,
-                                color = NexaAccent,
-                                fontWeight = FontWeight.Medium
+                                fontSize = 10.sp,
+                                color = NexaAccent.copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 0.5.sp
                             )
                         }
                     }
                 }
-                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.Close,
                         null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // New chat button
+        // New chat button — glass style
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clickable { onNewChat() },
             shape = RoundedCornerShape(14.dp),
-            color = NexaAccent.copy(alpha = 0.1f)
+            color = NexaAccent.copy(alpha = 0.06f),
+            border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.12f))
         ) {
             Row(
                 modifier = Modifier.padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = NexaAccent, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Add, contentDescription = null, tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
                 Text(
                     NexaStrings.get("new_chat", lang),
-                    color = NexaAccent,
+                    color = NexaAccent.copy(alpha = 0.8f),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
+                    fontSize = 13.sp,
+                    letterSpacing = 0.5.sp
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Chat history
+        // Chat history — takes all available space
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 12.dp)
@@ -903,326 +903,72 @@ fun DrawerContent(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        // Settings & Account pinned to bottom — minimal
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
 
-        // === Quick Settings ===
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Language selector
+            // Settings button
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .clickable {
-                        val next = if (lang == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
-                        onSetLanguage(next)
+                        onToggleSettings()
+                        onClose()
                     }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = NexaAccent.copy(alpha = 0.12f),
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Language, null, modifier = Modifier.size(16.dp), tint = NexaAccent)
-                    }
-                }
-                Text(NexaStrings.get("language", lang), fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // Spanish flag
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (lang == AppLanguage.SPANISH) NexaAccent.copy(alpha = 0.15f) else Color.Transparent,
-                        border = if (lang == AppLanguage.SPANISH) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.4f)) else null,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onSetLanguage(AppLanguage.SPANISH) }
-                    ) {
-                        Text("\uD83C\uDDEA\uD83C\uDDF8", fontSize = 14.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                    }
-                    // English flag
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (lang == AppLanguage.ENGLISH) NexaAccent.copy(alpha = 0.15f) else Color.Transparent,
-                        border = if (lang == AppLanguage.ENGLISH) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.4f)) else null,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onSetLanguage(AppLanguage.ENGLISH) }
-                    ) {
-                        Text("\uD83C\uDDFA\uD83C\uDDF8", fontSize = 14.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                    }
-                }
-            }
-
-            // Voice selector
-            var showVoicePicker by remember { mutableStateOf(false) }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { showVoicePicker = !showVoicePicker }
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = NexaAccent.copy(alpha = 0.12f),
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        val isMale = uiState.voiceType == VoiceType.MALE_1 || uiState.voiceType == VoiceType.MALE_2 || uiState.voiceType == VoiceType.MALE_3
-                        Icon(if (isMale) Icons.Default.Man else Icons.Default.Woman, null, modifier = Modifier.size(16.dp), tint = NexaAccent)
-                    }
-                }
-                Text(NexaStrings.get("voice", lang), fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Text(NexaStrings.get(uiState.voiceType.name.lowercase(), lang), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Icon(if (showVoicePicker) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-
-            // Voice picker grid (expandable)
-            AnimatedVisibility(visible = showVoicePicker) {
-                Column(modifier = Modifier.padding(start = 40.dp, end = 4.dp, bottom = 4.dp)) {
-                    Text(
-                        if (lang == AppLanguage.SPANISH) "Mujer" else "Female",
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 0.5.sp,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                        listOf(VoiceType.FEMALE_1, VoiceType.FEMALE_2, VoiceType.FEMALE_3).forEach { voice ->
-                            val selected = uiState.voiceType == voice
-                            Surface(
-                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { onSetVoiceType(voice) },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (selected) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.5f)) else null
-                            ) {
-                                Column(modifier = Modifier.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("👩", fontSize = 14.sp)
-                                    Text(NexaStrings.get(voice.name.lowercase(), lang), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface)
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        if (lang == AppLanguage.SPANISH) "Hombre" else "Male",
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 0.5.sp,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                        listOf(VoiceType.MALE_1, VoiceType.MALE_2, VoiceType.MALE_3).forEach { voice ->
-                            val selected = uiState.voiceType == voice
-                            Surface(
-                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { onSetVoiceType(voice) },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (selected) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.5f)) else null
-                            ) {
-                                Column(modifier = Modifier.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("👨", fontSize = 14.sp)
-                                    Text(NexaStrings.get(voice.name.lowercase(), lang), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Theme toggle
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onToggleTheme() }.padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.12f), modifier = Modifier.size(30.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(if (uiState.isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode, null, modifier = Modifier.size(16.dp), tint = NexaAccent)
-                    }
-                }
-                Text(NexaStrings.get("theme", lang), fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(false to Icons.Default.LightMode, true to Icons.Default.DarkMode).forEach { (dark, icon) ->
-                        val selected = uiState.isDarkTheme == dark
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (selected) NexaAccent.copy(alpha = 0.15f) else Color.Transparent,
-                            border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.4f)) else null,
-                            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)).clickable { if (!selected) onToggleTheme() }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(icon, null, modifier = Modifier.size(14.dp), tint = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Auto-speak toggle
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onToggleAutoSpeak() }.padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.12f), modifier = Modifier.size(30.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff, null, modifier = Modifier.size(16.dp), tint = NexaAccent)
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(NexaStrings.get("auto_speak", lang), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Text(NexaStrings.get("auto_speak_desc", lang), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                }
-                Switch(
-                    checked = uiState.autoSpeak,
-                    onCheckedChange = { onToggleAutoSpeak() },
-                    colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent),
-                    modifier = Modifier.scale(0.75f)
-                )
-            }
-        }
-
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-
-        // Account
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { if (user.isLoggedIn) onLogout() else onNavigateToLogin() }.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else NexaAccent.copy(alpha = 0.12f),
-                modifier = Modifier.size(30.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(if (user.isLoggedIn) Icons.Default.Logout else Icons.Default.Person, null, modifier = Modifier.size(16.dp), tint = if (user.isLoggedIn) MaterialTheme.colorScheme.error else NexaAccent)
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (user.isLoggedIn) NexaStrings.get("logout", lang) else NexaStrings.get("login", lang),
-                    fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    color = if (user.isLoggedIn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                )
-                if (user.isLoggedIn) {
-                    Text(user.email, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                }
-            }
-        }
-
-        // Settings gear pinned to bottom-left
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp, bottom = 10.dp, top = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = {
-                    onToggleSettings()
-                    onClose()
-                },
-                modifier = Modifier.size(40.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = NexaStrings.get("settings", lang),
-                    tint = NexaAccent.copy(alpha = 0.45f),
-                    modifier = Modifier.size(22.dp)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    NexaStrings.get("settings", lang),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    letterSpacing = 0.3.sp
+                )
+            }
+
+            // Account button
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        if (user.isLoggedIn) onLogout() else onNavigateToLogin()
+                    }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    if (user.isLoggedIn) Icons.Default.Logout else Icons.Default.Person,
+                    contentDescription = null,
+                    tint = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.6f) else NexaAccent.copy(alpha = 0.5f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    if (user.isLoggedIn) NexaStrings.get("logout", lang) else NexaStrings.get("login", lang),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    letterSpacing = 0.3.sp
                 )
             }
         }
     }
 }
 
-
-// ═══════════════════════════════════════
-//  SETTINGS PANEL (inside drawer)
-// ═══════════════════════════════════════
-
-@Composable
-fun SettingsPanel(
-    uiState: NexaUiState,
-    onSetLanguage: (AppLanguage) -> Unit,
-    onSetVoiceType: (VoiceType) -> Unit,
-    onToggleTheme: () -> Unit,
-    onToggleAutoSpeak: () -> Unit,
-    onNavigateToLogin: () -> Unit,
-    onLogout: () -> Unit
-) {
-    val lang = uiState.language
-    val user = uiState.user
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState())
-    ) {
-        Text(NexaStrings.get("general", lang), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
-
-        UltraSettingRow(icon = Icons.Default.DarkMode, title = NexaStrings.get("theme", lang)) {
-            Row(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                listOf(Icons.Default.LightMode, Icons.Default.DarkMode).forEach { icon ->
-                    val selected = if (icon == Icons.Default.DarkMode) uiState.isDarkTheme else !uiState.isDarkTheme
-                    Box(modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(if (selected) NexaAccent else Color.Transparent).clickable { if (!selected) onToggleTheme() }, contentAlignment = Alignment.Center) {
-                        Icon(icon, null, modifier = Modifier.size(14.dp), tint = if (selected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-
-        UltraSettingRow(icon = Icons.Default.Language, title = NexaStrings.get("language", lang), value = uiState.language.label, onClick = {
-            val next = if (uiState.language == AppLanguage.SPANISH) AppLanguage.ENGLISH else AppLanguage.SPANISH
-            onSetLanguage(next)
-        })
-
-        UltraSettingRow(
-            icon = if (uiState.voiceType == VoiceType.MALE_1 || uiState.voiceType == VoiceType.MALE_2 || uiState.voiceType == VoiceType.MALE_3) Icons.Default.Man else Icons.Default.Woman,
-            title = NexaStrings.get("voice", lang),
-            value = NexaStrings.get(uiState.voiceType.name.lowercase(), lang),
-            onClick = {
-                val voices = VoiceType.entries.toList()
-                val nextIndex = (voices.indexOf(uiState.voiceType) + 1) % voices.size
-                onSetVoiceType(voices[nextIndex])
-            }
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.height(90.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(VoiceType.entries.toList()) { voice ->
-                val isMale = voice == VoiceType.MALE_1 || voice == VoiceType.MALE_2 || voice == VoiceType.MALE_3
-                val selected = uiState.voiceType == voice
-                Surface(modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onSetVoiceType(voice) }, shape = RoundedCornerShape(8.dp), color = if (selected) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), border = if (selected) BorderStroke(1.dp, NexaAccent) else null) {
-                    Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(if (isMale) "👨" else "👩", fontSize = 14.sp)
-                        Text(NexaStrings.get(voice.name.lowercase(), lang), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(NexaStrings.get("interface_section", lang), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
-
-        UltraSettingRow(icon = if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff, title = NexaStrings.get("auto_speak", lang)) {
-            Switch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() }, colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent), modifier = Modifier.scale(0.7f))
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(NexaStrings.get("account_section", lang), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
-
-        UltraSettingRow(icon = if (user.isLoggedIn) Icons.Default.Person else Icons.Default.PersonOutline, title = if (user.isLoggedIn) user.email else NexaStrings.get("login", lang), value = if (user.isLoggedIn) NexaStrings.get("logout", lang) else null, onClick = {
-            if (user.isLoggedIn) onLogout() else onNavigateToLogin()
-        })
-
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-}
 
 @Composable
 fun ChatSessionItem(
@@ -1235,23 +981,32 @@ fun ChatSessionItem(
     var showMenu by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp).clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        color = if (isActive) NexaAccent.copy(alpha = 0.08f) else Color.Transparent
+        color = if (isActive) NexaAccent.copy(alpha = 0.06f) else Color.Transparent,
+        border = if (isActive) BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.1f)) else null
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (isActive) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(16.dp), tint = if (isActive) NexaAccent.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(session.title, fontSize = 13.sp, fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal, color = if (isActive) NexaAccent else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${session.messages.size} ${NexaStrings.get("messages_count", language)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                Text(
+                    session.title.ifEmpty { NexaStrings.get("new_chat", language) },
+                    fontSize = 13.sp,
+                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = 0.2.sp
+                )
+                Text("${session.messages.size} ${NexaStrings.get("messages_count", language)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
             }
             Box {
-                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(text = { Text("🗑️ ${NexaStrings.get("delete_chat", language)}") }, onClick = { showMenu = false; onDelete() })
@@ -1280,63 +1035,51 @@ fun ChatTopBar(
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Animated glow logo
+                // Minimal glowing logo
                 val infiniteTransition = rememberInfiniteTransition(label = "logo")
                 val glowAlpha by infiniteTransition.animateFloat(
-                    initialValue = 0.15f, targetValue = 0.35f,
-                    animationSpec = infiniteRepeatable(animation = tween(2000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+                    initialValue = 0.12f, targetValue = 0.28f,
+                    animationSpec = infiniteRepeatable(animation = tween(3000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
                     label = "glow"
                 )
                 Box(
-                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(NexaAccent.copy(alpha = glowAlpha)),
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.04f)))),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("⚡", fontSize = 18.sp)
+                    Text("⚡", fontSize = 16.sp)
                 }
                 Column {
-                    Text("NEXA PRO", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, letterSpacing = 2.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent))
-                        Text("EN LÍNEA", fontSize = 8.sp, color = NexaAccent, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
+                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 3.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
+                        Text(NexaStrings.get("online", uiState.language), fontSize = 7.sp, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.5.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         },
         navigationIcon = {
             IconButton(onClick = onToggleDrawer) {
-                Icon(Icons.Default.Menu, contentDescription = NexaStrings.get("menu", uiState.language), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.Menu, contentDescription = NexaStrings.get("menu", uiState.language), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
             }
         },
         actions = {
-            FilledIconButton(
-                onClick = onSurpriseMe, modifier = Modifier.size(36.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = NexaAccent.copy(alpha = 0.12f), contentColor = NexaAccent),
-                shape = RoundedCornerShape(10.dp)
-            ) { Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) }
-
-            FilledIconButton(
-                onClick = onToggleAutoSpeak, modifier = Modifier.size(36.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = if (uiState.autoSpeak) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (uiState.autoSpeak) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant),
-                shape = RoundedCornerShape(10.dp)
-            ) { Icon(if (uiState.autoSpeak) Icons.Default.VolumeUp else Icons.Default.VolumeOff, contentDescription = null, modifier = Modifier.size(18.dp)) }
-
-            if (uiState.isSpeaking) {
-                FilledIconButton(
-                    onClick = onStopSpeaking, modifier = Modifier.size(36.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f), contentColor = MaterialTheme.colorScheme.error),
-                    shape = RoundedCornerShape(10.dp)
-                ) { Icon(Icons.Default.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp)) }
+            // Settings - single entry point
+            IconButton(onClick = onToggleSettings) {
+                Icon(Icons.Default.Settings, contentDescription = NexaStrings.get("settings", uiState.language), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
             }
 
-            FilledIconButton(
-                onClick = onClearChat, modifier = Modifier.size(36.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                shape = RoundedCornerShape(10.dp)
-            ) { Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp)) }
+            if (uiState.isSpeaking) {
+                IconButton(onClick = onStopSpeaking) {
+                    Icon(Icons.Default.StopCircle, contentDescription = null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+                }
+            }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = if (uiState.isDarkTheme) Color(0xFF0A0A0A) else Color.White)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )
 }
 
@@ -1346,12 +1089,12 @@ fun ChatTopBar(
 
 @Composable
 fun ErrorBanner(error: String, onDismiss: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f)) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f), border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.1f))) {
         Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-            Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+            Text(error, color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.weight(1f), letterSpacing = 0.2.sp)
+            IconButton(onClick = onDismiss, modifier = Modifier.size(22.dp)) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -1395,35 +1138,36 @@ fun ChatMessages(
 @Composable
 fun EmptyState(lang: AppLanguage) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 60.dp, bottom = 40.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 80.dp, bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Pulsing glow orb
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
-        val scale by infiniteTransition.animateFloat(
-            initialValue = 0.97f, targetValue = 1.03f,
-            animationSpec = infiniteRepeatable(animation = tween(3000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        val glowScale by infiniteTransition.animateFloat(
+            initialValue = 0.95f, targetValue = 1.05f,
+            animationSpec = infiniteRepeatable(animation = tween(4000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
             label = "pulse"
         )
+        val glowAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.12f, targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(animation = tween(3000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            label = "glowAlpha"
+        )
         Box(
-            modifier = Modifier.size((56 * scale).dp).clip(RoundedCornerShape(16.dp)).background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.18f), NexaAccent.copy(alpha = 0.04f)))),
+            modifier = Modifier
+                .size((64 * glowScale).dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.02f), Color.Transparent))),
             contentAlignment = Alignment.Center
-        ) { Text("⚡", fontSize = 30.sp) }
-        Spacer(modifier = Modifier.height(18.dp))
-        Text("NEXA PRO", fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
-        Spacer(modifier = Modifier.height(4.dp))
-        Surface(shape = RoundedCornerShape(20.dp), color = NexaAccent.copy(alpha = 0.1f)) {
-            Text("v${BuildConfig.VERSION_NAME}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+        ) { Text("⚡", fontSize = 32.sp) }
+        Spacer(modifier = Modifier.height(28.dp))
+        Text("NEXA PRO", fontSize = 26.sp, fontWeight = FontWeight.Black, letterSpacing = 6.sp, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(modifier = Modifier.height(6.dp))
+        Surface(shape = RoundedCornerShape(16.dp), color = NexaAccent.copy(alpha = 0.08f)) {
+            Text("v${BuildConfig.VERSION_NAME}", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.5.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(NexaStrings.get("welcome_msg", lang), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 22.sp)
-        Spacer(modifier = Modifier.height(22.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("🎙️", "💡", "⚡").forEach { emoji ->
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(40.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text(emoji, fontSize = 16.sp) }
-                }
-            }
-        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(NexaStrings.get("welcome_msg", lang), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), textAlign = TextAlign.Center, lineHeight = 24.sp, letterSpacing = 0.3.sp)
     }
 }
 
@@ -1440,23 +1184,25 @@ fun MessageBubble(
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
         Surface(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
-            color = if (isUser) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            shadowElevation = if (!isUser) 2.dp else 0.dp,
-            border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)) else null
+            color = if (isUser) NexaAccent.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)) else null
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                // NEXA label inside the bubble for bot messages
+                // Minimal NEXA label for bot messages
                 if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
                     Row(
                         modifier = Modifier.padding(bottom = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
-                            modifier = Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(NexaAccent.copy(alpha = 0.15f)),
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(NexaAccent.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
-                        ) { Text("⚡", fontSize = 7.sp) }
-                        Text("NEXA", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                        ) { Text("⚡", fontSize = 6.sp) }
+                        Text("NEXA", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.45f), letterSpacing = 1.5.sp)
                     }
                 }
                 if (message.attachmentName != null && message.content.startsWith("📎")) {
@@ -1479,17 +1225,17 @@ fun MessageBubble(
         }
 
         if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
-            Row(modifier = Modifier.padding(top = 4.dp, start = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(onClick = onSpeak, shape = RoundedCornerShape(8.dp), color = if (isSpeaking) NexaAccent.copy(alpha = 0.12f) else Color.Transparent, modifier = Modifier.size(30.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp, null, modifier = Modifier.size(15.dp), tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) }
+            Row(modifier = Modifier.padding(top = 6.dp, start = 2.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(onClick = onSpeak, shape = RoundedCornerShape(8.dp), color = if (isSpeaking) NexaAccent.copy(alpha = 0.08f) else Color.Transparent, modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp), tint = if (isSpeaking) NexaAccent.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
                 }
-                Surface(onClick = onCopy, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(30.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) }
+                Surface(onClick = onCopy, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(28.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
                 }
                 var showMsgMenu by remember { mutableStateOf(false) }
                 Box {
-                    Surface(onClick = { showMsgMenu = true }, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(30.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.MoreHoriz, null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) }
+                    Surface(onClick = { showMsgMenu = true }, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(28.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.MoreHoriz, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) }
                     }
                     DropdownMenu(expanded = showMsgMenu, onDismissRequest = { showMsgMenu = false }) {
                         DropdownMenuItem(text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("export_pdf", language)) } }, onClick = { showMsgMenu = false; onExport() })
@@ -1503,25 +1249,26 @@ fun MessageBubble(
 
 @Composable
 fun ThinkingIndicator(lang: AppLanguage) {
-    Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(modifier = Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             repeat(3) { index ->
                 val infiniteTransition = rememberInfiniteTransition(label = "dot$index")
-                val alpha by infiniteTransition.animateFloat(initialValue = 0.2f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(600, delayMillis = index * 200), repeatMode = RepeatMode.Reverse), label = "dotAlpha$index")
-                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
+                val alpha by infiniteTransition.animateFloat(initialValue = 0.15f, targetValue = 0.8f, animationSpec = infiniteRepeatable(animation = tween(700, delayMillis = index * 180), repeatMode = RepeatMode.Reverse), label = "dotAlpha$index")
+                val size by infiniteTransition.animateFloat(initialValue = 5f, targetValue = 7f, animationSpec = infiniteRepeatable(animation = tween(700, delayMillis = index * 180), repeatMode = RepeatMode.Reverse), label = "dotSize$index")
+                Box(modifier = Modifier.size(size.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
             }
         }
-        Text(NexaStrings.get("thinking", lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+        Text(NexaStrings.get("thinking", lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), letterSpacing = 0.5.sp)
     }
 }
 
 @Composable
 fun DotsTyping() {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         repeat(3) { index ->
             val infiniteTransition = rememberInfiniteTransition(label = "typing$index")
-            val alpha by infiniteTransition.animateFloat(initialValue = 0.2f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(500, delayMillis = index * 150), repeatMode = RepeatMode.Reverse), label = "typingAlpha$index")
-            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
+            val alpha by infiniteTransition.animateFloat(initialValue = 0.15f, targetValue = 0.7f, animationSpec = infiniteRepeatable(animation = tween(600, delayMillis = index * 150), repeatMode = RepeatMode.Reverse), label = "typingAlpha$index")
+            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
         }
     }
 }
@@ -1548,8 +1295,8 @@ fun InputBar(
     val keyboardController = LocalSoftwareKeyboardController.current
     var showMenu by remember { mutableStateOf(false) }
 
-    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background, shadowElevation = 16.dp) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), shadowElevation = 0.dp, border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             // Attachment preview
             AnimatedVisibility(visible = pendingAttachment != null) {
                 Surface(shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
@@ -1563,10 +1310,10 @@ fun InputBar(
 
             // Main input row
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Attach menu
+                // Attach menu — minimal
                 Box {
-                    Surface(onClick = { showMenu = true }, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(42.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp)) }
+                    Surface(onClick = { showMenu = true }, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)), modifier = Modifier.size(42.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(20.dp)) }
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
@@ -1574,34 +1321,34 @@ fun InputBar(
                     }
                 }
 
-                // Text input
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), modifier = Modifier.weight(1f)) {
+                // Text input — glass style
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f), border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)), modifier = Modifier.weight(1f)) {
                     Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         TextField(
                             value = text, onValueChange = onTextChange,
                             modifier = Modifier.weight(1f).defaultMinSize(minHeight = 42.dp),
-                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp) },
+                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
                             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
                             maxLines = 4, textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
                         )
-                        Surface(onClick = { if (isListening) onStopListening() else onStartListening() }, shape = CircleShape, color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.15f) else Color.Transparent, modifier = Modifier.size(36.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(if (isListening) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = null, tint = if (isListening) MaterialTheme.colorScheme.error else NexaAccent, modifier = Modifier.size(20.dp)) }
+                        Surface(onClick = { if (isListening) onStopListening() else onStartListening() }, shape = CircleShape, color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else Color.Transparent, modifier = Modifier.size(36.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(if (isListening) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = null, tint = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else NexaAccent.copy(alpha = 0.5f), modifier = Modifier.size(18.dp)) }
                         }
                     }
                 }
 
-                // Send button
+                // Send button — glow when active
                 val canSend = text.isNotBlank() || pendingAttachment != null
-                Surface(onClick = { onSend(); keyboardController?.hide() }, enabled = canSend, shape = CircleShape, color = if (canSend) NexaAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(42.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(20.dp)) }
+                Surface(onClick = { onSend(); keyboardController?.hide() }, enabled = canSend, shape = CircleShape, color = if (canSend) NexaAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), border = if (canSend) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else null, modifier = Modifier.size(42.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(18.dp)) }
                 }
             }
 
-            // Hint
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.Center) {
-                Text(NexaStrings.get("mic_hint", language), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), letterSpacing = 0.5.sp)
+            // Hint — very subtle
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.Center) {
+                Text(NexaStrings.get("mic_hint", language), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), letterSpacing = 0.8.sp)
             }
         }
     }
@@ -1623,20 +1370,26 @@ fun UpdateDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("🔄", fontSize = 24.sp)
-                Text(NexaStrings.get("update_available", language), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NexaAccent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) { Text("🔄", fontSize = 14.sp) }
+                Text(NexaStrings.get("update_available", language), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp)
             }
         },
         text = {
             Column {
-                Text("v${updateInfo.versionName}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(updateInfo.changelog, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 20.sp)
+                Text("v${updateInfo.versionName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 0.5.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(updateInfo.changelog, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), lineHeight = 20.sp)
             }
         },
-        confirmButton = { Button(onClick = onUpdate, colors = ButtonDefaults.buttonColors(containerColor = NexaAccent), shape = RoundedCornerShape(10.dp)) { Text(NexaStrings.get("update_now", language), color = Color.Black, fontWeight = FontWeight.Bold) } },
-        dismissButton = { if (!updateInfo.forceUpdate) TextButton(onClick = onDismiss) { Text(NexaStrings.get("later", language), color = MaterialTheme.colorScheme.onSurfaceVariant) } },
-        shape = RoundedCornerShape(18.dp)
+        confirmButton = { Button(onClick = onUpdate, colors = ButtonDefaults.buttonColors(containerColor = NexaAccent), shape = RoundedCornerShape(12.dp)) { Text(NexaStrings.get("update_now", language), color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) } },
+        dismissButton = { if (!updateInfo.forceUpdate) TextButton(onClick = onDismiss) { Text(NexaStrings.get("later", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) } },
+        shape = RoundedCornerShape(24.dp)
     )
 }
 
@@ -1673,7 +1426,11 @@ object NexaStrings {
         "confirm_password" to "Confirmar contraseña", "repeat_password" to "Repite la contraseña",
         "fill_all" to "Completa todos los campos", "invalid_email" to "Email no válido", "min_chars" to "Mínimo 6 caracteres",
         "passwords_no_match" to "Las contraseñas no coinciden", "email_taken" to "Este email ya está registrado",
-        "session_expired" to "Sesión expirada. Inicia sesión de nuevo.", "voice_unavailable" to "Reconocimiento de voz no disponible"
+        "session_expired" to "Sesión expirada. Inicia sesión de nuevo.", "voice_unavailable" to "Reconocimiento de voz no disponible",
+        "online" to "EN LÍNEA", "copied" to "Copiado ✓", "nothing_to_export" to "No hay contenido para exportar",
+        "voice_error" to "Error de voz", "connection_error" to "Error de conexión", "unknown" to "desconocido",
+        "export_pdf_title" to "Exportar PDF", "generated_by" to "Generado por NEXA PRO",
+        "rate_limit" to "Límite de mensajes alcanzado. Intenta más tarde.", "server_error" to "Error del servidor"
     )
 
     private val english = mapOf(
@@ -1697,33 +1454,12 @@ object NexaStrings {
         "min_6" to "Minimum 6 characters", "confirm_password" to "Confirm password", "repeat_password" to "Repeat password",
         "fill_all" to "Fill in all fields", "invalid_email" to "Invalid email", "min_chars" to "Minimum 6 characters",
         "passwords_no_match" to "Passwords don't match", "email_taken" to "This email is already registered",
-        "session_expired" to "Session expired. Please sign in again.", "voice_unavailable" to "Voice recognition not available"
+        "session_expired" to "Session expired. Please sign in again.", "voice_unavailable" to "Voice recognition not available",
+        "online" to "ONLINE", "copied" to "Copied ✓", "nothing_to_export" to "No content to export",
+        "voice_error" to "Voice error", "connection_error" to "Connection error", "unknown" to "unknown",
+        "export_pdf_title" to "Export PDF", "generated_by" to "Generated by NEXA PRO",
+        "rate_limit" to "Message limit reached. Try again later.", "server_error" to "Server error"
     )
-}
-
-@Composable
-fun UltraSettingRow(
-    icon: ImageVector,
-    title: String,
-    value: String? = null,
-    onClick: (() -> Unit)? = null,
-    content: (@Composable () -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).let { if (onClick != null) it.clickable { onClick() } else it }.padding(vertical = 10.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) { Icon(icon, null, modifier = Modifier.size(16.dp), tint = NexaAccent) }
-        Column(modifier = Modifier.weight(1f)) { Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface) }
-        if (value != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(value, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-            }
-        }
-        content?.invoke()
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1741,48 +1477,115 @@ fun GeneralSettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(NexaStrings.get("settings", uiState.language), fontWeight = FontWeight.Bold) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NexaAccent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.Settings, null, modifier = Modifier.size(14.dp), tint = NexaAccent) }
+                Text(NexaStrings.get("settings", uiState.language), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+            }
+        },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(NexaStrings.get("language", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(AppLanguage.SPANISH to "Español 🇪🇸", AppLanguage.ENGLISH to "English 🇺🇸").forEach { (lang, label) ->
-                        FilterChip(selected = uiState.language == lang, onClick = { onSetLanguage(lang) }, label = { Text(label) })
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                // Language section
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(NexaStrings.get("language", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(AppLanguage.SPANISH to "Español 🇪🇸", AppLanguage.ENGLISH to "English 🇺🇸").forEach { (lang, label) ->
+                            FilterChip(
+                                selected = uiState.language == lang,
+                                onClick = { onSetLanguage(lang) },
+                                label = { Text(label, fontSize = 13.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
+                                    selectedLabelColor = NexaAccent
+                                ),
+                                border = if (uiState.language == lang) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            )
+                        }
                     }
                 }
-                HorizontalDivider(color = if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFEEEEEE))
-                Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                val voices = VoiceType.entries.toList()
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    voices.chunked(3).forEach { rowVoices ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowVoices.forEach { voice ->
-                                val isMale = voice.name.contains("MALE")
-                                val selected = uiState.voiceType == voice
-                                Surface(modifier = Modifier.weight(1f).clickable { onSetVoiceType(voice) }, shape = RoundedCornerShape(12.dp), color = if (selected) NexaAccent.copy(alpha = 0.2f) else (if (uiState.isDarkTheme) Color(0xFF1A1A1A) else Color(0xFFF5F5F5)), border = if (selected) BorderStroke(2.dp, NexaAccent) else BorderStroke(1.dp, if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFDDDDDD))) {
-                                    Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
-                                        Text(NexaStrings.get(voice.name.lowercase(), uiState.language), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else (if (uiState.isDarkTheme) Color.White else Color.Black), textAlign = TextAlign.Center)
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+
+                // Voice section
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    val voices = VoiceType.entries.toList()
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        voices.chunked(3).forEach { rowVoices ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                rowVoices.forEach { voice ->
+                                    val isMale = voice.name.contains("MALE")
+                                    val selected = uiState.voiceType == voice
+                                    Surface(
+                                        modifier = Modifier.weight(1f).clickable { onSetVoiceType(voice) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (selected) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
+                                            Text(NexaStrings.get(voice.name.lowercase(), uiState.language), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), textAlign = TextAlign.Center)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                HorizontalDivider(color = if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFEEEEEE))
-                Row(verticalAlignment = Alignment.CenterVertically) { Text(NexaStrings.get("auto_speak", uiState.language), modifier = Modifier.weight(1f)); Switch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() }) }
-                Row(verticalAlignment = Alignment.CenterVertically) { Text(NexaStrings.get("theme", uiState.language), modifier = Modifier.weight(1f)); Switch(checked = uiState.isDarkTheme, onCheckedChange = { onToggleTheme() }) }
-                HorizontalDivider(color = if (uiState.isDarkTheme) Color(0xFF333333) else Color(0xFFEEEEEE))
-                Button(onClick = { onClearChat(); onDismiss() }, colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.error), modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) { Icon(Icons.Default.Delete, contentDescription = null); Spacer(modifier = Modifier.width(8.dp)); Text(NexaStrings.get("clear_chat", uiState.language)) }
-                if (uiState.user.isLoggedIn) {
-                    Button(onClick = { onLogout(); onDismiss() }, colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = NexaAccent), modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null); Spacer(modifier = Modifier.width(8.dp)); Text(NexaStrings.get("logout", uiState.language)) }
-                } else {
-                    Button(onClick = { onNavigateToLogin(); onDismiss() }, colors = ButtonDefaults.buttonColors(containerColor = NexaAccent, contentColor = Color.Black), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Person, contentDescription = null); Spacer(modifier = Modifier.width(8.dp)); Text(NexaStrings.get("login", uiState.language), fontWeight = FontWeight.Bold) }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+
+                // Toggles
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(NexaStrings.get("auto_speak", uiState.language), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text(NexaStrings.get("auto_speak_desc", uiState.language), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        }
+                        Switch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() }, colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent.copy(alpha = 0.4f), checkedThumbColor = NexaAccent))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(NexaStrings.get("theme", uiState.language), modifier = Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Switch(checked = uiState.isDarkTheme, onCheckedChange = { onToggleTheme() }, colors = SwitchDefaults.colors(checkedTrackColor = NexaAccent.copy(alpha = 0.4f), checkedThumbColor = NexaAccent))
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+
+                // Actions
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(onClick = { onClearChat(); onDismiss() }, shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f), border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.1f)), modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                            Text(NexaStrings.get("clear_chat", uiState.language), color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), fontSize = 13.sp)
+                        }
+                    }
+                    if (uiState.user.isLoggedIn) {
+                        Surface(onClick = { onLogout(); onDismiss() }, shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.06f), border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.1f)), modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                                Text(NexaStrings.get("logout", uiState.language), color = NexaAccent.copy(alpha = 0.7f), fontSize = 13.sp)
+                            }
+                        }
+                    } else {
+                        Surface(onClick = { onNavigateToLogin(); onDismiss() }, shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = NexaAccent, modifier = Modifier.size(18.dp))
+                                Text(NexaStrings.get("login", uiState.language), color = NexaAccent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = NexaAccent) } },
-        containerColor = if (uiState.isDarkTheme) Color(0xFF111111) else Color.White,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.sp) } },
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp)
     )
 }
