@@ -231,10 +231,16 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openUpdatePage() {
-        val url = _uiState.value.updateInfo?.downloadUrl
-            ?: "https://github.com/angelpipo1968/nexa-ai-android/releases/latest"
-        updateChecker.openDownloadPage(getApplication(), url)
-        _uiState.value = _uiState.value.copy(showUpdateDialog = false)
+        val info = _uiState.value.updateInfo ?: return
+        val context = getApplication<Application>()
+
+        _uiState.value = _uiState.value.copy(
+            updateInfo = info.copy(changelog = info.changelog),
+            showUpdateDialog = false
+        )
+
+        // Try direct APK download + install; falls back to browser
+        updateChecker.downloadAndInstall(context, info.downloadUrl, info.versionName)
     }
 
     // ═══════════════════════════════════════

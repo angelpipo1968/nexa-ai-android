@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nexa.ai.BuildConfig
 import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.viewmodel.*
 import kotlinx.coroutines.launch
@@ -1110,33 +1111,63 @@ fun DrawerContent(
                 }
             }
         }
+        }
 
-        Spacer(modifier = Modifier.weight(0.1f))
+        Spacer(modifier = Modifier.weight(1f))
 
-        // Settings gear — absolute bottom
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            contentAlignment = Alignment.CenterStart
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+        // Account
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { if (user.isLoggedIn) onLogout() else onNavigateToLogin() }.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else NexaAccent.copy(alpha = 0.12f),
+                modifier = Modifier.size(30.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(if (user.isLoggedIn) Icons.Default.Logout else Icons.Default.Person, null, modifier = Modifier.size(16.dp), tint = if (user.isLoggedIn) MaterialTheme.colorScheme.error else NexaAccent)
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (user.isLoggedIn) NexaStrings.get("logout", lang) else NexaStrings.get("login", lang),
+                    fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                    color = if (user.isLoggedIn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
+                if (user.isLoggedIn) {
+                    Text(user.email, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                }
+            }
+        }
+
+        // Settings gear pinned to bottom-left
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, bottom = 10.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = {
                     onToggleSettings()
                     onClose()
                 },
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = NexaStrings.get("settings", lang),
-                    tint = NexaAccent.copy(alpha = 0.6f),
-                    modifier = Modifier.size(24.dp)
+                    tint = NexaAccent.copy(alpha = 0.45f),
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
     }
-}
+
 
 // ═══════════════════════════════════════
 //  SETTINGS PANEL (inside drawer)
@@ -1407,7 +1438,7 @@ fun EmptyState(lang: AppLanguage) {
         Text("NEXA PRO", fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
         Spacer(modifier = Modifier.height(4.dp))
         Surface(shape = RoundedCornerShape(20.dp), color = NexaAccent.copy(alpha = 0.1f)) {
-            Text("v3.1", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+            Text("v${BuildConfig.VERSION_NAME}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NexaAccent, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(NexaStrings.get("welcome_msg", lang), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 22.sp)
