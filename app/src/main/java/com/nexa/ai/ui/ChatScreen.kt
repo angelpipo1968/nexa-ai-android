@@ -64,7 +64,13 @@ fun ChatMainScreen(
     onSetDrawerView: (Int) -> Unit,
     onAttachFile: () -> Unit,
     onClearAttachment: () -> Unit = {},
-    onNavigateToLottery: () -> Unit = {}
+    onNavigateToLottery: () -> Unit = {},
+    onPinSession: (String) -> Unit = {},
+    onRenameSession: (String) -> Unit = {},
+    onCloneSession: (String) -> Unit = {},
+    onArchiveSession: (String) -> Unit = {},
+    onShareSession: (String) -> Unit = {},
+    onDownloadSession: (String) -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -86,7 +92,10 @@ fun ChatMainScreen(
                 onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
                 onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
                 onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
-                onNavigateToLottery = onNavigateToLottery
+                onNavigateToLottery = onNavigateToLottery,
+                onPinSession = onPinSession, onRenameSession = onRenameSession,
+                onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
+                onShareSession = onShareSession, onDownloadSession = onDownloadSession
             )
         },
         gesturesEnabled = true
@@ -131,7 +140,10 @@ fun DrawerContent(
     onDeleteSession: (String) -> Unit, onClose: () -> Unit, onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit, onSetLanguage: (AppLanguage) -> Unit, onSetVoiceType: (VoiceType) -> Unit,
     onToggleTheme: () -> Unit, onToggleSettings: () -> Unit, onToggleAutoSpeak: () -> Unit,
-    onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {}
+    onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {},
+    onPinSession: (String) -> Unit = {}, onRenameSession: (String) -> Unit = {},
+    onCloneSession: (String) -> Unit = {}, onArchiveSession: (String) -> Unit = {},
+    onShareSession: (String) -> Unit = {}, onDownloadSession: (String) -> Unit = {}
 ) {
     val sessions = uiState.sessions
     val activeSessionId = uiState.activeSessionId
@@ -181,7 +193,10 @@ fun DrawerContent(
         LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
             items(sessions, key = { it.id }) { session ->
                 ChatSessionItem(session = session, language = lang, isActive = session.id == activeSessionId,
-                    onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) })
+                    onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) },
+                    onPin = { onPinSession(session.id) }, onRename = { onRenameSession(session.id) },
+                    onClone = { onCloneSession(session.id) }, onArchive = { onArchiveSession(session.id) },
+                    onShare = { onShareSession(session.id) }, onDownload = { onDownloadSession(session.id) })
             }
         }
 
@@ -231,7 +246,13 @@ fun DrawerContent(
 }
 
 @Composable
-fun ChatSessionItem(session: ChatSession, language: AppLanguage, isActive: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
+fun ChatSessionItem(
+    session: ChatSession, language: AppLanguage, isActive: Boolean,
+    onClick: () -> Unit, onDelete: () -> Unit,
+    onPin: () -> Unit = {}, onRename: () -> Unit = {},
+    onClone: () -> Unit = {}, onArchive: () -> Unit = {},
+    onShare: () -> Unit = {}, onDownload: () -> Unit = {}
+) {
     var showMenu by remember { mutableStateOf(false) }
     Surface(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp).clickable { onClick() },
         shape = RoundedCornerShape(12.dp), color = if (isActive) NexaAccent.copy(alpha = 0.06f) else Color.Transparent,
@@ -254,7 +275,48 @@ fun ChatSessionItem(session: ChatSession, language: AppLanguage, isActive: Boole
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("🗑️ ${NexaStrings.get("delete_chat", language)}") },
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.PushPin, null, modifier = Modifier.size(16.dp), tint = NexaAccent.copy(alpha = 0.7f))
+                            Text(NexaStrings.get("pin_chat", language), fontSize = 13.sp)
+                        }},
+                        onClick = { showMenu = false; onPin() })
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                            Text(NexaStrings.get("rename_chat", language), fontSize = 13.sp)
+                        }},
+                        onClick = { showMenu = false; onRename() })
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                            Text(NexaStrings.get("clone_chat", language), fontSize = 13.sp)
+                        }},
+                        onClick = { showMenu = false; onClone() })
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Archive, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                            Text(NexaStrings.get("archive_chat", language), fontSize = 13.sp)
+                        }},
+                        onClick = { showMenu = false; onArchive() })
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                            Text(NexaStrings.get("share_chat", language), fontSize = 13.sp)
+                        }},
+                        onClick = { showMenu = false; onShare() })
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                            Text(NexaStrings.get("download_chat", language), fontSize = 13.sp)
+                        }},
+                        onClick = { showMenu = false; onDownload() })
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+                    DropdownMenuItem(
+                        text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                            Text(NexaStrings.get("delete_chat", language), fontSize = 13.sp, color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                        }},
                         onClick = { showMenu = false; onDelete() })
                 }
             }
