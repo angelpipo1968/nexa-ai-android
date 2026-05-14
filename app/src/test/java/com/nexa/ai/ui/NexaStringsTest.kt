@@ -50,7 +50,7 @@ class NexaStringsTest {
 
     @Test
     fun `Spanish and English have different values`() {
-        val keys = listOf("new_chat", "settings", "login", "email", "password", "thinking")
+        val keys = listOf("new_chat", "settings", "login", "password", "thinking", "online")
         for (key in keys) {
             val es = NexaStrings.get(key, AppLanguage.SPANISH)
             val en = NexaStrings.get(key, AppLanguage.ENGLISH)
