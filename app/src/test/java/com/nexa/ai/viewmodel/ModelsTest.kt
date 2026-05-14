@@ -78,11 +78,12 @@ class ModelsTest {
 
     @Test
     fun `Screen enum has all values`() {
-        assertEquals(4, Screen.entries.size)
+        assertEquals(5, Screen.entries.size)
         assertTrue(Screen.entries.contains(Screen.CHAT))
         assertTrue(Screen.entries.contains(Screen.LOGIN))
         assertTrue(Screen.entries.contains(Screen.REGISTER))
         assertTrue(Screen.entries.contains(Screen.LOTTERY))
+        assertTrue(Screen.entries.contains(Screen.SETTINGS))
     }
 
     @Test
