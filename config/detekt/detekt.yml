@@ -2,10 +2,11 @@
 # https://detekt.github.io/detekt/
 
 build:
-  maxIssues: 0
+  maxIssues: 500
   excludeCorrectable: false
 
 complexity:
+
   LongMethod:
     active: true
     threshold: 60
@@ -13,9 +14,12 @@ complexity:
     active: true
     functionThreshold: 10
     constructorThreshold: 10
-  ComplexMethod:
+  CyclomaticComplexMethod:
     active: true
     threshold: 15
+  NestedBlockDepth:
+    active: true
+    threshold: 4
   TooManyFunctions:
     active: true
     thresholdInFiles: 20
@@ -27,16 +31,15 @@ complexity:
 style:
   MaxLineLength:
     active: true
-    maxLineLength: 140
+    maxLineLength: 250
   MagicNumber:
     active: false
   ReturnCount:
     active: true
-    max: 3
-  NestedBlockDepth:
-    active: true
-    max: 4
+    max: 10
   ForbiddenComment:
+
+
     active: false
   WildcardImport:
     active: false

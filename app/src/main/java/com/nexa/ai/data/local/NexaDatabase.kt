@@ -52,6 +52,9 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :sessionId")
     suspend fun deleteSession(sessionId: String)
 
+    @Query("DELETE FROM messages")
+    suspend fun deleteAllMessages()
+
     @Query("DELETE FROM sessions")
     suspend fun deleteAll()
 
@@ -60,6 +63,15 @@ interface SessionDao {
 
     @Query("DELETE FROM messages WHERE sessionId = :sessionId")
     suspend fun deleteMessagesForSession(sessionId: String)
+
+    /** Atomic replace-all: borra mensajes primero, luego sesiones, luego inserta todo. */
+    @Transaction
+    suspend fun saveAll(sessions: List<SessionEntity>, messages: List<MessageEntity>) {
+        deleteAllMessages()   // 1. borra messages primero (evita FK violation)
+        deleteAll()           // 2. borra sessions
+        sessions.forEach { insertSession(it) }  // 3. inserta sessions
+        if (messages.isNotEmpty()) insertMessages(messages) // 4. inserta messages
+    }
 }
 
 data class SessionWithMessages(

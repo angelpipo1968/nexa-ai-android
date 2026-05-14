@@ -14,7 +14,7 @@ object NexaStrings {
         "new_chat" to "Nuevo chat", "settings" to "Ajustes", "language" to "Idioma", "voice" to "Voz", "theme" to "Tema",
         "dark" to "Oscuro", "light" to "Claro", "system" to "Sistema", "male_1" to "Hombre 1", "male_2" to "Hombre 2", "male_3" to "Hombre 3",
         "female_1" to "Mujer 1", "female_2" to "Mujer 2", "female_3" to "Mujer 3", "login" to "Iniciar sesión",
-        "logout" to "Cerrar sesión", "register" to "Registrarse", "email" to "Email", "password" to "Contraseña",
+        "logout" to "Cerrar sesión", "register" to "Registrarse", "email" to "Correo electrónico", "password" to "Contraseña",
         "thinking" to "pensando...", "input_hint" to "Escribe un mensaje...", "listening" to "🎙️ Escuchando...",
         "mic_hint" to "🎙️ hablar • ↵ enviar", "messages_count" to "mensajes", "delete_chat" to "Borrar chat",
         "pin_chat" to "Fijar chat", "rename_chat" to "Renombrar", "clone_chat" to "Clonar",
