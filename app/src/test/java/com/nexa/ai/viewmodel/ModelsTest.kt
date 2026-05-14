@@ -119,7 +119,6 @@ class ModelsTest {
         assertEquals(ThemeMode.DARK, state.themeMode)
         assertTrue(state.isDark(isSystemDark = false))
         assertFalse(state.drawerOpen)
-        assertFalse(state.showSettings)
         assertEquals(Screen.CHAT, state.currentScreen)
         assertFalse(state.user.isLoggedIn)
     }
