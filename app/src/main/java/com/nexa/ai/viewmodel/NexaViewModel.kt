@@ -32,7 +32,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionStore = SessionStore(application)
     private val settingsStore = SettingsStore(application)
 
-    private var lastSendTimestamp = 0Lf
+    private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
 
     private val surprisePromptsEs = listOf(
