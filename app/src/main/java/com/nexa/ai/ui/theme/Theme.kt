@@ -3,6 +3,8 @@ package com.nexa.ai.ui.theme
 import android.app.Activity
 import android.content.res.Configuration
 import android.os.Build
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -164,6 +166,20 @@ fun NexaTheme(
         }
     }
 
+    // Animated theme transition
+    val animatedColorScheme = colorScheme.copy(
+        primary = animateColorAsState(colorScheme.primary, tween(500), label = "primary").value,
+        onPrimary = animateColorAsState(colorScheme.onPrimary, tween(500), label = "onPrimary").value,
+        background = animateColorAsState(colorScheme.background, tween(500), label = "background").value,
+        surface = animateColorAsState(colorScheme.surface, tween(500), label = "surface").value,
+        surfaceVariant = animateColorAsState(colorScheme.surfaceVariant, tween(500), label = "surfaceVariant").value,
+        onBackground = animateColorAsState(colorScheme.onBackground, tween(500), label = "onBackground").value,
+        onSurface = animateColorAsState(colorScheme.onSurface, tween(500), label = "onSurface").value,
+        onSurfaceVariant = animateColorAsState(colorScheme.onSurfaceVariant, tween(500), label = "onSurfaceVariant").value,
+        outline = animateColorAsState(colorScheme.outline, tween(500), label = "outline").value,
+        error = animateColorAsState(colorScheme.error, tween(500), label = "error").value,
+    )
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -171,8 +187,8 @@ fun NexaTheme(
                 val context = view.context
                 val activity = context as? Activity ?: return@SideEffect
                 val window = activity.window
-                window.statusBarColor = colorScheme.background.toArgb()
-                window.navigationBarColor = colorScheme.background.toArgb()
+                window.statusBarColor = animatedColorScheme.background.toArgb()
+                window.navigationBarColor = animatedColorScheme.background.toArgb()
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
             } catch (e: Exception) {
                 android.util.Log.e("NexaTheme", "Theme error: ${e.message}")
@@ -181,7 +197,7 @@ fun NexaTheme(
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = animatedColorScheme,
         content = content
     )
 }

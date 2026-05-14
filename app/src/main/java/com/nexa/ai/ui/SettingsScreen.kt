@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,12 +22,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -120,6 +126,10 @@ fun SettingsScreen(
             },
             containerColor = Color.Transparent
         ) { padding ->
+            // Staggered entrance animation state
+            var sectionsVisible by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { sectionsVisible = true }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -129,8 +139,8 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
 
-                // ── Brand ──
-                Row(
+                // ── Brand (staggered index 0) ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 0) { Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
@@ -174,10 +184,12 @@ fun SettingsScreen(
                         )
                     }
                 }
+                } // StaggeredFadeIn brand
 
                 // ════════════════════════════════
-                //  LANGUAGE
+                //  LANGUAGE (staggered index 1)
                 // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 1) {
                 SectionLabel(NexaStrings.get("language", uiState.language).uppercase())
                 FuturisticCard {
                     Row(
@@ -199,10 +211,12 @@ fun SettingsScreen(
                         }
                     }
                 }
+                } // StaggeredFadeIn language
 
                 // ════════════════════════════════
-                //  VOICE
+                //  VOICE (staggered index 2)
                 // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 2) {
                 SectionLabel(NexaStrings.get("voice", uiState.language).uppercase())
                 FuturisticCard {
                     Row(
@@ -294,10 +308,12 @@ fun SettingsScreen(
                         }
                     }
                 }
+                } // StaggeredFadeIn voice
 
                 // ════════════════════════════════
-                //  THEME
+                //  THEME (staggered index 3)
                 // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 3) {
                 SectionLabel(NexaStrings.get("theme", uiState.language).uppercase())
                 FuturisticCard {
                     Row(
@@ -334,10 +350,12 @@ fun SettingsScreen(
                         )
                     }
                 }
+                } // StaggeredFadeIn theme
 
                 // ════════════════════════════════
-                //  PREFERENCES
+                //  PREFERENCES (staggered index 4)
                 // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 4) {
                 SectionLabel(
                     if (uiState.language == AppLanguage.SPANISH) "PREFERENCIAS" else "PREFERENCES"
                 )
@@ -380,10 +398,12 @@ fun SettingsScreen(
                         )
                     }
                 }
+                } // StaggeredFadeIn preferences
 
                 // ════════════════════════════════
-                //  DANGER ZONE
+                //  DANGER ZONE (staggered index 5)
                 // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
                 SectionLabel(
                     if (uiState.language == AppLanguage.SPANISH) "ZONA DE PELIGRO" else "DANGER ZONE",
                     color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
@@ -441,8 +461,10 @@ fun SettingsScreen(
                         }
                     }
                 }
+                } // StaggeredFadeIn danger zone
 
-                // ── Version ──
+                // ── Version (staggered index 6) ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -468,6 +490,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
                     )
                 }
+                } // StaggeredFadeIn version
 
                 Spacer(modifier = Modifier.height(40.dp))
             }
@@ -479,6 +502,39 @@ fun SettingsScreen(
 // ═══════════════════════════════════════════════════════════════
 //  COMPONENTS — Minimalist Futuristic
 // ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun StaggeredFadeIn(
+    visible: Boolean,
+    index: Int,
+    durationMs: Int = 450,
+    staggerMs: Int = 80,
+    content: @Composable () -> Unit
+) {
+    val animVisibleState = remember { MutableTransitionState(false) }
+    animVisibleState.targetState = visible
+
+    AnimatedVisibility(
+        visibleState = animVisibleState,
+        enter = fadeIn(
+            animationSpec = tween(
+                durationMillis = durationMs,
+                delayMillis = index * staggerMs,
+                easing = FastOutSlowInEasing
+            )
+        ) + slideInVertically(
+            animationSpec = tween(
+                durationMillis = durationMs,
+                delayMillis = index * staggerMs,
+                easing = FastOutSlowInEasing
+            ),
+            initialOffsetY = { it / 12 }
+        ),
+        exit = fadeOut()
+    ) {
+        content()
+    }
+}
 
 @Composable
 private fun SectionLabel(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)) {
@@ -514,8 +570,31 @@ private fun FuturisticPill(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    // Press scale animation
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "pillScale"
+    )
+
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        tryAwaitRelease()
+                        pressed = false
+                    },
+                    onTap = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    }
+                )
+            },
         shape = RoundedCornerShape(12.dp),
         color = if (selected) accent.copy(alpha = 0.07f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
@@ -559,10 +638,41 @@ private fun VoiceCard(
     onClick: () -> Unit
 ) {
     val accent = LocalAccentColor.current
+    val haptic = LocalHapticFeedback.current
     val isMale = voice.name.contains("MALE")
 
+    // Press scale animation
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.93f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "voiceScale"
+    )
+
+    // Waveform animation for selected card
+    val infiniteTransition = rememberInfiniteTransition(label = "waveform")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
+        label = "wavePhase"
+    )
+
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        tryAwaitRelease()
+                        pressed = false
+                    },
+                    onTap = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    }
+                )
+            },
         shape = RoundedCornerShape(14.dp),
         color = if (selected) accent.copy(alpha = 0.05f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
@@ -611,14 +721,27 @@ private fun VoiceCard(
                     textAlign = TextAlign.Center,
                     letterSpacing = 0.3.sp
                 )
-                // Active dot
+                // Active waveform / dot
                 if (selected) {
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .clip(CircleShape)
-                            .background(accent)
-                    )
+                    // Mini neon waveform
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.height(8.dp)
+                    ) {
+                        repeat(5) { i ->
+                            val barHeight = (4 + 4 * kotlin.math.sin(
+                                wavePhase.toDouble() + i * 0.8
+                            ).toFloat()).dp
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(barHeight)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(accent.copy(alpha = 0.7f))
+                            )
+                        }
+                    }
                 } else {
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -639,8 +762,12 @@ private fun RowScope.ThemeOption(
     modifier: Modifier = Modifier
 ) {
     val accent = LocalAccentColor.current
+    val haptic = LocalHapticFeedback.current
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         shape = RoundedCornerShape(14.dp),
         color = if (selected) accent.copy(alpha = 0.05f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),

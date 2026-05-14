@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,8 +24,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +77,8 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
                 onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
                 onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null)
         }
-        if (isThinking) item { ThinkingIndicator(language) }
+        if (isThinking && messages.isEmpty()) item { ShimmerLoading(isDarkTheme = isDarkTheme) }
+        if (isThinking && messages.isNotEmpty()) item { ThinkingIndicator(language) }
     }
 }
 
@@ -78,29 +89,68 @@ fun EmptyState(lang: AppLanguage) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Subtle pulsing glow with ⚡
+        // Premium pulsating glow with layered effects
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
         val glowScale by infiniteTransition.animateFloat(
-            initialValue = 0.92f, targetValue = 1.08f,
+            initialValue = 0.88f, targetValue = 1.12f,
             animationSpec = infiniteRepeatable(animation = tween(5000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
             label = "pulse"
         )
         val glowAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.08f, targetValue = 0.18f,
+            initialValue = 0.06f, targetValue = 0.2f,
             animationSpec = infiniteRepeatable(animation = tween(4000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
             label = "glowAlpha"
         )
-        Box(
-            modifier = Modifier
-                .size((56 * glowScale).dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(Brush.radialGradient(listOf(
-                    NexaAccent.copy(alpha = glowAlpha),
-                    NexaAccent.copy(alpha = 0.02f),
-                    Color.Transparent
-                ))),
-            contentAlignment = Alignment.Center
-        ) { Text("⚡", fontSize = 26.sp) }
+        val outerGlowAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.02f, targetValue = 0.08f,
+            animationSpec = infiniteRepeatable(animation = tween(6000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            label = "outerGlow"
+        )
+        val rotation by infiniteTransition.animateFloat(
+            initialValue = -2f, targetValue = 2f,
+            animationSpec = infiniteRepeatable(animation = tween(7000, easing = EaseInOut), repeatMode = RepeatMode.Reverse),
+            label = "wobble"
+        )
+
+        Box(contentAlignment = Alignment.Center) {
+            // Outer glow ring
+            Box(
+                modifier = Modifier
+                    .size((80 * glowScale).dp)
+                    .graphicsLayer {
+                        alpha = outerGlowAlpha
+                        rotationZ = rotation
+                    }
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.radialGradient(listOf(
+                            NexaAccent.copy(alpha = 0.15f),
+                            NexaAccent.copy(alpha = 0.03f),
+                            Color.Transparent
+                        ))
+                    )
+            )
+            // Inner glow
+            Box(
+                modifier = Modifier
+                    .size((56 * glowScale).dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Brush.radialGradient(listOf(
+                        NexaAccent.copy(alpha = glowAlpha),
+                        NexaAccent.copy(alpha = 0.02f),
+                        Color.Transparent
+                    ))),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "⚡",
+                    fontSize = 26.sp,
+                    modifier = Modifier.graphicsLayer {
+                        rotationZ = rotation * 0.3f
+                    }
+                )
+            }
+        }
 
         // Minimal brand text
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -131,7 +181,53 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
         ThemeMode.DARK -> MaterialTheme.colorScheme.onSurface
         ThemeMode.LIGHT -> Color.White
     }
+    val haptic = LocalHapticFeedback.current
+    // Swipe gesture state
+    var swipeOffset by remember { mutableFloatStateOf(0f) }
+    val animatedSwipeOffset by animateFloatAsState(
+        targetValue = swipeOffset,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "swipeOffset"
+    )
+    // Threshold to trigger action
+    val swipeThreshold = 120f
+    var swipeTriggered by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
+        Box(
+            modifier = Modifier
+                .pointerInput(onCopy, onSpeak) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (!swipeTriggered && kotlin.math.abs(swipeOffset) > swipeThreshold) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (swipeOffset > 0) onCopy() else onSpeak()
+                            }
+                            swipeTriggered = false
+                            swipeOffset = 0f
+                        },
+                        onDragCancel = { swipeOffset = 0f },
+                        onHorizontalDrag = { _, dragAmount ->
+                            swipeOffset = (swipeOffset + dragAmount).coerceIn(-200f, 200f)
+                        }
+                    )
+                }
+                .graphicsLayer { translationX = animatedSwipeOffset }
+        ) {
+            // Swipe hint backgrounds
+            if (kotlin.math.abs(animatedSwipeOffset) > 20f) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            if (animatedSwipeOffset > 0)
+                                NexaAccent.copy(alpha = (kotlin.math.abs(animatedSwipeOffset) / 400f).coerceAtMost(0.15f))
+                            else
+                                Color(0xFF6C63FF).copy(alpha = (kotlin.math.abs(animatedSwipeOffset) / 400f).coerceAtMost(0.15f))
+                        )
+                )
+            }
+
         Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
             color = if (isUser) userBubbleColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)) else null) {
@@ -217,21 +313,84 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 }
             }
         }
+        } // swipe gesture Box
     }
 }
 
 @Composable
 fun ThinkingIndicator(lang: AppLanguage) {
-    Row(modifier = Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            repeat(3) { index ->
-                val infiniteTransition = rememberInfiniteTransition(label = "dot$index")
-                val alpha by infiniteTransition.animateFloat(initialValue = 0.15f, targetValue = 0.8f, animationSpec = infiniteRepeatable(animation = tween(700, delayMillis = index * 180), repeatMode = RepeatMode.Reverse), label = "dotAlpha$index")
-                val size by infiniteTransition.animateFloat(initialValue = 5f, targetValue = 7f, animationSpec = infiniteRepeatable(animation = tween(700, delayMillis = index * 180), repeatMode = RepeatMode.Reverse), label = "dotSize$index")
-                Box(modifier = Modifier.size(size.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
-            }
-        }
-        Text(NexaStrings.get("thinking", lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), letterSpacing = 0.5.sp)
+    // Neon sinusoidal wave indicator
+    val infiniteTransition = rememberInfiniteTransition(label = "thinking")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = LinearEasing)
+        ),
+        label = "wavePhase"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
+    Row(
+        modifier = Modifier.padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Sinusoidal neon wave
+        Box(
+            modifier = Modifier
+                .width(60.dp)
+                .height(20.dp)
+                .drawBehind {
+                    val width = size.width
+                    val height = size.height
+                    val centerY = height / 2f
+                    val amplitude = height * 0.35f
+                    val segments = 40
+
+                    // Glow layer
+                    for (i in 0 until segments - 1) {
+                        val x1 = width * i / segments
+                        val x2 = width * (i + 1) / segments
+                        val y1 = centerY + amplitude * kotlin.math.sin(phase + i * 0.5f)
+                        val y2 = centerY + amplitude * kotlin.math.sin(phase + (i + 1) * 0.5f)
+                        drawLine(
+                            color = NexaAccent.copy(alpha = glowAlpha * 0.15f),
+                            start = Offset(x1, y1),
+                            end = Offset(x2, y2),
+                            strokeWidth = 8.dp.toPx()
+                        )
+                    }
+                    // Main neon line
+                    for (i in 0 until segments - 1) {
+                        val x1 = width * i / segments
+                        val x2 = width * (i + 1) / segments
+                        val y1 = centerY + amplitude * kotlin.math.sin(phase + i * 0.5f)
+                        val y2 = centerY + amplitude * kotlin.math.sin(phase + (i + 1) * 0.5f)
+                        drawLine(
+                            color = NexaAccent.copy(alpha = glowAlpha),
+                            start = Offset(x1, y1),
+                            end = Offset(x2, y2),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                    }
+                }
+        )
+        Text(
+            NexaStrings.get("thinking", lang),
+            fontSize = 12.sp,
+            color = NexaAccent.copy(alpha = glowAlpha * 0.5f),
+            letterSpacing = 0.5.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -242,6 +401,92 @@ fun DotsTyping() {
             val infiniteTransition = rememberInfiniteTransition(label = "typing$index")
             val alpha by infiniteTransition.animateFloat(initialValue = 0.15f, targetValue = 0.7f, animationSpec = infiniteRepeatable(animation = tween(600, delayMillis = index * 150), repeatMode = RepeatMode.Reverse), label = "typingAlpha$index")
             Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  SHIMMER LOADING EFFECT
+// ═══════════════════════════════════════
+
+@Composable
+fun ShimmerLoading(isDarkTheme: Boolean = true) {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerTranslate by infiniteTransition.animateFloat(
+        initialValue = -300f,
+        targetValue = 900f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerTranslate"
+    )
+
+    val baseColor = if (isDarkTheme) Color(0xFF1A1A26) else Color(0xFFF0F1F5)
+    val highlightColor = if (isDarkTheme) Color(0xFF2A2A3A) else Color(0xFFE0E2EA)
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Shimmer bubble - simulates AI response
+        Surface(
+            shape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp),
+            color = baseColor,
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f))
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                // NEXA label shimmer
+                Row(
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(baseColor)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(baseColor)
+                    )
+                }
+                // Content line shimmers
+                repeat(3) { lineIndex ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(
+                                when (lineIndex) {
+                                    0 -> 0.9f
+                                    1 -> 0.7f
+                                    else -> 0.45f
+                                }
+                            )
+                            .height(12.dp)
+                            .padding(vertical = 2.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .drawBehind {
+                                drawRoundRect(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            baseColor,
+                                            highlightColor,
+                                            baseColor
+                                        ),
+                                        startX = shimmerTranslate - 100f,
+                                        endX = shimmerTranslate + 200f
+                                    ),
+                                    cornerRadius = CornerRadius(6.dp.toPx())
+                                )
+                            }
+                    )
+                }
+            }
         }
     }
 }

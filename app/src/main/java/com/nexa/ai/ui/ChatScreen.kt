@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,8 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,12 +123,92 @@ fun ChatMainScreen(
                     ErrorBanner(uiState.error ?: "", onDismissError)
                 }
 
-                ChatMessages(messages = uiState.messages, isThinking = uiState.isThinking,
-                    language = uiState.language, speakingMessageId = uiState.speakingMessageId,
-                    onSpeakMessage = onSpeakMessage, onCopyMessage = onCopyMessage,
-                    onExportMessage = onExportMessage, onRegenerate = onRegenerate,
-                    isDarkTheme = isDarkTheme, themeMode = uiState.themeMode,
-                    modifier = Modifier.weight(1f))
+                // Pull-to-refresh gesture for clearing chat
+                val haptic = LocalHapticFeedback.current
+                var pullOffset by remember { mutableFloatStateOf(0f) }
+                val animatedPullOffset by animateFloatAsState(
+                    targetValue = pullOffset,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "pullOffset"
+                )
+                val pullThreshold = 150f
+                var refreshTriggered by remember { mutableStateOf(false) }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .pointerInput(uiState.messages.isNotEmpty()) {
+                            if (uiState.messages.isNotEmpty()) {
+                                detectVerticalDragGestures(
+                                    onDragEnd = {
+                                        if (pullOffset > pullThreshold && !refreshTriggered) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onClearChat()
+                                        }
+                                        refreshTriggered = false
+                                        pullOffset = 0f
+                                    },
+                                    onDragCancel = { pullOffset = 0f },
+                                    onVerticalDrag = { _, dragAmount ->
+                                        if (dragAmount > 0) {
+                                            pullOffset = (pullOffset + dragAmount).coerceAtMost(250f)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                ) {
+                    // Pull indicator
+                    if (animatedPullOffset > 20f) {
+                        val progress = (animatedPullOffset / pullThreshold).coerceAtMost(1f)
+                        val infiniteTransition = rememberInfiniteTransition(label = "pullGlow")
+                        val glowAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.3f, targetValue = 0.8f,
+                            animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                            label = "pullGlow"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(animatedPullOffset.dp * 0.4f)
+                                .graphicsLayer { alpha = progress * 0.8f },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size((16 + 8 * progress).dp),
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * progress)
+                                )
+                                if (progress > 0.7f) {
+                                    Text(
+                                        if (uiState.language == AppLanguage.SPANISH) "Soltar para limpiar" else "Release to clear",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    ChatMessages(
+                        messages = uiState.messages,
+                        isThinking = uiState.isThinking,
+                        language = uiState.language,
+                        speakingMessageId = uiState.speakingMessageId,
+                        onSpeakMessage = onSpeakMessage,
+                        onCopyMessage = onCopyMessage,
+                        onExportMessage = onExportMessage,
+                        onRegenerate = onRegenerate,
+                        isDarkTheme = isDarkTheme,
+                        themeMode = uiState.themeMode,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { translationY = animatedPullOffset * 0.3f }
+                    )
+                }
 
                 InputBar(text = uiState.inputText, language = uiState.language,
                     isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
@@ -158,12 +245,43 @@ fun DrawerContent(
         sessions.filter { it.title.contains(searchQuery, ignoreCase = true) || it.messages.any { m -> m.content.contains(searchQuery, ignoreCase = true) } }
 
     ModalDrawerSheet(modifier = Modifier.width(300.dp), drawerContainerColor = MaterialTheme.colorScheme.surface) {
-        // Header
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp)) {
+        // Header with parallax effect
+        val drawerListState = rememberLazyListState()
+        val headerParallaxOffset by remember {
+            derivedStateOf { (drawerListState.firstVisibleItemScrollOffset * 0.4f) }
+        }
+        val headerAlpha by remember {
+            derivedStateOf { (1f - (drawerListState.firstVisibleItemScrollOffset / 300f).coerceIn(0f, 0.6f)) }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    translationY = -headerParallaxOffset
+                    alpha = headerAlpha
+                }
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            NexaAccent.copy(alpha = 0.04f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+        ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                // Animated glow on drawer logo
+                val infiniteTransition = rememberInfiniteTransition(label = "drawerGlow")
+                val glowAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.10f, targetValue = 0.22f,
+                    animationSpec = infiniteRepeatable(tween(3500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                    label = "drawerGlowAlpha"
+                )
                 Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                    .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.15f), NexaAccent.copy(alpha = 0.03f)))),
+                    .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.03f)))),
                     contentAlignment = Alignment.Center) { Text("⚡", fontSize = 20.sp) }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 3.sp)
