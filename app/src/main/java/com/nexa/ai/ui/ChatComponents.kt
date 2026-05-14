@@ -314,10 +314,9 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                     Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp,
                         color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
                 }
-            }
-        }
-        if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
-            Row(modifier = Modifier.padding(top = 6.dp, start = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Action buttons INSIDE the message bubble, after the text
+                if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
+                    Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Speak button
                 Surface(onClick = onSpeak, shape = RoundedCornerShape(8.dp),
                     color = if (isSpeaking) NexaAccent.copy(alpha = 0.12f) else Color.Transparent,
@@ -388,6 +387,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
                         }
                     }
+                }
                 }
             }
         }
