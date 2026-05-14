@@ -4,7 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
-import com.nexa.ai.data.*
+import com.nexa.ai.data.ChatMessage
+import com.nexa.ai.data.NexaRepository
+import com.nexa.ai.data.PersistedMessage
+import com.nexa.ai.data.PersistedSession
+import com.nexa.ai.data.SessionStore
+import com.nexa.ai.data.StreamEvent
+import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.ui.NexaStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -704,4 +710,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         speechManager.destroy()
     }
-}
+}import com.nexa.ai.data.ChatMessage
+import com.nexa.ai.data.NexaRepository
+import com.nexa.ai.data.PersistedMessage
+import com.nexa.ai.data.PersistedSession
+import com.nexa.ai.data.SessionStore
+import com.nexa.ai.data.StreamEvent
+import com.nexa.ai.data.UpdateChecker
