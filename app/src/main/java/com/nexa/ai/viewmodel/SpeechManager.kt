@@ -8,8 +8,6 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
 /**
@@ -46,8 +44,14 @@ class SpeechManager(private val application: Application) {
             tts = TextToSpeech(application) { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     ttsReady = true
-                    applyVoiceSettings()
                     tts?.setSpeechRate(1.0f)
+
+                    // Set default language first, then apply voice settings
+                    try {
+                        tts?.setLanguage(Locale.getDefault())
+                    } catch (e: Exception) {
+                        tts?.setLanguage(Locale.US)
+                    }
 
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
@@ -61,6 +65,11 @@ class SpeechManager(private val application: Application) {
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                     })
+
+                    // Apply voice settings after a small delay to let TTS fully initialize
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        applyVoiceSettings()
+                    }, 500)
                 }
             }
         } catch (e: Exception) {
@@ -75,13 +84,32 @@ class SpeechManager(private val application: Application) {
                 AppLanguage.SPANISH -> Locale("es", "ES")
                 AppLanguage.ENGLISH -> Locale.US
             }
+
             val localeResult = tts?.setLanguage(locale)
             if (localeResult == TextToSpeech.LANG_MISSING_DATA || localeResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.setLanguage(Locale.US)
+                // Fallback to device default
+                tts?.setLanguage(Locale.getDefault())
             }
 
-            val allVoices = tts?.voices?.filter { it.locale.language == locale.language }
-            if (allVoices.isNullOrEmpty()) return
+            // Voice selection - skip if no voices available (some devices don't expose voices)
+            val allVoices = try { tts?.voices } catch (e: Exception) { null }
+            if (allVoices.isNullOrEmpty()) {
+                // Just set pitch, skip voice selection
+                val pitch = when (currentVoiceType) {
+                    VoiceType.FEMALE_1 -> 1.1f
+                    VoiceType.FEMALE_2 -> 1.0f
+                    VoiceType.FEMALE_3 -> 0.9f
+                    VoiceType.MALE_1   -> 0.8f
+                    VoiceType.MALE_2   -> 1.0f
+                    VoiceType.MALE_3   -> 1.2f
+                }
+                tts?.setPitch(pitch)
+                tts?.setSpeechRate(1.0f)
+                return
+            }
+
+            val localeVoices = allVoices.filter { it.locale.language == locale.language }
+            if (localeVoices.isEmpty()) return
 
             val voiceName = getVoiceName(currentLanguage, currentVoiceType)
 
@@ -89,12 +117,12 @@ class SpeechManager(private val application: Application) {
                     currentVoiceType == VoiceType.MALE_2 ||
                     currentVoiceType == VoiceType.MALE_3
 
-            val selectedVoice = allVoices.find { it.name == voiceName }
+            val selectedVoice = localeVoices.find { it.name == voiceName }
                 ?: run {
                     val genderKeywords = if (isMale) listOf("male", "man", "hom") else listOf("female", "woman", "fem")
-                    allVoices.find { v -> genderKeywords.any { v.name.lowercase().contains(it) } }
+                    localeVoices.find { v -> genderKeywords.any { v.name.lowercase().contains(it) } }
                 }
-                ?: allVoices.firstOrNull()
+                ?: localeVoices.firstOrNull()
                 ?: return
 
             tts?.voice = selectedVoice
@@ -148,10 +176,12 @@ class SpeechManager(private val application: Application) {
         if (cleaned.isBlank()) return
 
         try {
-            val params = Bundle().apply {
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+            // Use simple speak without params to avoid device-specific crashes
+            val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, null, messageId ?: "msg")
+            if (result == TextToSpeech.ERROR) {
+                android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
+                onSpeakingStateChanged?.invoke(false, null)
             }
-            tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, messageId ?: "msg")
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "TTS speak error: ${e.message}", e)
             onSpeakingStateChanged?.invoke(false, null)
