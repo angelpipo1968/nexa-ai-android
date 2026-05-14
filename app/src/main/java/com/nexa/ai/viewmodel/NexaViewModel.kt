@@ -626,16 +626,16 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             val paragraphGap = 4f
 
             var pageNum = 0
-            var page: android.graphics.pdf.PdfDocument.Page
-            var canvas: android.graphics.Canvas
+            var page: android.graphics.pdf.PdfDocument.Page? = null
+            var canvas: android.graphics.Canvas? = null
             var y: Float
 
             fun newPage(startY: Float = 50f): Float {
-                if (pageNum > 0) pdfDocument.finishPage(page)
+                if (pageNum > 0) pdfDocument.finishPage(page!!)
                 pageNum++
                 val info = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
                 page = pdfDocument.startPage(info)
-                canvas = page.canvas
+                canvas = page!!.canvas
                 paint.textSize = 12f
                 paint.isFakeBoldText = false
                 paint.color = android.graphics.Color.BLACK
@@ -652,17 +652,17 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             paint.textSize = 16f
             paint.isFakeBoldText = true
             paint.color = android.graphics.Color.parseColor("#00E5A0")
-            canvas.drawText("NEXA PRO", marginLeft, 45f, paint)
+            canvas!!.drawText("NEXA PRO", marginLeft, 45f, paint)
 
             paint.textSize = 10f
             paint.isFakeBoldText = false
             paint.color = android.graphics.Color.GRAY
             val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-            canvas.drawText(dateStr, marginLeft, 62f, paint)
+            canvas!!.drawText(dateStr, marginLeft, 62f, paint)
 
             paint.color = android.graphics.Color.parseColor("#00E5A0")
             paint.strokeWidth = 1f
-            canvas.drawLine(marginLeft, 72f, 545f, 72f, paint)
+            canvas!!.drawLine(marginLeft, 72f, 545f, 72f, paint)
 
             paint.textSize = 12f
             paint.isFakeBoldText = false
@@ -677,7 +677,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
                     if (paint.measureText(testLine) > maxTextWidth) {
                         y = ensureSpace(y)
-                        canvas.drawText(currentLine, marginLeft, y, paint)
+                        canvas!!.drawText(currentLine, marginLeft, y, paint)
                         y += lineHeight
                         currentLine = word
                     } else {
@@ -686,7 +686,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (currentLine.isNotEmpty()) {
                     y = ensureSpace(y)
-                    canvas.drawText(currentLine, marginLeft, y, paint)
+                    canvas!!.drawText(currentLine, marginLeft, y, paint)
                     y += lineHeight
                 }
                 y += paragraphGap
@@ -695,9 +695,9 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             // Footer
             paint.textSize = 8f
             paint.color = android.graphics.Color.LTGRAY
-            canvas.drawText(NexaStrings.get("generated_by", _uiState.value.language), marginLeft, 820f, paint)
+            canvas!!.drawText(NexaStrings.get("generated_by", _uiState.value.language), marginLeft, 820f, paint)
 
-            pdfDocument.finishPage(page)
+            pdfDocument.finishPage(page!!)
 
             val fileName = "nexa_export_${System.currentTimeMillis()}.pdf"
             val file = java.io.File(context.cacheDir, fileName)
