@@ -394,6 +394,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
         } // swipe gesture Box
     }
 }
+}
 
 @Composable
 fun ThinkingIndicator(lang: AppLanguage) {
@@ -649,7 +650,6 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
             }
         }
     }
-}
 }
 
 // ═══════════════════════════════════════
