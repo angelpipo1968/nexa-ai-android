@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.data.UpdateInfo
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.theme.NexaAccentDark
 import com.nexa.ai.viewmodel.*
 
 // ═══════════════════════════════════════
@@ -336,9 +337,14 @@ fun GeneralSettingsDialog(
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-                // Voice
+                // Voice — card grid with gradient highlight
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(NexaAccent.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center) { Text("🎙️", fontSize = 10.sp) }
+                        Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                            color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    }
                     val voices = VoiceType.entries.toList()
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         voices.chunked(3).forEach { rowVoices ->
@@ -346,12 +352,47 @@ fun GeneralSettingsDialog(
                                 rowVoices.forEach { voice ->
                                     val isMale = voice.name.contains("MALE")
                                     val selected = uiState.voiceType == voice
-                                    Surface(modifier = Modifier.weight(1f).clickable { onSetVoiceType(voice) }, shape = RoundedCornerShape(12.dp),
-                                        color = if (selected) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                        border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))) {
-                                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
-                                            Text(NexaStrings.get(voice.name.lowercase(), uiState.language), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), textAlign = TextAlign.Center)
+                                    Surface(
+                                        modifier = Modifier.weight(1f).clickable { onSetVoiceType(voice) },
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        border = if (selected) BorderStroke(1.5.dp, NexaAccent.copy(alpha = 0.5f))
+                                            else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+                                    ) {
+                                        Box(
+                                            modifier = if (selected) Modifier.background(
+                                                Brush.linearGradient(listOf(NexaAccent.copy(alpha = 0.12f), NexaAccent.copy(alpha = 0.04f)))
+                                            ) else Modifier
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.size(32.dp).clip(CircleShape)
+                                                        .background(if (selected) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        if (isMale) "👨" else "👩",
+                                                        fontSize = 16.sp
+                                                    )
+                                                }
+                                                Text(
+                                                    NexaStrings.get(voice.name.lowercase(), uiState.language),
+                                                    fontSize = 9.sp,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                                    textAlign = TextAlign.Center,
+                                                    letterSpacing = 0.3.sp
+                                                )
+                                                if (selected) {
+                                                    Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
+                                                } else {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -360,40 +401,68 @@ fun GeneralSettingsDialog(
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-                // Theme — 3 equal-width chips
+                // Theme — visual cards with preview colors
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(NexaStrings.get("theme", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(NexaAccent.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center) { Text("🎨", fontSize = 10.sp) }
+                        Text(NexaStrings.get("theme", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                            color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
+                    }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
-                            ThemeMode.DARK to NexaStrings.get("dark", uiState.language),
-                            ThemeMode.LIGHT to NexaStrings.get("light", uiState.language),
-                            ThemeMode.SYSTEM to NexaStrings.get("system", uiState.language)
-                        ).forEach { (mode, label) ->
+                            Triple(ThemeMode.DARK, NexaStrings.get("dark", uiState.language), listOf(Color(0xFF1A1A24), Color(0xFF0D0D12))),
+                            Triple(ThemeMode.LIGHT, NexaStrings.get("light", uiState.language), listOf(Color(0xFFF8F9FC), Color(0xFFFFFFFF))),
+                            Triple(ThemeMode.SYSTEM, NexaStrings.get("system", uiState.language), listOf(Color(0xFF1A1A24), Color(0xFFF8F9FC)))
+                        ).forEach { (mode, label, previewColors) ->
                             val selected = uiState.themeMode == mode
-                            FilterChip(
-                                selected = selected,
-                                onClick = { onSetThemeMode(mode) },
-                                modifier = Modifier.weight(1f),
-                                label = {
+                            Surface(
+                                modifier = Modifier.weight(1f).clickable { onSetThemeMode(mode) },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (selected) NexaAccent.copy(alpha = 0.06f) else Color.Transparent,
+                                border = if (selected) BorderStroke(1.5.dp, NexaAccent.copy(alpha = 0.4f))
+                                    else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    // Mini theme preview
+                                    Box(
+                                        modifier = Modifier.size(36.dp, 24.dp).clip(RoundedCornerShape(6.dp))
+                                            .background(Brush.linearGradient(previewColors)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (mode == ThemeMode.SYSTEM) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                                                Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(2.dp)).background(NexaAccent.copy(alpha = 0.6f)))
+                                                Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.6f)))
+                                            }
+                                        } else {
+                                            Box(modifier = Modifier.size(8.dp, 2.dp).clip(RoundedCornerShape(1.dp))
+                                                .background(if (mode == ThemeMode.DARK) NexaAccent.copy(alpha = 0.7f) else NexaAccentDark.copy(alpha = 0.7f)))
+                                        }
+                                    }
                                     Text(
-                                        text = when (mode) {
+                                        when (mode) {
                                             ThemeMode.DARK -> "🌙 $label"
                                             ThemeMode.LIGHT -> "☀️ $label"
                                             ThemeMode.SYSTEM -> "⚙️ $label"
                                         },
-                                        fontSize = 12.sp,
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        textAlign = TextAlign.Center
+                                        fontSize = 10.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                        textAlign = TextAlign.Center,
+                                        letterSpacing = 0.3.sp
                                     )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
-                                    selectedLabelColor = NexaAccent
-                                ),
-                                border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f))
-                                else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                            )
+                                    if (selected) {
+                                        Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
+                                    } else {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }

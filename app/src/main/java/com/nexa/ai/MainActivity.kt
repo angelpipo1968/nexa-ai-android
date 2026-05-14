@@ -41,6 +41,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Install crash logger — saves to /sdcard/Documents/nexa_crash_log.txt
+        CrashHandler.install(this)
+
         setContent {
             val uiState by viewModel.uiState.collectAsState()
 
@@ -74,6 +77,7 @@ class MainActivity : ComponentActivity() {
                         onSetLanguage = { viewModel.setLanguage(it) },
                         onSetVoiceType = { viewModel.setVoiceType(it) },
                         onCycleTheme = { viewModel.cycleTheme() },
+                        onSetThemeMode = { viewModel.setThemeMode(it) },
                         onNavigateToLogin = { viewModel.navigateToLogin() },
                         onNavigateToRegister = { viewModel.navigateToRegister() },
                         onNavigateToChat = { viewModel.navigateToChat() },

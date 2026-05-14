@@ -58,12 +58,12 @@ class NexaRepository {
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
-                if (data == "[DONE]") {
-                    trySend(StreamEvent.Done)
-                    return
-                }
-
                 try {
+                    if (data == "[DONE]") {
+                        trySend(StreamEvent.Done)
+                        return
+                    }
+
                     val obj = gson.fromJson(data, JsonObject::class.java)
                     
                     if (obj.has("done") && obj.get("done").asBoolean) {
@@ -90,27 +90,39 @@ class NexaRepository {
 
             override fun onClosed(eventSource: EventSource) {
                 Log.d(TAG, "SSE Connection Closed")
-                trySend(StreamEvent.Done)
-                close()
+                try {
+                    trySend(StreamEvent.Done)
+                    close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing SSE flow", e)
+                }
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 Log.e(TAG, "SSE Failure: ${t?.message}", t)
-                when {
-                    response?.code == 401 -> {
-                        trySend(StreamEvent.AuthExpired)
+                try {
+                    when {
+                        response?.code == 401 -> {
+                            trySend(StreamEvent.AuthExpired)
+                        }
+                        response?.code == 429 -> {
+                            trySend(StreamEvent.Error("rate_limit"))
+                        }
+                        t != null -> {
+                            trySend(StreamEvent.Error("connection_error:${t.localizedMessage}"))
+                        }
+                        else -> {
+                            trySend(StreamEvent.Error("server_error:${response?.code}"))
+                        }
                     }
-                    response?.code == 429 -> {
-                        trySend(StreamEvent.Error("rate_limit"))
-                    }
-                    t != null -> {
-                        trySend(StreamEvent.Error("connection_error:${t.localizedMessage}"))
-                    }
-                    else -> {
-                        trySend(StreamEvent.Error("server_error:${response?.code}"))
-                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error sending failure event", e)
                 }
-                close(t)
+                try {
+                    close(t)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing flow", e)
+                }
             }
         }
 
