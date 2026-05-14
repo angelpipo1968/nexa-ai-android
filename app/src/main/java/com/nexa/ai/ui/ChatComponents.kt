@@ -158,6 +158,47 @@ fun EmptyState(lang: AppLanguage) {
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), letterSpacing = 6.sp)
             Box(modifier = Modifier.width(24.dp).height(0.5.dp).background(NexaAccent.copy(alpha = 0.15f)))
         }
+
+        // Voice activation hint
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            // Mic icon with pulse
+            val pulseTransition = rememberInfiniteTransition(label = "micPulse")
+            val micScale by pulseTransition.animateFloat(
+                initialValue = 0.95f, targetValue = 1.05f,
+                animationSpec = infiniteRepeatable(tween(2500, easing = EaseInOut), RepeatMode.Reverse),
+                label = "micScale"
+            )
+            val micGlow by pulseTransition.animateFloat(
+                initialValue = 0.08f, targetValue = 0.18f,
+                animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
+                label = "micGlow"
+            )
+            Box(
+                modifier = Modifier
+                    .size((36 * micScale).dp)
+                    .clip(CircleShape)
+                    .background(NexaAccent.copy(alpha = micGlow)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = NexaAccent.copy(alpha = 0.6f)
+                )
+            }
+            Text(
+                if (lang == AppLanguage.SPANISH) "Toca para activar voz" else "Tap to activate voice",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                letterSpacing = 0.5.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
