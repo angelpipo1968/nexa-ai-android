@@ -42,64 +42,76 @@ class SpeechManager(private val application: Application) {
     // ═══════════════════════════════════════
 
     private fun initTTS() {
-        tts = TextToSpeech(application) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                ttsReady = true
-                applyVoiceSettings()
-                tts?.setSpeechRate(1.0f)
+        try {
+            tts = TextToSpeech(application) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    ttsReady = true
+                    applyVoiceSettings()
+                    tts?.setSpeechRate(1.0f)
 
-                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {
-                        onSpeakingStateChanged?.invoke(true, utteranceId)
-                    }
-                    override fun onDone(utteranceId: String?) {
-                        onSpeakingStateChanged?.invoke(false, null)
-                    }
-                    @Deprecated("Deprecated")
-                    override fun onError(utteranceId: String?) {
-                        onSpeakingStateChanged?.invoke(false, null)
-                    }
-                })
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            onSpeakingStateChanged?.invoke(true, utteranceId)
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            onSpeakingStateChanged?.invoke(false, null)
+                        }
+                        @Deprecated("Deprecated")
+                        override fun onError(utteranceId: String?) {
+                            onSpeakingStateChanged?.invoke(false, null)
+                        }
+                    })
+                }
             }
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "TTS init error: ${e.message}", e)
         }
     }
 
     fun applyVoiceSettings() {
-        if (!ttsReady) return
-        val locale = when (currentLanguage) {
-            AppLanguage.SPANISH -> Locale("es", "ES")
-            AppLanguage.ENGLISH -> Locale.US
-        }
-        tts?.language = locale
-
-        val allVoices = tts?.voices?.filter { it.locale.language == locale.language } ?: return
-        if (allVoices.isEmpty()) return
-
-        val voiceName = getVoiceName(currentLanguage, currentVoiceType)
-
-        val isMale = currentVoiceType == VoiceType.MALE_1 ||
-                currentVoiceType == VoiceType.MALE_2 ||
-                currentVoiceType == VoiceType.MALE_3
-
-        val selectedVoice = allVoices.find { it.name == voiceName }
-            ?: run {
-                val genderKeywords = if (isMale) listOf("male", "man", "hom") else listOf("female", "woman", "fem")
-                allVoices.find { v -> genderKeywords.any { v.name.lowercase().contains(it) } }
+        if (!ttsReady || tts == null) return
+        try {
+            val locale = when (currentLanguage) {
+                AppLanguage.SPANISH -> Locale("es", "ES")
+                AppLanguage.ENGLISH -> Locale.US
             }
-            ?: allVoices.first()
+            val localeResult = tts?.setLanguage(locale)
+            if (localeResult == TextToSpeech.LANG_MISSING_DATA || localeResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts?.setLanguage(Locale.US)
+            }
 
-        tts?.voice = selectedVoice
+            val allVoices = tts?.voices?.filter { it.locale.language == locale.language }
+            if (allVoices.isNullOrEmpty()) return
 
-        val pitch = when (currentVoiceType) {
-            VoiceType.FEMALE_1 -> 1.1f
-            VoiceType.FEMALE_2 -> 1.0f
-            VoiceType.FEMALE_3 -> 0.9f
-            VoiceType.MALE_1   -> 0.8f
-            VoiceType.MALE_2   -> 1.0f
-            VoiceType.MALE_3   -> 1.2f
+            val voiceName = getVoiceName(currentLanguage, currentVoiceType)
+
+            val isMale = currentVoiceType == VoiceType.MALE_1 ||
+                    currentVoiceType == VoiceType.MALE_2 ||
+                    currentVoiceType == VoiceType.MALE_3
+
+            val selectedVoice = allVoices.find { it.name == voiceName }
+                ?: run {
+                    val genderKeywords = if (isMale) listOf("male", "man", "hom") else listOf("female", "woman", "fem")
+                    allVoices.find { v -> genderKeywords.any { v.name.lowercase().contains(it) } }
+                }
+                ?: allVoices.firstOrNull()
+                ?: return
+
+            tts?.voice = selectedVoice
+
+            val pitch = when (currentVoiceType) {
+                VoiceType.FEMALE_1 -> 1.1f
+                VoiceType.FEMALE_2 -> 1.0f
+                VoiceType.FEMALE_3 -> 0.9f
+                VoiceType.MALE_1   -> 0.8f
+                VoiceType.MALE_2   -> 1.0f
+                VoiceType.MALE_3   -> 1.2f
+            }
+            tts?.setPitch(pitch)
+            tts?.setSpeechRate(1.0f)
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "Voice settings error: ${e.message}", e)
         }
-        tts?.setPitch(pitch)
-        tts?.setSpeechRate(1.0f)
     }
 
     private fun getVoiceName(lang: AppLanguage, type: VoiceType): String {
@@ -124,7 +136,7 @@ class SpeechManager(private val application: Application) {
     }
 
     fun speak(text: String, messageId: String? = null, currentSpeakingId: String?) {
-        if (!ttsReady) return
+        if (!ttsReady || tts == null) return
 
         if (messageId != null && currentSpeakingId == messageId) {
             stopSpeaking()
@@ -135,10 +147,15 @@ class SpeechManager(private val application: Application) {
         val cleaned = cleanForSpeech(text)
         if (cleaned.isBlank()) return
 
-        val params = Bundle().apply {
-            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+        try {
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+            }
+            tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, messageId ?: "msg")
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "TTS speak error: ${e.message}", e)
+            onSpeakingStateChanged?.invoke(false, null)
         }
-        tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, messageId ?: "msg")
     }
 
     fun stopSpeaking() {
@@ -184,70 +201,84 @@ class SpeechManager(private val application: Application) {
     // ═══════════════════════════════════════
 
     fun startListening() {
-        if (!SpeechRecognizer.isRecognitionAvailable(application)) {
-            onError?.invoke("voice_unavailable")
-            return
-        }
+        try {
+            if (!SpeechRecognizer.isRecognitionAvailable(application)) {
+                onError?.invoke("voice_unavailable")
+                return
+            }
 
-        stopSpeaking()
+            stopSpeaking()
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    onListeningStateChanged?.invoke(true)
-                }
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {
-                    onListeningStateChanged?.invoke(false)
-                }
-                override fun onError(error: Int) {
-                    onListeningStateChanged?.invoke(false)
-                    when (error) {
-                        SpeechRecognizer.ERROR_NO_MATCH -> {}
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {}
-                        else -> onError?.invoke("voice_error: $error")
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        onListeningStateChanged?.invoke(true)
                     }
-                }
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.firstOrNull() ?: return
-                    onInputTextChanged?.invoke(text)
-                    onSpeechResult?.invoke(text)
-                }
-                override fun onPartialResults(partialResults: Bundle?) {
-                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.firstOrNull() ?: return
-                    onSpeechPartial?.invoke(text)
-                }
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
-        }
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {
+                        onListeningStateChanged?.invoke(false)
+                    }
+                    override fun onError(error: Int) {
+                        onListeningStateChanged?.invoke(false)
+                        when (error) {
+                            SpeechRecognizer.ERROR_NO_MATCH -> {}
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {}
+                            else -> onError?.invoke("voice_error: $error")
+                        }
+                    }
+                    override fun onResults(results: Bundle?) {
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull() ?: return
+                        onInputTextChanged?.invoke(text)
+                        onSpeechResult?.invoke(text)
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull() ?: return
+                        onSpeechPartial?.invoke(text)
+                    }
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
 
-        val langCode = when (currentLanguage) {
-            AppLanguage.SPANISH -> "es-ES"
-            AppLanguage.ENGLISH -> "en-US"
-        }
+            val langCode = when (currentLanguage) {
+                AppLanguage.SPANISH -> "es-ES"
+                AppLanguage.ENGLISH -> "en-US"
+            }
 
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            }
 
-        speechRecognizer?.startListening(intent)
+            speechRecognizer?.startListening(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "Speech recognition error: ${e.message}", e)
+            onListeningStateChanged?.invoke(false)
+            onError?.invoke("voice_error")
+        }
     }
 
     fun stopListening() {
-        speechRecognizer?.stopListening()
+        try {
+            speechRecognizer?.stopListening()
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "Stop listening error: ${e.message}", e)
+        }
         onListeningStateChanged?.invoke(false)
     }
 
     fun destroy() {
-        speechRecognizer?.destroy()
-        tts?.stop()
-        tts?.shutdown()
+        try {
+            speechRecognizer?.destroy()
+            tts?.stop()
+            tts?.shutdown()
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "Destroy error: ${e.message}", e)
+        }
     }
 }
