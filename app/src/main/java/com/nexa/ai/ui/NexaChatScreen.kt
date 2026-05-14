@@ -59,7 +59,8 @@ fun NexaChatScreen(
     onCloneSession: (String) -> Unit = {},
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
-    onDownloadSession: (String) -> Unit = {}
+    onDownloadSession: (String) -> Unit = {},
+    onRegenerate: () -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -106,7 +107,8 @@ fun NexaChatScreen(
             onNavigateToLottery = onNavigateToLottery,
             onPinSession = onPinSession, onRenameSession = onRenameSession,
             onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
-            onShareSession = onShareSession, onDownloadSession = onDownloadSession)
+            onShareSession = onShareSession, onDownloadSession = onDownloadSession,
+            onRegenerate = onRegenerate)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,
             isDarkTheme = isDark,

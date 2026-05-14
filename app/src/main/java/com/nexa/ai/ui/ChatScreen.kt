@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +71,8 @@ fun ChatMainScreen(
     onCloneSession: (String) -> Unit = {},
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
-    onDownloadSession: (String) -> Unit = {}
+    onDownloadSession: (String) -> Unit = {},
+    onRegenerate: () -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -117,7 +119,7 @@ fun ChatMainScreen(
                 ChatMessages(messages = uiState.messages, isThinking = uiState.isThinking,
                     language = uiState.language, speakingMessageId = uiState.speakingMessageId,
                     onSpeakMessage = onSpeakMessage, onCopyMessage = onCopyMessage,
-                    onExportMessage = onExportMessage, modifier = Modifier.weight(1f))
+                    onExportMessage = onExportMessage, onRegenerate = onRegenerate, modifier = Modifier.weight(1f))
 
                 InputBar(text = uiState.inputText, language = uiState.language,
                     isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
@@ -149,6 +151,9 @@ fun DrawerContent(
     val activeSessionId = uiState.activeSessionId
     val user = uiState.user
     val lang = uiState.language
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredSessions = if (searchQuery.isBlank()) sessions else
+        sessions.filter { it.title.contains(searchQuery, ignoreCase = true) || it.messages.any { m -> m.content.contains(searchQuery, ignoreCase = true) } }
 
     ModalDrawerSheet(modifier = Modifier.width(300.dp), drawerContainerColor = MaterialTheme.colorScheme.surface) {
         // Header
@@ -189,14 +194,58 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
+        // Search bar
+        Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
+            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Search, null, modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                androidx.compose.foundation.text.BasicTextField(
+                    value = searchQuery, onValueChange = { searchQuery = it },
+                    modifier = Modifier.weight(1f),
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface),
+                    singleLine = true,
+                    decorationBox = { innerTextField ->
+                        if (searchQuery.isEmpty()) {
+                            Text(NexaStrings.get("search_chats", lang), fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                        }
+                        innerTextField()
+                    }
+                )
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(18.dp)) {
+                        Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
         // Session list
-        LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
-            items(sessions, key = { it.id }) { session ->
-                ChatSessionItem(session = session, language = lang, isActive = session.id == activeSessionId,
-                    onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) },
-                    onPin = { onPinSession(session.id) }, onRename = { onRenameSession(session.id) },
-                    onClone = { onCloneSession(session.id) }, onArchive = { onArchiveSession(session.id) },
-                    onShare = { onShareSession(session.id) }, onDownload = { onDownloadSession(session.id) })
+        if (filteredSessions.isEmpty()) {
+            Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+                Text(NexaStrings.get(if (searchQuery.isEmpty()) "no_chats" else "no_results", lang),
+                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                    fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
+                items(filteredSessions, key = { it.id }) { session ->
+                    ChatSessionItem(session = session, language = lang, isActive = session.id == activeSessionId,
+                        onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) },
+                        onPin = { onPinSession(session.id) }, onRename = { onRenameSession(session.id) },
+                        onClone = { onCloneSession(session.id) }, onArchive = { onArchiveSession(session.id) },
+                        onShare = { onShareSession(session.id) }, onDownload = { onDownloadSession(session.id) })
+                }
             }
         }
 

@@ -44,7 +44,8 @@ import com.nexa.ai.viewmodel.*
 @Composable
 fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLanguage,
     speakingMessageId: String?, onSpeakMessage: (String, String) -> Unit,
-    onCopyMessage: (String) -> Unit, onExportMessage: (Message) -> Unit, modifier: Modifier = Modifier) {
+    onCopyMessage: (String) -> Unit, onExportMessage: (Message) -> Unit,
+    onRegenerate: () -> Unit = {}, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -54,9 +55,11 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (messages.isEmpty()) item { EmptyState(language) }
         items(messages, key = { it.id }) { msg ->
+            val isLast = msg == messages.lastOrNull()
+            val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
             MessageBubble(message = msg, isSpeaking = speakingMessageId == msg.id, language = language,
                 onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
-                onExport = { onExportMessage(msg) })
+                onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null)
         }
         if (isThinking) item { ThinkingIndicator(language) }
     }
@@ -104,7 +107,7 @@ fun EmptyState(lang: AppLanguage) {
 
 @Composable
 fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
-    onSpeak: () -> Unit, onCopy: () -> Unit, onExport: () -> Unit) {
+    onSpeak: () -> Unit, onCopy: () -> Unit, onExport: () -> Unit, onRegenerate: (() -> Unit)? = null) {
     val isUser = message.role == "user"
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
         Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
@@ -132,7 +135,8 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()
                 } else {
-                    Text(text = message.content, fontSize = 15.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurface)
+                    val markdownText = rememberMarkdownText(message.content)
+                    Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -179,6 +183,13 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("export_pdf", language)) } },
                             onClick = { showMsgMenu = false; onExport() }
                         )
+                        if (onRegenerate != null) {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+                            DropdownMenuItem(
+                                text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = NexaAccent); Text(NexaStrings.get("regenerate", language)) } },
+                                onClick = { showMsgMenu = false; onRegenerate() }
+                            )
+                        }
                     }
                 }
             }
