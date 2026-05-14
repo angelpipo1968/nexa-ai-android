@@ -575,7 +575,7 @@ private fun FuturisticPill(
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "pillScale"
     )
 
@@ -645,7 +645,7 @@ private fun VoiceCard(
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.93f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "voiceScale"
     )
 

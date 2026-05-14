@@ -183,10 +183,10 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     }
     val haptic = LocalHapticFeedback.current
     // Swipe gesture state
-    var swipeOffset by remember { mutableFloatStateOf(0f) }
+    var swipeOffset by remember { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(
         targetValue = swipeOffset,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "swipeOffset"
     )
     // Threshold to trigger action

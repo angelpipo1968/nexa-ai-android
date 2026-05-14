@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -125,10 +126,10 @@ fun ChatMainScreen(
 
                 // Pull-to-refresh gesture for clearing chat
                 val haptic = LocalHapticFeedback.current
-                var pullOffset by remember { mutableFloatStateOf(0f) }
+                var pullOffset by remember { mutableStateOf(0f) }
                 val animatedPullOffset by animateFloatAsState(
                     targetValue = pullOffset,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
                     label = "pullOffset"
                 )
                 val pullThreshold = 150f
@@ -358,7 +359,7 @@ fun DrawerContent(
                     fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
             }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), state = drawerListState, contentPadding = PaddingValues(horizontal = 12.dp)) {
                 items(filteredSessions, key = { it.id }) { session ->
                     ChatSessionItem(session = session, language = lang, isActive = session.id == activeSessionId,
                         onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) },
