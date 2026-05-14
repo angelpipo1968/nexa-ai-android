@@ -58,8 +58,6 @@ interface SessionDao {
     @Query("DELETE FROM sessions")
     suspend fun deleteAll()
 
-    @Query("DELETE FROM messages")
-    suspend fun deleteAllMessages()
 
     @Query("DELETE FROM messages WHERE sessionId = :sessionId")
     suspend fun deleteMessagesForSession(sessionId: String)
