@@ -9,6 +9,7 @@ import com.nexa.ai.data.NexaRepository
 import com.nexa.ai.data.PersistedMessage
 import com.nexa.ai.data.PersistedSession
 import com.nexa.ai.data.SessionStore
+import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.StreamEvent
 import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.ui.NexaStrings
@@ -29,6 +30,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NexaRepository()
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
+    private val settingsStore = SettingsStore(application)
 
     private var lastSendTimestamp = 0Lf
     private val sendCooldownMs = 1500L
@@ -102,6 +104,18 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             if (user != null) {
                 _uiState.value = _uiState.value.copy(user = user)
             }
+
+            // Restore persisted preferences (theme, language, voice)
+            val savedTheme = settingsStore.themeMode.first()
+            val savedLanguage = settingsStore.language.first()
+            val savedVoice = settingsStore.voiceType.first()
+            _uiState.value = _uiState.value.copy(
+                themeMode = savedTheme,
+                language = savedLanguage,
+                voiceType = savedVoice
+            )
+            speechManager.setLanguage(savedLanguage)
+            speechManager.setVoiceType(savedVoice)
 
             // Restore sessions
             val savedSessions = sessionStore.sessions.first()
@@ -559,15 +573,18 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun setLanguage(lang: AppLanguage) {
         _uiState.value = _uiState.value.copy(language = lang)
         speechManager.setLanguage(lang)
+        viewModelScope.launch { settingsStore.setLanguage(lang) }
     }
 
     fun setVoiceType(type: VoiceType) {
         _uiState.value = _uiState.value.copy(voiceType = type)
         speechManager.setVoiceType(type)
+        viewModelScope.launch { settingsStore.setVoiceType(type) }
     }
 
     fun setThemeMode(mode: ThemeMode) {
         _uiState.value = _uiState.value.copy(themeMode = mode)
+        viewModelScope.launch { settingsStore.setThemeMode(mode) }
     }
 
     fun cycleTheme() {
@@ -577,6 +594,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             ThemeMode.SYSTEM -> ThemeMode.DARK
         }
         _uiState.value = _uiState.value.copy(themeMode = next)
+        viewModelScope.launch { settingsStore.setThemeMode(next) }
     }
 
     fun copyToClipboard(text: String) {

@@ -69,15 +69,7 @@ fun ChatMainScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
 
-    // Sync drawer FROM UI → ViewModel
-    LaunchedEffect(drawerState.targetValue) {
-        val isOpen = drawerState.targetValue == DrawerValue.Open
-        if (isOpen != uiState.drawerOpen) {
-            if (isOpen) onToggleDrawer() else onCloseDrawer()
-        }
-    }
-
-    // Sync drawer FROM ViewModel → UI
+    // Sync drawer: ViewModel → UI only (avoid double-sync race condition)
     LaunchedEffect(uiState.drawerOpen) {
         if (uiState.drawerOpen && drawerState.isClosed) drawerState.open()
         else if (!uiState.drawerOpen && drawerState.isOpen) drawerState.close()
