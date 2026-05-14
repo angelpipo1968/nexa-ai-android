@@ -123,7 +123,7 @@ fun SettingsScreen(
             //  VOICE
             // ════════════════════════════════
             SettingsCard {
-                SettingsHeader(icon = Icons.Default.RecordVoiceOver, title = NexaStrings.get("voice", uiState.language))
+                SettingsHeader(icon = Icons.Default.Mic, title = NexaStrings.get("voice", uiState.language))
                 Spacer(modifier = Modifier.height(14.dp))
                 val voices = VoiceType.entries.toList()
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -184,7 +184,7 @@ fun SettingsScreen(
             //  THEME
             // ════════════════════════════════
             SettingsCard {
-                SettingsHeader(icon = Icons.Default.Palette, title = NexaStrings.get("theme", uiState.language))
+                SettingsHeader(icon = Icons.Default.Settings, title = NexaStrings.get("theme", uiState.language))
                 Spacer(modifier = Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ThemeOption(
