@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.nexa.ai"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexa.ai"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 35
         versionName = "3.5"
 
