@@ -567,7 +567,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     // ═══════════════════════════════════════
 
     fun toggleSettings() {
-        _uiState.value = _uiState.value.copy(showSettings = !_uiState.value.showSettings)
+        val current = _uiState.value.currentScreen
+        if (current == Screen.SETTINGS) {
+            _uiState.value = _uiState.value.copy(currentScreen = Screen.CHAT, drawerOpen = false)
+        } else {
+            _uiState.value = _uiState.value.copy(currentScreen = Screen.SETTINGS, drawerOpen = false)
+        }
     }
 
     fun setLanguage(lang: AppLanguage) {

@@ -103,16 +103,14 @@ fun NexaChatScreen(
             isDarkTheme = isDark,
             onBack = onNavigateToChat
         )
-    }
-
-    // Settings dialog
-    if (uiState.showSettings) {
-        GeneralSettingsDialog(
+        Screen.SETTINGS -> SettingsScreen(
             uiState = uiState, isDarkTheme = isDark,
-            onDismiss = onToggleSettings,
+            onBack = onNavigateToChat,
             onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
             onSetThemeMode = onSetThemeMode,
             onToggleAutoSpeak = onToggleAutoSpeak,
-            onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout)
+            onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout
+        )
     }
+
 }

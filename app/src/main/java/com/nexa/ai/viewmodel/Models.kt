@@ -39,7 +39,7 @@ data class UserData(
     val isLoggedIn: Boolean = false
 )
 
-enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY }
+enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY, SETTINGS }
 
 // ═══════════════════════════════════════
 //  UI STATE
@@ -64,7 +64,6 @@ data class NexaUiState(
     val voiceType: VoiceType = VoiceType.FEMALE_1,
     val themeMode: ThemeMode = ThemeMode.DARK,
     val drawerOpen: Boolean = false,
-    val showSettings: Boolean = false,
     val drawerView: Int = 0,
     // Auth
     val currentScreen: Screen = Screen.CHAT,
