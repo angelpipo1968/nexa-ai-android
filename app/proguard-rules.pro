@@ -1,10 +1,19 @@
 # Add project specific ProGuard rules here.
 -keepattributes Signature
 -keepattributes *Annotation*
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
 
 # Keep Gson classes
 -keep class com.google.gson.** { *; }
+-keep class com.google.gson.annotations.** { *; }
+-keep class com.google.gson.internal.** { *; }
+-keep class com.google.gson.reflect.** { *; }
+-keep class com.google.gson.stream.** { *; }
 -keep class com.nexa.ai.data.** { *; }
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
 
 # Keep OkHttp
 -dontwarn okhttp3.**
