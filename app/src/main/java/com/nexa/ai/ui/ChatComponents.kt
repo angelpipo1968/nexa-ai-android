@@ -60,7 +60,9 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     speakingMessageId: String?, onSpeakMessage: (String, String) -> Unit,
     onCopyMessage: (String) -> Unit, onExportMessage: (Message) -> Unit,
     onRegenerate: () -> Unit = {}, isDarkTheme: Boolean = true,
-    themeMode: ThemeMode = ThemeMode.DARK, modifier: Modifier = Modifier) {
+    themeMode: ThemeMode = ThemeMode.DARK, modifier: Modifier = Modifier,
+    onClearChat: () -> Unit = {}, onStopSpeaking: () -> Unit = {},
+    isSpeaking: Boolean = false) {
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -75,7 +77,9 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
             MessageBubble(message = msg, isSpeaking = speakingMessageId == msg.id, language = language,
                 isDarkTheme = isDarkTheme, themeMode = themeMode,
                 onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
-                onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null)
+                onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null,
+                isLastAssistant = isLastAssistant, onClearChat = onClearChat,
+                onStopSpeaking = onStopSpeaking, isGloballySpeaking = isSpeaking)
         }
         if (isThinking && messages.isEmpty()) item { ShimmerLoading(isDarkTheme = isDarkTheme) }
         if (isThinking && messages.isNotEmpty()) item { ThinkingIndicator(language) }
@@ -215,7 +219,9 @@ fun EmptyState(lang: AppLanguage) {
 @Composable
 fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     isDarkTheme: Boolean = true, themeMode: ThemeMode = ThemeMode.DARK,
-    onSpeak: () -> Unit, onCopy: () -> Unit, onExport: () -> Unit, onRegenerate: (() -> Unit)? = null) {
+    onSpeak: () -> Unit, onCopy: () -> Unit, onExport: () -> Unit, onRegenerate: (() -> Unit)? = null,
+    isLastAssistant: Boolean = false, onClearChat: () -> Unit = {},
+    onStopSpeaking: () -> Unit = {}, isGloballySpeaking: Boolean = false) {
     val isUser = message.role == "user"
 
     // Dynamic color for user bubble: SYSTEM mode uses Material You, others use custom colors
@@ -359,6 +365,27 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                                 text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = NexaAccent); Text(NexaStrings.get("regenerate", language)) } },
                                 onClick = { showMsgMenu = false; onRegenerate() }
                             )
+                        }
+                    }
+                }
+                // Clear chat button (only on last assistant message)
+                if (isLastAssistant) {
+                    Surface(onClick = onClearChat, shape = RoundedCornerShape(8.dp),
+                        color = Color.Transparent, modifier = Modifier.size(32.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        }
+                    }
+                }
+                // Stop speaking button (only when globally speaking)
+                if (isGloballySpeaking) {
+                    Surface(onClick = onStopSpeaking, shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
+                        modifier = Modifier.size(32.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Stop, null, modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
                         }
                     }
                 }

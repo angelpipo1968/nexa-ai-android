@@ -207,10 +207,7 @@ fun ChatMainScreen(
                         themeMode = uiState.themeMode,
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer { translationY = animatedPullOffset * 0.3f },
-                        onClearChat = onClearChat,
-                        onStopSpeaking = onStopSpeaking,
-                        isSpeaking = uiState.isSpeaking
+                            .graphicsLayer { translationY = animatedPullOffset * 0.3f }
                     )
                 }
 
@@ -531,7 +528,18 @@ fun ChatTopBar(uiState: NexaUiState, onToggleDrawer: () -> Unit, onToggleAutoSpe
             }
         },
         actions = {
-            // Action buttons moved below assistant messages
+            if (uiState.messages.isNotEmpty()) {
+                IconButton(onClick = onClearChat) {
+                    Icon(Icons.Default.Close, contentDescription = if (uiState.language == AppLanguage.SPANISH) "Limpiar chat" else "Clear chat",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                }
+            }
+            if (uiState.isSpeaking) {
+                IconButton(onClick = onStopSpeaking) {
+                    Icon(Icons.Default.Stop, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+                }
+            }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )
