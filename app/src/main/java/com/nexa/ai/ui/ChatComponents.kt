@@ -650,6 +650,7 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
         }
     }
 }
+}
 
 // ═══════════════════════════════════════
 //  UPDATE DIALOG
