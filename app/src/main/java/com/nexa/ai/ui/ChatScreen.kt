@@ -528,9 +528,11 @@ fun ChatTopBar(uiState: NexaUiState, onToggleDrawer: () -> Unit, onToggleAutoSpe
             }
         },
         actions = {
-            IconButton(onClick = onToggleSettings) {
-                Icon(Icons.Default.Settings, contentDescription = NexaStrings.get("settings", uiState.language),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+            if (uiState.messages.isNotEmpty()) {
+                IconButton(onClick = onClearChat) {
+                    Icon(Icons.Default.Close, contentDescription = if (uiState.language == AppLanguage.SPANISH) "Limpiar chat" else "Clear chat",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                }
             }
             if (uiState.isSpeaking) {
                 IconButton(onClick = onStopSpeaking) {
