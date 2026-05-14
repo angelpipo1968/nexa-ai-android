@@ -159,7 +159,17 @@ fun EmptyState(lang: AppLanguage) {
             Box(modifier = Modifier.width(24.dp).height(0.5.dp).background(NexaAccent.copy(alpha = 0.15f)))
         }
 
-        // Voice activation hint
+        // Welcome message
+        Text(
+            NexaStrings.get("welcome_msg", lang),
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+            textAlign = TextAlign.Center,
+            letterSpacing = 0.3.sp,
+            lineHeight = 20.sp
+        )
+
+        // Voice activation hint (below welcome text)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
