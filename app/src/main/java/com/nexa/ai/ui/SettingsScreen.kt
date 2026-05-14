@@ -92,7 +92,7 @@ fun SettingsScreen(
             //  LANGUAGE
             // ════════════════════════════════
             SettingsCard {
-                SettingsHeader(icon = Icons.Default.Language, title = NexaStrings.get("language", uiState.language))
+                SettingsHeader(icon = Icons.Default.Public, title = NexaStrings.get("language", uiState.language))
                 Spacer(modifier = Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     listOf(AppLanguage.SPANISH to "Español 🇪🇸", AppLanguage.ENGLISH to "English 🇺🇸").forEach { (lang, label) ->
