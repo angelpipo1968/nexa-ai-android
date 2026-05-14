@@ -10,6 +10,7 @@ import com.nexa.ai.data.local.MessageEntity
 import com.nexa.ai.data.local.NexaDatabase
 import com.nexa.ai.data.local.SessionEntity
 import com.nexa.ai.data.local.SessionWithMessages
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -54,34 +55,40 @@ class SessionStore(private val context: Context) {
 
     /** Save all sessions and the active session ID. Used for bulk updates. */
     suspend fun save(sessions: List<PersistedSession>, activeId: String?) {
-        // Clear existing data
-        dao.deleteAll()
+        // Transacción Room: todo o nada — previene FOREIGN KEY constraint failed
+        db.withTransaction {
+            // 1. Limpiar mensajes PRIMERO (por si CASCADE falla o hay timing issues)
+            dao.deleteAllMessages()
 
-        // Insert all sessions and messages
-        for (session in sessions) {
-            dao.insertSession(
-                SessionEntity(
-                    id = session.id,
-                    title = session.title,
-                    createdAt = session.createdAt,
-                    updatedAt = session.updatedAt
+            // 2. Limpiar sesiones
+            dao.deleteAll()
+
+            // 3. Re-insertar todo de forma segura
+            for (session in sessions) {
+                dao.insertSession(
+                    SessionEntity(
+                        id = session.id,
+                        title = session.title,
+                        createdAt = session.createdAt,
+                        updatedAt = session.updatedAt
+                    )
                 )
-            )
-            if (session.messages.isNotEmpty()) {
-                dao.insertMessages(
-                    session.messages.map { msg ->
-                        MessageEntity(
-                            sessionId = session.id,
-                            messageId = msg.id,
-                            role = msg.role,
-                            content = msg.content
-                        )
-                    }
-                )
+                if (session.messages.isNotEmpty()) {
+                    dao.insertMessages(
+                        session.messages.map { msg ->
+                            MessageEntity(
+                                sessionId = session.id,
+                                messageId = msg.id,
+                                role = msg.role,
+                                content = msg.content
+                            )
+                        }
+                    )
+                }
             }
         }
 
-        // Save active session ID
+        // Guardar active session ID fuera de la transacción Room
         if (activeId != null) {
             context.activeSessionStore.edit { prefs ->
                 prefs[KEY_ACTIVE_ID] = activeId
