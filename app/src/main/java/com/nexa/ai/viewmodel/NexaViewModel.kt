@@ -468,7 +468,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
 
-                repository.sendMessage(allMessages, BuildConfig.API_BASE_URL).collect { event ->
+                repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
+                    language = _uiState.value.language.code).collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text

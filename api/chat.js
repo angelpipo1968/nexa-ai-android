@@ -146,11 +146,37 @@ const PROVIDERS = {
 };
 
 // ═══════════════════════════════════════
-//  SYSTEM PROMPT
+//  SYSTEM PROMPT (language-aware)
 // ═══════════════════════════════════════
 
-const SYSTEM_PROMPT = `Eres NEXA PRO, un asistente de IA avanzado. Características:
-- Respondes en el idioma del usuario (español por defecto)
+function getSystemPrompt(language) {
+  const lang = (language || 'es').toLowerCase();
+
+  if (lang === 'en') {
+    return `You are NEXA PRO, an advanced AI assistant. Guidelines:
+- ALWAYS respond in English, regardless of the language of previous messages
+- You are direct, helpful, and concise
+- You can help with programming, analysis, creativity, general questions
+- You have personality: you're intelligent, slightly witty, and always helpful
+- If asked what you are, say you are NEXA PRO
+- Don't use excessive markdown, be natural in your responses
+- If the user greets you, respond in a friendly and brief way
+- Max 500 tokens per response to keep answers concise
+
+SPECIAL CAPABILITIES:
+- LOTTERY: You can check lottery results (Powerball, EuroMillones, etc.) and generate recommended numbers.
+- FLIGHTS: When the user asks about flights, air routes, or flight status, ALWAYS include the flight information provided in the context. If no flight data is available, suggest the user provide more details (origin city, destination, date).
+
+FLIGHT RESPONSE FORMAT:
+- Show airline, flight number, departure and arrival times
+- Indicate flight status (on time, delayed, etc.)
+- If delayed, mention how many minutes
+- Be concise but informative`;
+  }
+
+  // Default: Spanish
+  return `Eres NEXA PRO, un asistente de IA avanzado. Características:
+- SIEMPRE responde en español, sin importar el idioma de mensajes anteriores
 - Eres directo, útil y conciso
 - Puedes ayudar con programación, análisis, creatividad, preguntas generales
 - Tienes personalidad: eres inteligente, ligeramente ingenioso, y siempre servicial
@@ -168,6 +194,7 @@ FORMATO DE RESPUESTA PARA VUELOS:
 - Indica el estado del vuelo (a tiempo, retrasado, etc.)
 - Si hay retraso, menciona cuántos minutos
 - Sé conciso pero informativo`;
+}
 
 // ═══════════════════════════════════════
 //  FLIGHT DETECTION & DATA FETCHING
@@ -780,7 +807,7 @@ export default async function handler(req) {
 
   try {
     const body = await req.json();
-    const { messages, provider: requestedProvider, model: requestedModel } = body;
+    const { messages, provider: requestedProvider, model: requestedModel, language } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ error: 'Messages array required' }), {
@@ -805,9 +832,9 @@ export default async function handler(req) {
       });
     }
 
-    // Add system prompt if not present
+    // Add system prompt if not present (language-aware)
     if (!sanitizedMessages.some(m => m.role === 'system')) {
-      sanitizedMessages.unshift({ role: 'system', content: SYSTEM_PROMPT });
+      sanitizedMessages.unshift({ role: 'system', content: getSystemPrompt(language) });
     }
 
     // Detect flight queries and fetch real data

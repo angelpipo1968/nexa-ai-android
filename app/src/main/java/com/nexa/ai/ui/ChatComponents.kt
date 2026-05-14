@@ -35,6 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.data.UpdateInfo
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.theme.NexaUserBubbleDark
+import com.nexa.ai.ui.theme.NexaUserBubbleLight
+import com.nexa.ai.ui.theme.dynamicPrimaryColor
+import com.nexa.ai.ui.theme.supportsDynamicColors
 import com.nexa.ai.viewmodel.*
 
 // ═══════════════════════════════════════
@@ -45,7 +49,8 @@ import com.nexa.ai.viewmodel.*
 fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLanguage,
     speakingMessageId: String?, onSpeakMessage: (String, String) -> Unit,
     onCopyMessage: (String) -> Unit, onExportMessage: (Message) -> Unit,
-    onRegenerate: () -> Unit = {}, modifier: Modifier = Modifier) {
+    onRegenerate: () -> Unit = {}, isDarkTheme: Boolean = true,
+    themeMode: ThemeMode = ThemeMode.DARK, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -58,6 +63,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
             val isLast = msg == messages.lastOrNull()
             val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
             MessageBubble(message = msg, isSpeaking = speakingMessageId == msg.id, language = language,
+                isDarkTheme = isDarkTheme, themeMode = themeMode,
                 onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
                 onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null)
         }
@@ -107,11 +113,27 @@ fun EmptyState(lang: AppLanguage) {
 
 @Composable
 fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
+    isDarkTheme: Boolean = true, themeMode: ThemeMode = ThemeMode.DARK,
     onSpeak: () -> Unit, onCopy: () -> Unit, onExport: () -> Unit, onRegenerate: (() -> Unit)? = null) {
     val isUser = message.role == "user"
+
+    // Dynamic color for user bubble: SYSTEM mode uses Material You, others use custom colors
+    val userBubbleColor = when (themeMode) {
+        ThemeMode.SYSTEM -> {
+            if (isDarkTheme) dynamicPrimaryColor().copy(alpha = 0.15f)
+            else dynamicPrimaryColor().copy(alpha = 0.85f)
+        }
+        ThemeMode.DARK -> NexaUserBubbleDark
+        ThemeMode.LIGHT -> NexaUserBubbleLight
+    }
+    val userTextColor = when (themeMode) {
+        ThemeMode.SYSTEM -> if (isDarkTheme) MaterialTheme.colorScheme.onSurface else Color.White
+        ThemeMode.DARK -> MaterialTheme.colorScheme.onSurface
+        ThemeMode.LIGHT -> Color.White
+    }
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
         Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
-            color = if (isUser) NexaAccent.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            color = if (isUser) userBubbleColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)) else null) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
@@ -126,17 +148,18 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                         Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.15f), modifier = Modifier.size(28.dp)) {
                             Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(14.dp), tint = NexaAccent) }
                         }
-                        Text(message.attachmentName, fontSize = 12.sp, color = NexaAccent, fontWeight = FontWeight.Medium)
+                        Text(message.attachmentName, fontSize = 12.sp, color = if (isUser) userTextColor else NexaAccent, fontWeight = FontWeight.Medium)
                     }
                     if (message.content.length > message.attachmentName.length + 3) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(message.content.removePrefix("📎 ${message.attachmentName}\n"), fontSize = 15.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(message.content.removePrefix("📎 ${message.attachmentName}\n"), fontSize = 15.sp, lineHeight = 22.sp, color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
                     }
                 } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()
                 } else {
                     val markdownText = rememberMarkdownText(message.content)
-                    Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp,
+                        color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
                 }
             }
         }

@@ -119,7 +119,9 @@ fun ChatMainScreen(
                 ChatMessages(messages = uiState.messages, isThinking = uiState.isThinking,
                     language = uiState.language, speakingMessageId = uiState.speakingMessageId,
                     onSpeakMessage = onSpeakMessage, onCopyMessage = onCopyMessage,
-                    onExportMessage = onExportMessage, onRegenerate = onRegenerate, modifier = Modifier.weight(1f))
+                    onExportMessage = onExportMessage, onRegenerate = onRegenerate,
+                    isDarkTheme = isDarkTheme, themeMode = uiState.themeMode,
+                    modifier = Modifier.weight(1f))
 
                 InputBar(text = uiState.inputText, language = uiState.language,
                     isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,

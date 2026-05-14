@@ -23,7 +23,8 @@ data class ChatMessage(
 
 data class ChatRequest(
     val messages: List<ChatMessage>,
-    val provider: String? = null
+    val provider: String? = null,
+    val language: String? = null
 )
 
 class NexaRepository {
@@ -40,9 +41,10 @@ class NexaRepository {
     fun sendMessage(
         messages: List<ChatMessage>,
         baseUrl: String,
-        provider: String? = null
+        provider: String? = null,
+        language: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val chatRequest = ChatRequest(messages, provider)
+        val chatRequest = ChatRequest(messages, provider, language)
         val body = gson.toJsonTree(chatRequest).asJsonObject
 
         val httpRequest = Request.Builder()
