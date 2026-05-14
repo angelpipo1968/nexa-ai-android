@@ -30,7 +30,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
 
-    private var lastSendTimestamp = 0L
+    private var lastSendTimestamp = 0Lf
     private val sendCooldownMs = 1500L
 
     private val surprisePromptsEs = listOf(
@@ -710,10 +710,4 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         speechManager.destroy()
     }
-}import com.nexa.ai.data.ChatMessage
-import com.nexa.ai.data.NexaRepository
-import com.nexa.ai.data.PersistedMessage
-import com.nexa.ai.data.PersistedSession
-import com.nexa.ai.data.SessionStore
-import com.nexa.ai.data.StreamEvent
-import com.nexa.ai.data.UpdateChecker
+}
