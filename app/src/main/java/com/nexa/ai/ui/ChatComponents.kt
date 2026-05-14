@@ -64,15 +64,41 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
 
 @Composable
 fun EmptyState(lang: AppLanguage) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 80.dp, bottom = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 120.dp, bottom = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // Subtle pulsing glow with ⚡
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
-        val glowScale by infiniteTransition.animateFloat(initialValue = 0.95f, targetValue = 1.05f,
-            animationSpec = infiniteRepeatable(animation = tween(4000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse), label = "pulse")
-        val glowAlpha by infiniteTransition.animateFloat(initialValue = 0.12f, targetValue = 0.25f,
-            animationSpec = infiniteRepeatable(animation = tween(3000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse), label = "glowAlpha")
-        Box(modifier = Modifier.size((64 * glowScale).dp).clip(RoundedCornerShape(20.dp))
-            .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.02f), Color.Transparent))),
-            contentAlignment = Alignment.Center) { Text("⚡", fontSize = 32.sp) }
+        val glowScale by infiniteTransition.animateFloat(
+            initialValue = 0.92f, targetValue = 1.08f,
+            animationSpec = infiniteRepeatable(animation = tween(5000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            label = "pulse"
+        )
+        val glowAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.08f, targetValue = 0.18f,
+            animationSpec = infiniteRepeatable(animation = tween(4000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            label = "glowAlpha"
+        )
+        Box(
+            modifier = Modifier
+                .size((56 * glowScale).dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Brush.radialGradient(listOf(
+                    NexaAccent.copy(alpha = glowAlpha),
+                    NexaAccent.copy(alpha = 0.02f),
+                    Color.Transparent
+                ))),
+            contentAlignment = Alignment.Center
+        ) { Text("⚡", fontSize = 26.sp) }
+
+        // Minimal brand text
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("NEXA", fontSize = 14.sp, fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), letterSpacing = 6.sp)
+            Box(modifier = Modifier.width(24.dp).height(0.5.dp).background(NexaAccent.copy(alpha = 0.15f)))
+        }
     }
 }
 
