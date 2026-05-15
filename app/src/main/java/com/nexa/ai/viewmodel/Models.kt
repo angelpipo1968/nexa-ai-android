@@ -59,6 +59,7 @@ data class NexaUiState(
     val isSpeaking: Boolean = false,
     val speakingMessageId: String? = null,
     val autoSpeak: Boolean = true,
+    val voiceMode: Boolean = false,
     // Settings
     val language: AppLanguage = AppLanguage.SPANISH,
     val voiceType: VoiceType = VoiceType.FEMALE_1,

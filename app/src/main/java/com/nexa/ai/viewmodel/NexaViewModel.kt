@@ -77,6 +77,15 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
+            // Voice mode: when AI finishes speaking, restart listening
+            if (!isSpeaking && _uiState.value.voiceMode) {
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(400)
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking) {
+                        speechManager.startListening()
+                    }
+                }
+            }
         }
         speechManager.onSpeechResult = { text ->
             sendMessage(text)
@@ -539,6 +548,25 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleAutoSpeak() {
         _uiState.value = _uiState.value.copy(autoSpeak = !_uiState.value.autoSpeak)
         if (!_uiState.value.autoSpeak) speechManager.stopSpeaking()
+    }
+
+    fun toggleVoiceMode() {
+        val activating = !_uiState.value.voiceMode
+        _uiState.value = _uiState.value.copy(voiceMode = activating)
+        if (activating) {
+            // Enable auto-speak so AI responses are spoken aloud
+            _uiState.value = _uiState.value.copy(autoSpeak = true)
+            speechManager.startListening()
+        } else {
+            speechManager.stopListening()
+            speechManager.stopSpeaking()
+        }
+    }
+
+    fun stopVoiceMode() {
+        _uiState.value = _uiState.value.copy(voiceMode = false)
+        speechManager.stopListening()
+        speechManager.stopSpeaking()
     }
 
     fun clearChat() {

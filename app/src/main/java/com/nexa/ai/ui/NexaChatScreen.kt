@@ -21,6 +21,8 @@ fun NexaChatScreen(
     onToggleAutoSpeak: () -> Unit,
     onStopSpeaking: () -> Unit,
     onSpeakMessage: (String, String) -> Unit,
+    onToggleVoiceMode: () -> Unit = {},
+    onStopVoiceMode: () -> Unit = {},
     onClearChat: () -> Unit,
     onDismissError: () -> Unit,
     onToggleDrawer: () -> Unit,
@@ -108,7 +110,8 @@ fun NexaChatScreen(
             onPinSession = onPinSession, onRenameSession = onRenameSession,
             onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
             onShareSession = onShareSession, onDownloadSession = onDownloadSession,
-            onRegenerate = onRegenerate)
+            onRegenerate = onRegenerate,
+            onToggleVoiceMode = onToggleVoiceMode, onStopVoiceMode = onStopVoiceMode)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,
             isDarkTheme = isDark,

@@ -98,7 +98,17 @@ class MainActivity : ComponentActivity() {
                         onSurpriseMe = { viewModel.surpriseMe() },
                         onSetDrawerView = { viewModel.setDrawerView(it) },
                         onAttachFile = { pickFile.launch("*/*") },
-                        onClearAttachment = { viewModel.clearPendingAttachment() }
+                        onClearAttachment = { viewModel.clearPendingAttachment() },
+                        onToggleVoiceMode = {
+                            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                                == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                viewModel.toggleVoiceMode()
+                            } else {
+                                requestPermission.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        onStopVoiceMode = { viewModel.stopVoiceMode() }
                     )
                 }
             }

@@ -62,7 +62,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     onRegenerate: () -> Unit = {}, isDarkTheme: Boolean = true,
     themeMode: ThemeMode = ThemeMode.DARK, modifier: Modifier = Modifier,
     onClearChat: () -> Unit = {}, onStopSpeaking: () -> Unit = {},
-    isSpeaking: Boolean = false) {
+    isSpeaking: Boolean = false, onActivateVoiceMode: () -> Unit = {}) {
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -70,7 +70,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     LazyColumn(modifier = modifier.fillMaxWidth(), state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (messages.isEmpty()) item { EmptyState(language) }
+        if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode) }
         items(messages, key = { it.id }) { msg ->
             val isLast = msg == messages.lastOrNull()
             val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
@@ -87,7 +87,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
 }
 
 @Composable
-fun EmptyState(lang: AppLanguage) {
+fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 120.dp, bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -177,7 +177,9 @@ fun EmptyState(lang: AppLanguage) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 12.dp)
+            modifier = Modifier.padding(top = 12.dp).clip(RoundedCornerShape(16.dp))
+                .clickable { onActivateVoiceMode() }
+                .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
             // Mic icon with pulse
             val pulseTransition = rememberInfiniteTransition(label = "micPulse")

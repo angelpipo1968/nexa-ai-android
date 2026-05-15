@@ -53,6 +53,8 @@ fun ChatMainScreen(
     onToggleAutoSpeak: () -> Unit,
     onStopSpeaking: () -> Unit,
     onSpeakMessage: (String, String) -> Unit,
+    onToggleVoiceMode: () -> Unit = {},
+    onStopVoiceMode: () -> Unit = {},
     onClearChat: () -> Unit,
     onDismissError: () -> Unit,
     onToggleDrawer: () -> Unit,
@@ -119,107 +121,285 @@ fun ChatMainScreen(
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
-            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-                AnimatedVisibility(visible = uiState.error != null) {
-                    ErrorBanner(uiState.error ?: "", onDismissError)
-                }
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    AnimatedVisibility(visible = uiState.error != null) {
+                        ErrorBanner(uiState.error ?: "", onDismissError)
+                    }
 
-                // Pull-to-refresh gesture for clearing chat
-                val haptic = LocalHapticFeedback.current
-                var pullOffset by remember { mutableStateOf(0f) }
-                val animatedPullOffset by animateFloatAsState(
-                    targetValue = pullOffset,
-                    animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
-                    label = "pullOffset"
-                )
-                val pullThreshold = 150f
-                var refreshTriggered by remember { mutableStateOf(false) }
+                    // Pull-to-refresh gesture for clearing chat
+                    val haptic = LocalHapticFeedback.current
+                    var pullOffset by remember { mutableStateOf(0f) }
+                    val animatedPullOffset by animateFloatAsState(
+                        targetValue = pullOffset,
+                        animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "pullOffset"
+                    )
+                    val pullThreshold = 150f
+                    var refreshTriggered by remember { mutableStateOf(false) }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .pointerInput(uiState.messages.isNotEmpty()) {
-                            if (uiState.messages.isNotEmpty()) {
-                                detectVerticalDragGestures(
-                                    onDragEnd = {
-                                        if (pullOffset > pullThreshold && !refreshTriggered) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onClearChat()
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .pointerInput(uiState.messages.isNotEmpty()) {
+                                if (uiState.messages.isNotEmpty()) {
+                                    detectVerticalDragGestures(
+                                        onDragEnd = {
+                                            if (pullOffset > pullThreshold && !refreshTriggered) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                onClearChat()
+                                            }
+                                            refreshTriggered = false
+                                            pullOffset = 0f
+                                        },
+                                        onDragCancel = { pullOffset = 0f },
+                                        onVerticalDrag = { _, dragAmount ->
+                                            if (dragAmount > 0) {
+                                                pullOffset = (pullOffset + dragAmount).coerceAtMost(250f)
+                                            }
                                         }
-                                        refreshTriggered = false
-                                        pullOffset = 0f
-                                    },
-                                    onDragCancel = { pullOffset = 0f },
-                                    onVerticalDrag = { _, dragAmount ->
-                                        if (dragAmount > 0) {
-                                            pullOffset = (pullOffset + dragAmount).coerceAtMost(250f)
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                ) {
-                    // Pull indicator
-                    if (animatedPullOffset > 20f) {
-                        val progress = (animatedPullOffset / pullThreshold).coerceAtMost(1f)
-                        val infiniteTransition = rememberInfiniteTransition(label = "pullGlow")
-                        val glowAlpha by infiniteTransition.animateFloat(
-                            initialValue = 0.3f, targetValue = 0.8f,
-                            animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
-                            label = "pullGlow"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(animatedPullOffset.dp * 0.4f)
-                                .graphicsLayer { alpha = progress * 0.8f },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = null,
-                                    modifier = Modifier.size((16 + 8 * progress).dp),
-                                    tint = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * progress)
-                                )
-                                if (progress > 0.7f) {
-                                    Text(
-                                        if (uiState.language == AppLanguage.SPANISH) "Soltar para limpiar" else "Release to clear",
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
-                                        letterSpacing = 0.5.sp
                                     )
                                 }
                             }
+                    ) {
+                        // Pull indicator
+                        if (animatedPullOffset > 20f) {
+                            val progress = (animatedPullOffset / pullThreshold).coerceAtMost(1f)
+                            val infiniteTransition = rememberInfiniteTransition(label = "pullGlow")
+                            val glowAlpha by infiniteTransition.animateFloat(
+                                initialValue = 0.3f, targetValue = 0.8f,
+                                animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                                label = "pullGlow"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(animatedPullOffset.dp * 0.4f)
+                                    .graphicsLayer { alpha = progress * 0.8f },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size((16 + 8 * progress).dp),
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * progress)
+                                    )
+                                    if (progress > 0.7f) {
+                                        Text(
+                                            if (uiState.language == AppLanguage.SPANISH) "Soltar para limpiar" else "Release to clear",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+                                }
+                            }
                         }
+
+                        ChatMessages(
+                            messages = uiState.messages,
+                            isThinking = uiState.isThinking,
+                            language = uiState.language,
+                            speakingMessageId = uiState.speakingMessageId,
+                            onSpeakMessage = onSpeakMessage,
+                            onCopyMessage = onCopyMessage,
+                            onExportMessage = onExportMessage,
+                            onRegenerate = onRegenerate,
+                            isDarkTheme = isDarkTheme,
+                            themeMode = uiState.themeMode,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { translationY = animatedPullOffset * 0.3f },
+                            onClearChat = onClearChat,
+                            onStopSpeaking = onStopSpeaking,
+                            isSpeaking = uiState.isSpeaking,
+                            onActivateVoiceMode = onToggleVoiceMode
+                        )
                     }
 
-                    ChatMessages(
-                        messages = uiState.messages,
-                        isThinking = uiState.isThinking,
-                        language = uiState.language,
-                        speakingMessageId = uiState.speakingMessageId,
-                        onSpeakMessage = onSpeakMessage,
-                        onCopyMessage = onCopyMessage,
-                        onExportMessage = onExportMessage,
-                        onRegenerate = onRegenerate,
-                        isDarkTheme = isDarkTheme,
-                        themeMode = uiState.themeMode,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { translationY = animatedPullOffset * 0.3f },
-                        onClearChat = onClearChat,
-                        onStopSpeaking = onStopSpeaking,
-                        isSpeaking = uiState.isSpeaking
+                    InputBar(text = uiState.inputText, language = uiState.language,
+                        isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
+                        pendingAttachment = uiState.pendingAttachment, onTextChange = onInputChange,
+                        onSend = onSend, onStartListening = onStartListening,
+                        onStopListening = onStopListening, onStopSpeaking = onStopSpeaking,
+                        onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
+                }
+
+                // Voice Mode Overlay
+                if (uiState.voiceMode) {
+                    VoiceModeOverlay(
+                        uiState = uiState,
+                        onStopVoiceMode = onStopVoiceMode
                     )
                 }
 
-                InputBar(text = uiState.inputText, language = uiState.language,
-                    isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
-                    pendingAttachment = uiState.pendingAttachment, onTextChange = onInputChange,
-                    onSend = onSend, onStartListening = onStartListening,
-                    onStopListening = onStopListening, onStopSpeaking = onStopSpeaking,
-                    onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
+                // Voice Mode FAB (when not in voice mode)
+                if (!uiState.voiceMode) {
+                    VoiceModeFab(
+                        onToggleVoiceMode = onToggleVoiceMode,
+                        language = uiState.language
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  VOICE MODE OVERLAY
+// ═══════════════════════════════════════
+
+@Composable
+fun VoiceModeOverlay(
+    uiState: NexaUiState,
+    onStopVoiceMode: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
+
+    // Pulsating ring animation
+    val ringScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f, targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
+        label = "ringScale"
+    )
+    val ringAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.15f, targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse),
+        label = "ringAlpha"
+    )
+    // Inner glow
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.08f, targetValue = 0.25f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = EaseInOut), RepeatMode.Reverse),
+        label = "glowAlpha"
+    )
+
+    // Determine current state for visual feedback
+    val stateLabel = when {
+        uiState.isListening -> NexaStrings.get("voice_mode_listening", uiState.language)
+        uiState.isThinking -> NexaStrings.get("voice_mode_thinking", uiState.language)
+        uiState.isSpeaking -> NexaStrings.get("voice_mode_speaking", uiState.language)
+        else -> NexaStrings.get("voice_mode_hint", uiState.language)
+    }
+    val stateIcon = when {
+        uiState.isListening -> Icons.Default.Mic
+        uiState.isThinking -> Icons.Default.Lightbulb
+        uiState.isSpeaking -> Icons.Default.VolumeUp
+        else -> Icons.Default.Mic
+    }
+    // Color shifts based on state
+    val accentColor = when {
+        uiState.isListening -> NexaAccent
+        uiState.isThinking -> Color(0xFF6C63FF) // Purple
+        uiState.isSpeaking -> Color(0xFF00BFA5) // Teal
+        else -> NexaAccent
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.92f))
+            .clickable(onClick = onStopVoiceMode),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Animated mic orb
+            Box(contentAlignment = Alignment.Center) {
+                // Outer pulsating ring
+                Box(
+                    modifier = Modifier
+                        .size((120 * ringScale).dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = ringAlpha * 0.3f))
+                )
+                // Middle ring
+                Box(
+                    modifier = Modifier
+                        .size((90 * ringScale).dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = ringAlpha * 0.5f))
+                )
+                // Inner glow circle
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(
+                                    accentColor.copy(alpha = glowAlpha),
+                                    accentColor.copy(alpha = 0.04f),
+                                    Color.Transparent
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        stateIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = accentColor
+                    )
+                }
+            }
+
+            // Status text
+            Text(
+                stateLabel,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = accentColor.copy(alpha = 0.8f),
+                letterSpacing = 0.5.sp
+            )
+
+            // Subtle hint
+            Text(
+                NexaStrings.get("tap_to_stop", uiState.language),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                letterSpacing = 0.3.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun VoiceModeFab(
+    onToggleVoiceMode: () -> Unit,
+    language: AppLanguage
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        val infiniteTransition = rememberInfiniteTransition(label = "fabPulse")
+        val fabGlow by infiniteTransition.animateFloat(
+            initialValue = 0.06f, targetValue = 0.18f,
+            animationSpec = infiniteRepeatable(tween(2500, easing = EaseInOut), RepeatMode.Reverse),
+            label = "fabGlow"
+        )
+
+        Surface(
+            onClick = onToggleVoiceMode,
+            shape = CircleShape,
+            color = NexaAccent.copy(alpha = 0.12f + fabGlow),
+            border = BorderStroke(1.dp, NexaAccent.copy(alpha = 0.25f)),
+            modifier = Modifier
+                .padding(end = 20.dp, bottom = 80.dp)
+                .size(56.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = NexaStrings.get("voice_mode", language),
+                    modifier = Modifier.size(24.dp),
+                    tint = NexaAccent
+                )
             }
         }
     }
