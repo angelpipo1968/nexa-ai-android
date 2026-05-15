@@ -258,6 +258,22 @@ fun VoiceModeOverlay(
     onStopVoiceMode: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
+    val haptic = LocalHapticFeedback.current
+
+    // Haptic on state change
+    var prevState by remember { mutableStateOf("") }
+    val currentState = when {
+        uiState.isListening -> "listening"
+        uiState.isThinking -> "thinking"
+        uiState.isSpeaking -> "speaking"
+        else -> "idle"
+    }
+    LaunchedEffect(currentState) {
+        if (prevState != currentState && prevState.isNotEmpty()) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+        prevState = currentState
+    }
 
     // ── Orb animations ──
     val ring1Scale by infiniteTransition.animateFloat(
@@ -306,6 +322,14 @@ fun VoiceModeOverlay(
         label = "rotation"
     )
 
+    // ── Swipe down to dismiss ──
+    var swipeOffset by remember { mutableStateOf(0f) }
+    val animatedSwipe by animateFloatAsState(
+        targetValue = swipeOffset,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "swipe"
+    )
+
     // ── State logic ──
     val isListening = uiState.isListening
     val isThinking = uiState.isThinking
@@ -326,17 +350,32 @@ fun VoiceModeOverlay(
         isSpeaking -> NexaStrings.get("voice_mode_speaking", uiState.language)
         else -> NexaStrings.get("voice_mode_hint", uiState.language)
     }
-    val stateSubtext = when {
-        isListening -> NexaStrings.get("voice_mode_hint", uiState.language)
-        isThinking -> "NEXA PRO"
-        isSpeaking -> "NEXA PRO"
-        else -> ""
-    }
+
+    // ── Live transcript: last 3 messages ──
+    val recentMessages = uiState.messages.takeLast(3)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0F)),
+            .background(Color(0xFF0A0A0F))
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (swipeOffset > 200f) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onStopVoiceMode()
+                        }
+                        swipeOffset = 0f
+                    },
+                    onDragCancel = { swipeOffset = 0f },
+                    onVerticalDrag = { _, dragAmount ->
+                        if (dragAmount > 0) {
+                            swipeOffset = (swipeOffset + dragAmount).coerceAtMost(400f)
+                        }
+                    }
+                )
+            }
+            .graphicsLayer { translationY = animatedSwipe * 0.3f; alpha = 1f - (swipeOffset / 600f) },
         contentAlignment = Alignment.Center
     ) {
         // ── Background subtle grid ──
@@ -359,10 +398,9 @@ fun VoiceModeOverlay(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(0.8f))
 
             // ═══ THE ORB ═══
             Box(contentAlignment = Alignment.Center) {
@@ -393,7 +431,7 @@ fun VoiceModeOverlay(
                         }
                 )
 
-                // Ring 3 — outermost glow ring
+                // Ring 3
                 Box(
                     modifier = Modifier
                         .size((170 * ring3Scale).dp)
@@ -402,7 +440,7 @@ fun VoiceModeOverlay(
                         .background(accentDim)
                 )
 
-                // Ring 2 — middle ring
+                // Ring 2
                 Box(
                     modifier = Modifier
                         .size((140 * ring2Scale).dp)
@@ -411,7 +449,7 @@ fun VoiceModeOverlay(
                         .background(accentMid)
                 )
 
-                // Ring 1 — inner ring
+                // Ring 1
                 Box(
                     modifier = Modifier
                         .size((110 * ring1Scale).dp)
@@ -450,7 +488,7 @@ fun VoiceModeOverlay(
                     }
                 }
 
-                // Core orb — the main circle
+                // Core orb
                 Box(
                     modifier = Modifier
                         .size((80 * coreScale).dp)
@@ -466,7 +504,6 @@ fun VoiceModeOverlay(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Inner icon
                     Icon(
                         imageVector = when {
                             isListening -> Icons.Default.Mic
@@ -481,7 +518,7 @@ fun VoiceModeOverlay(
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // ═══ STATUS TEXT ═══
             AnimatedContent(
@@ -501,49 +538,113 @@ fun VoiceModeOverlay(
                 )
             }
 
-            if (stateSubtext.isNotEmpty()) {
+            // Conversation counter
+            val msgCount = uiState.messages.size
+            if (msgCount > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    stateSubtext,
+                    "$msgCount ${NexaStrings.get("messages_count", uiState.language)}",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.15f),
-                    letterSpacing = 4.sp
+                    color = Color.White.copy(alpha = 0.12f),
+                    letterSpacing = 2.sp
                 )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ═══ LIVE TRANSCRIPT ═══
+            if (recentMessages.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    recentMessages.forEach { msg ->
+                        val isUser = msg.role == "user"
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+                        ) {
+                            Text(
+                                text = msg.content.take(80) + if (msg.content.length > 80) "…" else "",
+                                fontSize = 11.sp,
+                                fontWeight = if (isUser) FontWeight.Medium else FontWeight.Normal,
+                                color = if (isUser) Color.White.copy(alpha = 0.18f)
+                                else NexaAccent.copy(alpha = 0.15f),
+                                lineHeight = 16.sp,
+                                modifier = Modifier.widthIn(max = 260.dp),
+                                maxLines = 2
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ═══ STOP BUTTON ═══
-            Surface(
-                onClick = onStopVoiceMode,
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White.copy(alpha = 0.04f),
-                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
-                modifier = Modifier.padding(bottom = 60.dp)
+            // ═══ BOTTOM BAR ═══
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(bottom = 50.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // Swipe hint (only when not swiping)
+                if (swipeOffset < 10f) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isListening) NexaAccent
+                                    else if (isSpeaking) Color(0xFF00E5D0)
+                                    else Color(0xFF7C6AFF)
+                                )
+                        )
+                        Text(
+                            NexaStrings.get("tap_to_stop", uiState.language),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.25f),
+                            letterSpacing = 1.5.sp
+                        )
+                    }
+                }
+
+                // Stop button
+                Surface(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStopVoiceMode()
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White.copy(alpha = 0.04f),
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f))
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isListening) NexaAccent
-                                else if (isSpeaking) Color(0xFF00E5D0)
-                                else Color(0xFF7C6AFF)
-                            )
-                    )
-                    Text(
-                        NexaStrings.get("tap_to_stop", uiState.language),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.35f),
-                        letterSpacing = 1.5.sp
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.White.copy(alpha = 0.3f)
+                        )
+                        Text(
+                            if (uiState.language == AppLanguage.SPANISH) "Detener" else "Stop",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.35f),
+                            letterSpacing = 1.5.sp
+                        )
+                    }
                 }
             }
         }

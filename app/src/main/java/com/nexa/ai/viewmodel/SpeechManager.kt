@@ -26,6 +26,7 @@ class SpeechManager(private val application: Application) {
     var onSpeechPartial: ((String) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
     var onInputTextChanged: ((String) -> Unit)? = null
+    var onRecognitionEnded: (() -> Unit)? = null
 
     // Current settings
     private var currentLanguage: AppLanguage = AppLanguage.SPANISH
@@ -253,8 +254,10 @@ class SpeechManager(private val application: Application) {
                     override fun onError(error: Int) {
                         onListeningStateChanged?.invoke(false)
                         when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH -> {}
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {}
+                            SpeechRecognizer.ERROR_NO_MATCH,
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
+                                onRecognitionEnded?.invoke()
+                            }
                             else -> onError?.invoke("voice_error: $error")
                         }
                     }

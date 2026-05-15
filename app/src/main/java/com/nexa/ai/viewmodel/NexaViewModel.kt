@@ -94,11 +94,32 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(inputText = text)
         }
         speechManager.onError = { errorKey ->
-            val lang = _uiState.value.language
-            _uiState.value = _uiState.value.copy(error = NexaStrings.get(errorKey, lang))
+            if (_uiState.value.voiceMode) {
+                // In voice mode, silently retry after a short delay
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(800)
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                        speechManager.startListening()
+                    }
+                }
+            } else {
+                val lang = _uiState.value.language
+                _uiState.value = _uiState.value.copy(error = NexaStrings.get(errorKey, lang))
+            }
         }
         speechManager.onInputTextChanged = { text ->
             _uiState.value = _uiState.value.copy(inputText = text)
+        }
+        // Voice mode: retry on recognition ended without match
+        speechManager.onRecognitionEnded = {
+            if (_uiState.value.voiceMode) {
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(500)
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                        speechManager.startListening()
+                    }
+                }
+            }
         }
     }
 
