@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -247,7 +248,7 @@ fun ChatMainScreen(
 }
 
 // ═══════════════════════════════════════
-//  VOICE MODE OVERLAY
+//  VOICE MODE OVERLAY — FUTURIST
 // ═══════════════════════════════════════
 
 @Composable
@@ -257,116 +258,300 @@ fun VoiceModeOverlay(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
 
-    // Pulsating ring animation
-    val ringScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f, targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
-        label = "ringScale"
+    // ── Orb animations ──
+    val ring1Scale by infiniteTransition.animateFloat(
+        initialValue = 0.9f, targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(tween(2200, easing = EaseInOut), RepeatMode.Reverse),
+        label = "r1"
     )
-    val ringAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.15f, targetValue = 0.4f,
+    val ring2Scale by infiniteTransition.animateFloat(
+        initialValue = 0.95f, targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = EaseInOut), RepeatMode.Reverse),
+        label = "r2"
+    )
+    val ring3Scale by infiniteTransition.animateFloat(
+        initialValue = 1.0f, targetValue = 1.25f,
+        animationSpec = infiniteRepeatable(tween(3400, easing = EaseInOut), RepeatMode.Reverse),
+        label = "r3"
+    )
+    val coreGlow by infiniteTransition.animateFloat(
+        initialValue = 0.15f, targetValue = 0.45f,
         animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse),
-        label = "ringAlpha"
+        label = "coreGlow"
     )
-    // Inner glow
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.08f, targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(tween(1500, easing = EaseInOut), RepeatMode.Reverse),
-        label = "glowAlpha"
+    val coreScale by infiniteTransition.animateFloat(
+        initialValue = 0.97f, targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
+        label = "coreScale"
     )
 
-    // Determine current state for visual feedback
+    // ── Wave animation ──
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing)),
+        label = "wavePhase"
+    )
+    val waveAmplitude by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOut), RepeatMode.Reverse),
+        label = "waveAmp"
+    )
+
+    // ── Rotation for outer ring ──
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
+        label = "rotation"
+    )
+
+    // ── State logic ──
+    val isListening = uiState.isListening
+    val isThinking = uiState.isThinking
+    val isSpeaking = uiState.isSpeaking
+
+    val accentColor = when {
+        isListening -> NexaAccent           // Green
+        isThinking -> Color(0xFF7C6AFF)     // Violet
+        isSpeaking -> Color(0xFF00E5D0)     // Cyan
+        else -> NexaAccent
+    }
+    val accentDim = accentColor.copy(alpha = 0.15f)
+    val accentMid = accentColor.copy(alpha = 0.35f)
+
     val stateLabel = when {
-        uiState.isListening -> NexaStrings.get("voice_mode_listening", uiState.language)
-        uiState.isThinking -> NexaStrings.get("voice_mode_thinking", uiState.language)
-        uiState.isSpeaking -> NexaStrings.get("voice_mode_speaking", uiState.language)
+        isListening -> NexaStrings.get("voice_mode_listening", uiState.language)
+        isThinking -> NexaStrings.get("voice_mode_thinking", uiState.language)
+        isSpeaking -> NexaStrings.get("voice_mode_speaking", uiState.language)
         else -> NexaStrings.get("voice_mode_hint", uiState.language)
     }
-    val stateIcon = when {
-        uiState.isListening -> Icons.Default.Mic
-        uiState.isThinking -> Icons.Default.Lightbulb
-        uiState.isSpeaking -> Icons.Default.VolumeUp
-        else -> Icons.Default.Mic
-    }
-    // Color shifts based on state
-    val accentColor = when {
-        uiState.isListening -> NexaAccent
-        uiState.isThinking -> Color(0xFF6C63FF) // Purple
-        uiState.isSpeaking -> Color(0xFF00BFA5) // Teal
-        else -> NexaAccent
+    val stateSubtext = when {
+        isListening -> NexaStrings.get("voice_mode_hint", uiState.language)
+        isThinking -> "NEXA PRO"
+        isSpeaking -> "NEXA PRO"
+        else -> ""
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.92f))
-            .clickable(onClick = onStopVoiceMode),
+            .background(Color(0xFF0A0A0F)),
         contentAlignment = Alignment.Center
     ) {
+        // ── Background subtle grid ──
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val gridColor = Color.White.copy(alpha = 0.015f)
+            val step = 40f
+            var x = 0f
+            while (x < w) {
+                drawLine(gridColor, Offset(x, 0f), Offset(x, h), strokeWidth = 0.5f)
+                x += step
+            }
+            var y = 0f
+            while (y < h) {
+                drawLine(gridColor, Offset(0f, y), Offset(w, y), strokeWidth = 0.5f)
+                y += step
+            }
+        }
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Animated mic orb
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ═══ THE ORB ═══
             Box(contentAlignment = Alignment.Center) {
-                // Outer pulsating ring
+
+                // Outermost ring — slow rotation, dashed
                 Box(
                     modifier = Modifier
-                        .size((120 * ringScale).dp)
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = ringAlpha * 0.3f))
+                        .size(220.dp)
+                        .graphicsLayer {
+                            rotationZ = rotation
+                            alpha = 0.12f
+                        }
+                        .drawBehind {
+                            val stroke = 1.5.dp.toPx()
+                            val dashLen = 12.dp.toPx()
+                            val gapLen = 8.dp.toPx()
+                            val r = size.minDimension / 2f
+                            val paint = android.graphics.Paint().apply {
+                                color = accentColor.copy(alpha = 0.12f).toArgb()
+                                strokeWidth = stroke
+                                style = android.graphics.Paint.Style.STROKE
+                                pathEffect = android.graphics.DashPathEffect(floatArrayOf(dashLen, gapLen), 0f)
+                                isAntiAlias = true
+                            }
+                            drawContext.canvas.nativeCanvas.drawCircle(
+                                size.width / 2f, size.height / 2f, r, paint
+                            )
+                        }
                 )
-                // Middle ring
+
+                // Ring 3 — outermost glow ring
                 Box(
                     modifier = Modifier
-                        .size((90 * ringScale).dp)
+                        .size((170 * ring3Scale).dp)
+                        .graphicsLayer { alpha = 0.08f }
                         .clip(CircleShape)
-                        .background(accentColor.copy(alpha = ringAlpha * 0.5f))
+                        .background(accentDim)
                 )
-                // Inner glow circle
+
+                // Ring 2 — middle ring
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size((140 * ring2Scale).dp)
+                        .graphicsLayer { alpha = 0.12f }
+                        .clip(CircleShape)
+                        .background(accentMid)
+                )
+
+                // Ring 1 — inner ring
+                Box(
+                    modifier = Modifier
+                        .size((110 * ring1Scale).dp)
+                        .graphicsLayer { alpha = 0.18f }
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.2f))
+                )
+
+                // Sound wave visualization ring
+                Canvas(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .graphicsLayer { alpha = if (isListening || isSpeaking) 0.6f else 0.15f }
+                ) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val baseRadius = size.minDimension / 2f - 10.dp.toPx()
+                    val segments = 60
+                    val amp = 12.dp.toPx() * waveAmplitude * if (isListening) 1f else if (isSpeaking) 0.7f else 0.2f
+
+                    for (i in 0 until segments) {
+                        val angle1 = (2f * Math.PI.toFloat() * i / segments)
+                        val angle2 = (2f * Math.PI.toFloat() * (i + 1) / segments)
+                        val wave1 = baseRadius + amp * kotlin.math.sin(wavePhase * 3 + i * 0.4f)
+                        val wave2 = baseRadius + amp * kotlin.math.sin(wavePhase * 3 + (i + 1) * 0.4f)
+                        val x1 = cx + wave1 * kotlin.math.cos(angle1)
+                        val y1 = cy + wave1 * kotlin.math.sin(angle1)
+                        val x2 = cx + wave2 * kotlin.math.cos(angle2)
+                        val y2 = cy + wave2 * kotlin.math.sin(angle2)
+                        drawLine(
+                            color = accentColor.copy(alpha = 0.4f + 0.3f * kotlin.math.sin(wavePhase + i * 0.2f)),
+                            start = Offset(x1, y1),
+                            end = Offset(x2, y2),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                    }
+                }
+
+                // Core orb — the main circle
+                Box(
+                    modifier = Modifier
+                        .size((80 * coreScale).dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
                                 listOf(
-                                    accentColor.copy(alpha = glowAlpha),
-                                    accentColor.copy(alpha = 0.04f),
+                                    accentColor.copy(alpha = coreGlow),
+                                    accentColor.copy(alpha = coreGlow * 0.4f),
                                     Color.Transparent
                                 )
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Inner icon
                     Icon(
-                        stateIcon,
+                        imageVector = when {
+                            isListening -> Icons.Default.Mic
+                            isThinking -> Icons.Default.AutoAwesome
+                            isSpeaking -> Icons.Default.VolumeUp
+                            else -> Icons.Default.Mic
+                        },
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(30.dp),
                         tint = accentColor
                     )
                 }
             }
 
-            // Status text
-            Text(
-                stateLabel,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = accentColor.copy(alpha = 0.8f),
-                letterSpacing = 0.5.sp
-            )
+            Spacer(modifier = Modifier.height(40.dp))
 
-            // Subtle hint
-            Text(
-                NexaStrings.get("tap_to_stop", uiState.language),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                letterSpacing = 0.3.sp
-            )
+            // ═══ STATUS TEXT ═══
+            AnimatedContent(
+                targetState = stateLabel,
+                transitionSpec = {
+                    fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 } togetherWith
+                    fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 4 }
+                },
+                label = "stateLabel"
+            ) { label ->
+                Text(
+                    label,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Light,
+                    color = accentColor.copy(alpha = 0.9f),
+                    letterSpacing = 2.sp
+                )
+            }
+
+            if (stateSubtext.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    stateSubtext,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.15f),
+                    letterSpacing = 4.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ═══ STOP BUTTON ═══
+            Surface(
+                onClick = onStopVoiceMode,
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.04f),
+                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+                modifier = Modifier.padding(bottom = 60.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isListening) NexaAccent
+                                else if (isSpeaking) Color(0xFF00E5D0)
+                                else Color(0xFF7C6AFF)
+                            )
+                    )
+                    Text(
+                        NexaStrings.get("tap_to_stop", uiState.language),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.35f),
+                        letterSpacing = 1.5.sp
+                    )
+                }
+            }
         }
     }
 }
+
+// ═══════════════════════════════════════
+//  VOICE MODE FAB — FUTURIST
+// ═══════════════════════════════════════
 
 @Composable
 fun VoiceModeFab(
@@ -378,28 +563,43 @@ fun VoiceModeFab(
         contentAlignment = Alignment.BottomEnd
     ) {
         val infiniteTransition = rememberInfiniteTransition(label = "fabPulse")
-        val fabGlow by infiniteTransition.animateFloat(
-            initialValue = 0.06f, targetValue = 0.18f,
-            animationSpec = infiniteRepeatable(tween(2500, easing = EaseInOut), RepeatMode.Reverse),
+        val glowAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.08f, targetValue = 0.22f,
+            animationSpec = infiniteRepeatable(tween(2200, easing = EaseInOut), RepeatMode.Reverse),
             label = "fabGlow"
         )
+        val ringScale by infiniteTransition.animateFloat(
+            initialValue = 0.9f, targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(tween(2800, easing = EaseInOut), RepeatMode.Reverse),
+            label = "fabRing"
+        )
 
-        Surface(
-            onClick = onToggleVoiceMode,
-            shape = CircleShape,
-            color = NexaAccent.copy(alpha = 0.12f + fabGlow),
-            border = BorderStroke(1.dp, NexaAccent.copy(alpha = 0.25f)),
-            modifier = Modifier
-                .padding(end = 20.dp, bottom = 80.dp)
-                .size(56.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = NexaStrings.get("voice_mode", language),
-                    modifier = Modifier.size(24.dp),
-                    tint = NexaAccent
-                )
+        Box(contentAlignment = Alignment.Center) {
+            // Outer pulse ring
+            Box(
+                modifier = Modifier
+                    .size((64 * ringScale).dp)
+                    .clip(CircleShape)
+                    .background(NexaAccent.copy(alpha = glowAlpha * 0.4f))
+            )
+            // Main button
+            Surface(
+                onClick = onToggleVoiceMode,
+                shape = CircleShape,
+                color = Color(0xFF0D1117),
+                border = BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f + glowAlpha)),
+                modifier = Modifier
+                    .padding(end = 20.dp, bottom = 80.dp)
+                    .size(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = NexaStrings.get("voice_mode", language),
+                        modifier = Modifier.size(22.dp),
+                        tint = NexaAccent.copy(alpha = 0.8f + glowAlpha * 0.5f)
+                    )
+                }
             }
         }
     }
