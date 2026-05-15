@@ -43,7 +43,7 @@ class AuthManager(private val application: Application) {
             userStore.saveUser(PersistedUser(email, displayName))
             LoginResult.Success(user)
         } catch (e: Exception) {
-            LoginResult.Error("Error: ${e.message}")
+            LoginResult.Error("connection_error")
         }
     }
 
@@ -75,7 +75,7 @@ class AuthManager(private val application: Application) {
                 RegisterResult.Error("email_taken")
             }
         } catch (e: Exception) {
-            RegisterResult.Error("Error: ${e.message}")
+            RegisterResult.Error("connection_error")
         }
     }
 

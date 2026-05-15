@@ -483,7 +483,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        "NEXA PRO v2.4.0",
+                        "NEXA PRO v${com.nexa.ai.BuildConfig.VERSION_NAME}",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 3.sp,

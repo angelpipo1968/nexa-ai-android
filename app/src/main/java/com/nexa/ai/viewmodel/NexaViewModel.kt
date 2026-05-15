@@ -33,7 +33,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsStore = SettingsStore(application)
 
     private var lastSendTimestamp = 0L
-    private val sendCooldownMs = 1500L
+    private val sendCooldownMs = 800L
 
     private val surprisePromptsEs = listOf(
         "Cuéntame algo fascinante sobre el universo",
@@ -662,121 +662,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportToPdf(message: Message) {
         val context = getApplication<Application>()
-
-        try {
-            val content = message.content.trim()
-            if (content.isEmpty()) {
-                android.widget.Toast.makeText(context, NexaStrings.get("nothing_to_export", _uiState.value.language), android.widget.Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            val pdfDocument = android.graphics.pdf.PdfDocument()
-            val paint = android.graphics.Paint().apply { isAntiAlias = true }
-            val pageWidth = 595
-            val pageHeight = 842
-            val marginLeft = 50f
-            val maxTextWidth = 495f
-            val maxY = 790f
-            val lineHeight = 18f
-            val paragraphGap = 4f
-
-            var pageNum = 0
-            var page: android.graphics.pdf.PdfDocument.Page? = null
-            var canvas: android.graphics.Canvas? = null
-            var y: Float
-
-            fun newPage(startY: Float = 50f): Float {
-                if (pageNum > 0) pdfDocument.finishPage(page!!)
-                pageNum++
-                val info = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
-                page = pdfDocument.startPage(info)
-                canvas = page!!.canvas
-                paint.textSize = 12f
-                paint.isFakeBoldText = false
-                paint.color = android.graphics.Color.BLACK
-                return startY
-            }
-
-            fun ensureSpace(currentY: Float, needed: Float = lineHeight): Float {
-                return if (currentY + needed > maxY) newPage() else currentY
-            }
-
-            // First page — header
-            y = newPage(95f)
-
-            paint.textSize = 16f
-            paint.isFakeBoldText = true
-            paint.color = android.graphics.Color.parseColor("#00E5A0")
-            canvas!!.drawText("NEXA PRO", marginLeft, 45f, paint)
-
-            paint.textSize = 10f
-            paint.isFakeBoldText = false
-            paint.color = android.graphics.Color.GRAY
-            val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-            canvas!!.drawText(dateStr, marginLeft, 62f, paint)
-
-            paint.color = android.graphics.Color.parseColor("#00E5A0")
-            paint.strokeWidth = 1f
-            canvas!!.drawLine(marginLeft, 72f, 545f, 72f, paint)
-
-            paint.textSize = 12f
-            paint.isFakeBoldText = false
-            paint.color = android.graphics.Color.BLACK
-
-            // Content
-            for (line in content.split("\n")) {
-                y = ensureSpace(y)
-                val words = line.split(" ")
-                var currentLine = ""
-                for (word in words) {
-                    val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
-                    if (paint.measureText(testLine) > maxTextWidth) {
-                        y = ensureSpace(y)
-                        canvas!!.drawText(currentLine, marginLeft, y, paint)
-                        y += lineHeight
-                        currentLine = word
-                    } else {
-                        currentLine = testLine
-                    }
-                }
-                if (currentLine.isNotEmpty()) {
-                    y = ensureSpace(y)
-                    canvas!!.drawText(currentLine, marginLeft, y, paint)
-                    y += lineHeight
-                }
-                y += paragraphGap
-            }
-
-            // Footer
-            paint.textSize = 8f
-            paint.color = android.graphics.Color.LTGRAY
-            canvas!!.drawText(NexaStrings.get("generated_by", _uiState.value.language), marginLeft, 820f, paint)
-
-            pdfDocument.finishPage(page!!)
-
-            val fileName = "nexa_export_${System.currentTimeMillis()}.pdf"
-            val file = java.io.File(context.cacheDir, fileName)
-            java.io.FileOutputStream(file).use { fos -> pdfDocument.writeTo(fos) }
-            pdfDocument.close()
-
-            val uri = androidx.core.content.FileProvider.getUriForFile(
-                context, "${context.packageName}.fileprovider", file
-            )
-
-            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-
-            val shareIntent = android.content.Intent.createChooser(intent, NexaStrings.get("export_pdf_title", _uiState.value.language))
-            shareIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(shareIntent)
-
-        } catch (e: Exception) {
-            android.util.Log.e("NEXA", "PDF Error: ${e.message}", e)
-            android.widget.Toast.makeText(context, "Error al generar PDF: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
-        }
+        com.nexa.ai.util.PdfExporter.exportToPdf(context, message, _uiState.value.language)
     }
 
     override fun onCleared() {
