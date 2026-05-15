@@ -12,7 +12,6 @@ import com.nexa.ai.data.local.SessionEntity
 import com.nexa.ai.data.local.SessionWithMessages
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.activeSessionStore: DataStore<Preferences> by preferencesDataStore(name = "nexa_active_session")

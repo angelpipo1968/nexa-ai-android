@@ -114,6 +114,13 @@ class MainActivity : ComponentActivity() {
                         onSetDrawerView = { viewModel.setDrawerView(it) },
                         onAttachFile = { pickFile.launch("*/*") },
                         onClearAttachment = { viewModel.clearPendingAttachment() },
+                        onPinSession = { /* Pin not yet supported — sessions are ordered by updatedAt */ },
+                        onRenameSession = { viewModel.renameSession(it) },
+                        onCloneSession = { viewModel.cloneSession(it) },
+                        onArchiveSession = { viewModel.archiveSession(it) },
+                        onShareSession = { viewModel.shareSession(it) },
+                        onDownloadSession = { viewModel.downloadSession(it) },
+                        onRegenerate = { viewModel.regenerate() },
                         onToggleVoiceMode = {
                             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                                 == PackageManager.PERMISSION_GRANTED

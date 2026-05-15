@@ -35,6 +35,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 800L
 
+    // Debounce persist to avoid DB rewrite on every streaming chunk
+    private var persistJob: kotlinx.coroutines.Job? = null
+    private val persistDebounceMs = 500L
+
     private val surprisePromptsEs = listOf(
         "Cuéntame algo fascinante sobre el universo",
         "Dame una receta rápida y deliciosa",
@@ -176,6 +180,28 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun persistSessions() {
+        // Cancel previous pending persist and debounce
+        persistJob?.cancel()
+        persistJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(persistDebounceMs)
+            val sessions = _uiState.value.sessions.map { s ->
+                PersistedSession(
+                    id = s.id,
+                    title = s.title,
+                    messages = s.messages.map { m ->
+                        PersistedMessage(id = m.id, role = m.role, content = m.content)
+                    },
+                    createdAt = s.createdAt,
+                    updatedAt = s.updatedAt
+                )
+            }
+            sessionStore.save(sessions, _uiState.value.activeSessionId)
+        }
+    }
+
+    /** Immediate persist — used for structural changes (delete, create, switch). */
+    private fun persistSessionsImmediate() {
+        persistJob?.cancel()
         viewModelScope.launch {
             val sessions = _uiState.value.sessions.map { s ->
                 PersistedSession(
@@ -337,10 +363,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         speechManager.stopSpeaking()
-        viewModelScope.launch {
-            authManager.logout()
-            sessionStore.clear()
-        }
+        // Clear state first to avoid race with createNewSession
         _uiState.value = _uiState.value.copy(
             user = UserData(),
             sessions = emptyList(),
@@ -348,7 +371,18 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             currentScreen = Screen.CHAT,
             drawerOpen = false
         )
-        createNewSession()
+        // Then clear persisted data and create fresh session
+        viewModelScope.launch {
+            authManager.logout()
+            sessionStore.clear()
+            // Create new session after DB is cleared
+            val session = ChatSession()
+            _uiState.value = _uiState.value.copy(
+                sessions = listOf(session),
+                activeSessionId = session.id
+            )
+            persistSessionsImmediate()
+        }
     }
 
     // ═══════════════════════════════════════
@@ -406,7 +440,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             activeSessionId = session.id,
             drawerOpen = false
         )
-        persistSessions()
+        persistSessionsImmediate()
     }
 
     fun switchSession(sessionId: String) {
@@ -416,7 +450,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             drawerOpen = false,
             error = null
         )
-        persistSessions()
+        persistSessionsImmediate()
     }
 
     fun deleteSession(sessionId: String) {
@@ -435,7 +469,110 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         if (updated.isEmpty()) {
             createNewSession()
         } else {
-            persistSessions()
+            persistSessionsImmediate()
+        }
+    }
+
+    fun renameSession(sessionId: String) {
+        val session = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        // Set the first user message as title if session has messages
+        val newTitle = session.messages.firstOrNull { it.role == "user" }?.content?.take(30)?.let {
+            it + if (it.length > 30) "..." else ""
+        } ?: NexaStrings.get("new_chat", _uiState.value.language)
+        updateSession(sessionId) { it.copy(title = newTitle) }
+    }
+
+    fun cloneSession(sessionId: String) {
+        val source = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        val clone = source.copy(
+            id = java.util.UUID.randomUUID().toString(),
+            title = "${source.title} (copia)",
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        _uiState.value = _uiState.value.copy(
+            sessions = listOf(clone) + _uiState.value.sessions,
+            activeSessionId = clone.id,
+            drawerOpen = false
+        )
+        persistSessionsImmediate()
+    }
+
+    fun archiveSession(sessionId: String) {
+        // Archive = move to end of list (visual de-prioritization)
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == sessionId }
+        if (idx >= 0) {
+            val session = sessions.removeAt(idx)
+            sessions.add(session) // move to end
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessionsImmediate()
+        }
+    }
+
+    fun shareSession(sessionId: String) {
+        val session = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        val context = getApplication<Application>()
+        val text = buildString {
+            appendLine("=== ${session.title} ===")
+            appendLine()
+            session.messages.forEach { msg ->
+                val prefix = if (msg.role == "user") "👤" else "⚡"
+                appendLine("$prefix ${msg.content}")
+                appendLine()
+            }
+        }
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, text)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, session.title)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val shareIntent = android.content.Intent.createChooser(intent, NexaStrings.get("share_chat", _uiState.value.language))
+        shareIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(shareIntent)
+    }
+
+    fun downloadSession(sessionId: String) {
+        val session = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        val context = getApplication<Application>()
+        val text = buildString {
+            appendLine("=== ${session.title} ===")
+            appendLine("Fecha: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(session.createdAt))}")
+            appendLine()
+            session.messages.forEach { msg ->
+                val role = if (msg.role == "user") "Tú" else "NEXA"
+                appendLine("[$role]: ${msg.content}")
+                appendLine()
+            }
+        }
+        try {
+            val fileName = "nexa_chat_${session.id.take(8)}.txt"
+            val file = java.io.File(context.cacheDir, fileName)
+            file.writeText(text)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", file
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val shareIntent = android.content.Intent.createChooser(intent, NexaStrings.get("download_chat", _uiState.value.language))
+            shareIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(shareIntent)
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(error = "Error: ${e.localizedMessage}")
+        }
+    }
+
+    private fun updateSession(sessionId: String, transform: (ChatSession) -> ChatSession) {
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == sessionId }
+        if (idx >= 0) {
+            sessions[idx] = transform(sessions[idx])
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessionsImmediate()
         }
     }
 
@@ -594,6 +731,34 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.stopSpeaking()
         updateActiveSession { it.copy(messages = emptyList()) }
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun regenerate() {
+        val session = _uiState.value.activeSession ?: return
+        val messages = session.messages
+        if (messages.isEmpty()) return
+
+        // Find last assistant message and remove it + the user message before it
+        val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" }
+        if (lastAssistantIdx < 0) return
+
+        // Remove last assistant message
+        val trimmed = messages.toMutableList()
+        trimmed.removeAt(lastAssistantIdx)
+
+        // Find the user message that prompted it
+        val lastUserIdx = trimmed.indexOfLast { it.role == "user" }
+        if (lastUserIdx < 0) return
+
+        val userContent = trimmed[lastUserIdx].content
+        trimmed.removeAt(lastUserIdx)
+
+        // Update session with trimmed messages
+        updateActiveSession { it.copy(messages = trimmed) }
+
+        // Re-send the user message
+        lastSendTimestamp = 0L // reset cooldown
+        sendMessage(userContent)
     }
 
     // ═══════════════════════════════════════

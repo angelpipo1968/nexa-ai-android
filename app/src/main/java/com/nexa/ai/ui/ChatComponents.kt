@@ -14,10 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -52,7 +49,6 @@ import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.ui.theme.NexaUserBubbleDark
 import com.nexa.ai.ui.theme.NexaUserBubbleLight
 import com.nexa.ai.ui.theme.dynamicPrimaryColor
-import com.nexa.ai.ui.theme.supportsDynamicColors
 import com.nexa.ai.viewmodel.*
 
 // ═══════════════════════════════════════
