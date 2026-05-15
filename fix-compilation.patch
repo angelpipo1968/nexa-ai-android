@@ -1,0 +1,55 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index b21f3f0..192434c 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -71,7 +71,7 @@ dependencies {
+     implementation("com.google.android.material:material:1.12.0")
+ 
+     // Compose BOM
+-    implementation(platform("androidx.compose:compose-bom:2025.05.01"))
++    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+     implementation("androidx.compose.ui:ui")
+     implementation("androidx.compose.ui:ui-graphics")
+     implementation("androidx.compose.ui:ui-tooling-preview")
+diff --git a/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt b/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt
+index 246ad4e..ecb510a 100644
+--- a/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt
++++ b/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt
+@@ -104,7 +104,7 @@ abstract class NexaDatabase : RoomDatabase() {
+                     NexaDatabase::class.java,
+                     "nexa_database"
+                 )
+-                    .fallbackToDestructiveMigration(dropAllTables = true)
++                    .fallbackToDestructiveMigration()
+                     .build()
+                 INSTANCE = instance
+                 instance
+diff --git a/app/src/main/java/com/nexa/ai/ui/SettingsScreen.kt b/app/src/main/java/com/nexa/ai/ui/SettingsScreen.kt
+index 6eb4d85..1b7ce50 100644
+--- a/app/src/main/java/com/nexa/ai/ui/SettingsScreen.kt
++++ b/app/src/main/java/com/nexa/ai/ui/SettingsScreen.kt
+@@ -160,7 +160,7 @@ fun SettingsScreen(
+                             },
+                         contentAlignment = Alignment.Center
+                     ) {
+-                        Icon(Icons.Default.FlashOn, contentDescription = null,
++                        Icon(Icons.Default.Bolt, contentDescription = null,
+                             modifier = Modifier.size(18.dp), tint = Color.Black)
+                     }
+                     Text(
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 517c031..01e69d1 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -1,8 +1,8 @@
+ // Top-level build file
+ plugins {
+     id("com.android.application") version "8.9.1" apply false
+-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
+-    id("com.google.devtools.ksp") version "2.0.21-1.0.27" apply false
++    id("org.jetbrains.kotlin.android") version "2.0.20" apply false
++    id("org.jetbrains.kotlin.plugin.compose") version "2.0.20" apply false
++    id("com.google.devtools.ksp") version "2.0.20-1.0.25" apply false
+     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
+ }

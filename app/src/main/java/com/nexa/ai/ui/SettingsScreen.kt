@@ -160,7 +160,7 @@ fun SettingsScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.FlashOn, contentDescription = null,
+                        Icon(Icons.Default.Bolt, contentDescription = null,
                             modifier = Modifier.size(18.dp), tint = Color.Black)
                     }
                     Text(

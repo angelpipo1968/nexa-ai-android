@@ -104,7 +104,7 @@ abstract class NexaDatabase : RoomDatabase() {
                     NexaDatabase::class.java,
                     "nexa_database"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
