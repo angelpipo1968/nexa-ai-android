@@ -43,7 +43,16 @@ object NexaStrings {
         "voice_mode" to "Modo Conversación", "voice_mode_on" to "Modo conversación activado",
         "voice_mode_off" to "Modo conversación desactivado", "voice_mode_hint" to "Habla libremente",
         "voice_mode_listening" to "Escuchando", "voice_mode_thinking" to "Pensando",
-        "voice_mode_speaking" to "Respondiendo", "tap_to_stop" to "Tocar para detener"
+        "voice_mode_speaking" to "Respondiendo", "tap_to_stop" to "Tocar para detener",
+        "pull_to_clear" to "Soltar para limpiar", "activate_voice" to "Toca para activar voz",
+        "male_label" to "Hombre", "female_label" to "Mujer",
+        "preferences" to "PREFERENCIAS", "danger_zone" to "ZONA DE PELIGRO",
+        "email_placeholder" to "tu@email.com",
+        "lottery" to "Lotería", "lottery_results" to "📊 Resultados", "lottery_generate" to "🎲 Generar",
+        "lottery_view_result" to "Ver último resultado", "lottery_generate_tickets" to "Generar 5 boletos recomendados",
+        "lottery_draw" to "Sorteo", "lottery_next_draw" to "Próximo sorteo",
+        "lottery_prize" to "Premio", "lottery_ticket" to "Boleto",
+        "lottery_recommended" to "⭐ Números recomendados"
     )
 
     private val english = mapOf(
@@ -79,6 +88,15 @@ object NexaStrings {
         "voice_mode" to "Voice Mode", "voice_mode_on" to "Voice mode activated",
         "voice_mode_off" to "Voice mode deactivated", "voice_mode_hint" to "Speak freely",
         "voice_mode_listening" to "Listening", "voice_mode_thinking" to "Thinking",
-        "voice_mode_speaking" to "Responding", "tap_to_stop" to "Tap to stop"
+        "voice_mode_speaking" to "Responding", "tap_to_stop" to "Tap to stop",
+        "pull_to_clear" to "Release to clear", "activate_voice" to "Tap to activate voice",
+        "male_label" to "Male", "female_label" to "Female",
+        "preferences" to "PREFERENCES", "danger_zone" to "DANGER ZONE",
+        "email_placeholder" to "your@email.com",
+        "lottery" to "Lottery", "lottery_results" to "📊 Results", "lottery_generate" to "🎲 Generate",
+        "lottery_view_result" to "View latest result", "lottery_generate_tickets" to "Generate 5 recommended tickets",
+        "lottery_draw" to "Draw", "lottery_next_draw" to "Next draw",
+        "lottery_prize" to "Prize", "lottery_ticket" to "Ticket",
+        "lottery_recommended" to "⭐ Recommended numbers"
     )
 }

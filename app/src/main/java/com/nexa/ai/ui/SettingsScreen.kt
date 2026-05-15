@@ -258,7 +258,7 @@ fun SettingsScreen(
 
                     // Male section
                     Text(
-                        if (uiState.language == AppLanguage.SPANISH) "Hombre" else "Male",
+                        NexaStrings.get("male_label", uiState.language),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp,
@@ -285,7 +285,7 @@ fun SettingsScreen(
 
                     // Female section
                     Text(
-                        if (uiState.language == AppLanguage.SPANISH) "Mujer" else "Female",
+                        NexaStrings.get("female_label", uiState.language),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp,
@@ -357,7 +357,7 @@ fun SettingsScreen(
                 // ════════════════════════════════
                 StaggeredFadeIn(visible = sectionsVisible, index = 4) {
                 SectionLabel(
-                    if (uiState.language == AppLanguage.SPANISH) "PREFERENCIAS" else "PREFERENCES"
+                    NexaStrings.get("preferences", uiState.language)
                 )
                 FuturisticCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -405,7 +405,7 @@ fun SettingsScreen(
                 // ════════════════════════════════
                 StaggeredFadeIn(visible = sectionsVisible, index = 5) {
                 SectionLabel(
-                    if (uiState.language == AppLanguage.SPANISH) "ZONA DE PELIGRO" else "DANGER ZONE",
+                    NexaStrings.get("danger_zone", uiState.language),
                     color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
                 )
                 FuturisticCard {

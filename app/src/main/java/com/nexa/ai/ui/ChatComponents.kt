@@ -208,7 +208,7 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
                 )
             }
             Text(
-                if (lang == AppLanguage.SPANISH) "Toca para activar voz" else "Tap to activate voice",
+                NexaStrings.get("activate_voice", lang),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
                 letterSpacing = 0.5.sp,

@@ -120,12 +120,12 @@ fun LotteryScreen(
                         Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
                             .background(NexaAccent.copy(alpha = 0.1f)),
                             contentAlignment = Alignment.Center) { Text("🎰", fontSize = 16.sp) }
-                        Text("Lotería", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(NexaStrings.get("lottery", language), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver")
+                        Icon(Icons.Default.ArrowBack, NexaStrings.get("back", language))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -163,8 +163,8 @@ fun LotteryScreen(
             // Tabs
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TabButton(text = "📊 Resultados", selected = activeTab == 0, onClick = { activeTab = 0 }, modifier = Modifier.weight(1f))
-                TabButton(text = "🎲 Generar", selected = activeTab == 1, onClick = { activeTab = 1 }, modifier = Modifier.weight(1f))
+                TabButton(text = NexaStrings.get("lottery_results", language), selected = activeTab == 0, onClick = { activeTab = 0 }, modifier = Modifier.weight(1f))
+                TabButton(text = NexaStrings.get("lottery_generate", language), selected = activeTab == 1, onClick = { activeTab = 1 }, modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -179,7 +179,7 @@ fun LotteryScreen(
                     // Results tab
                     item {
                         ActionButton(
-                            text = "Ver último resultado",
+                            text = NexaStrings.get("lottery_view_result", language),
                             icon = Icons.Default.Refresh,
                             isLoading = isLoading,
                             onClick = { loadResults() }
@@ -218,7 +218,7 @@ fun LotteryScreen(
                     // Generate tab
                     item {
                         ActionButton(
-                            text = "Generar 5 boletos recomendados",
+                            text = NexaStrings.get("lottery_generate_tickets", language),
                             icon = Icons.Default.Casino,
                             isLoading = isLoading,
                             onClick = { loadTickets() }
@@ -277,7 +277,7 @@ private fun ResultCard(numbers: List<String>, extraNumbers: List<String>, drawDa
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (drawDate != null) {
-                Text("Sorteo: $drawDate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                Text("${NexaStrings.get("lottery_draw", language)}: $drawDate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
             }
 
             // Main numbers
@@ -297,10 +297,10 @@ private fun ResultCard(numbers: List<String>, extraNumbers: List<String>, drawDa
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (nextDrawDate != null) {
-                        Text("Próximo sorteo: $nextDrawDate", fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f))
+                        Text("${NexaStrings.get("lottery_next_draw", language)}: $nextDrawDate", fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f))
                     }
                     if (jackpot != null) {
-                        Text("Premio: $jackpot", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = NexaAccent)
+                        Text("${NexaStrings.get("lottery_prize", language)}: $jackpot", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = NexaAccent)
                     }
                 }
             }
@@ -314,7 +314,7 @@ private fun RecommendedCard(numbers: List<String>) {
         border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.1f))) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("⭐ Números recomendados", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            Text(NexaStrings.get("lottery_recommended", language), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 color = NexaAccent.copy(alpha = 0.6f))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 numbers.forEach { num -> Ball(number = num) }
@@ -347,7 +347,7 @@ private fun TicketCard(ticketNumber: Int, ticket: LotteryTicket) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
-                Text("Boleto #$ticketNumber", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                Text("${NexaStrings.get("lottery_ticket", language)} #$ticketNumber", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                     color = NexaAccent.copy(alpha = 0.6f))
                 Icon(Icons.Default.Casino, null, modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))

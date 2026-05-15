@@ -189,7 +189,7 @@ fun ChatMainScreen(
                                     )
                                     if (progress > 0.7f) {
                                         Text(
-                                            if (uiState.language == AppLanguage.SPANISH) "Soltar para limpiar" else "Release to clear",
+                                            NexaStrings.get("pull_to_clear", uiState.language),
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
                                             letterSpacing = 0.5.sp
@@ -638,7 +638,7 @@ fun VoiceModeOverlay(
                             tint = Color.White.copy(alpha = 0.3f)
                         )
                         Text(
-                            if (uiState.language == AppLanguage.SPANISH) "Detener" else "Stop",
+                            NexaStrings.get("stop", uiState.language),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.White.copy(alpha = 0.35f),

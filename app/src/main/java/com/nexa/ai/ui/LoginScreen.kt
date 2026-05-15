@@ -87,7 +87,7 @@ fun LoginScreen(
 
             // Email field
             AuthTextField(value = email, onValueChange = onEmailChange,
-                label = NexaStrings.get("email", language), placeholder = "tu@email.com",
+                label = NexaStrings.get("email", language), placeholder = NexaStrings.get("email_placeholder", language),
                 leadingIcon = Icons.Default.Email, isDarkTheme = isDarkTheme,
                 keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
 
@@ -182,7 +182,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             AuthTextField(value = email, onValueChange = onEmailChange,
-                label = NexaStrings.get("email", language), placeholder = "tu@email.com",
+                label = NexaStrings.get("email", language), placeholder = NexaStrings.get("email_placeholder", language),
                 leadingIcon = Icons.Default.Email, isDarkTheme = isDarkTheme,
                 keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
 
