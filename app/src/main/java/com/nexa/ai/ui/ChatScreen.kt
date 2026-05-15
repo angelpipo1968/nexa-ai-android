@@ -856,22 +856,22 @@ fun DrawerContent(
             }
         }
 
-        // Lottery button (hidden - uncomment to restore)
-        // Surface(
-        //     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-        //         .clickable { onNavigateToLottery(); onClose() },
-        //     shape = RoundedCornerShape(12.dp),
-        //     color = NexaAccent.copy(alpha = 0.04f),
-        //     border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.08f))
-        // ) {
-        //     Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-        //         verticalAlignment = Alignment.CenterVertically,
-        //         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        //         Text("🎰", fontSize = 16.sp)
-        //         Text("Lotería", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-        //             color = NexaAccent.copy(alpha = 0.7f))
-        //     }
-        // }
+        // Lottery button
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                .clickable { onNavigateToLottery(); onClose() },
+            shape = RoundedCornerShape(12.dp),
+            color = NexaAccent.copy(alpha = 0.04f),
+            border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.08f))
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("🎰", fontSize = 16.sp)
+                Text(NexaStrings.get("lottery", lang), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                    color = NexaAccent.copy(alpha = 0.7f))
+            }
+        }
 
         // Bottom actions
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
