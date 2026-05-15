@@ -177,8 +177,11 @@ class SpeechManager(private val application: Application) {
         if (cleaned.isBlank()) return
 
         try {
-            // Use simple speak without params to avoid device-specific crashes
-            val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, null, messageId ?: "msg")
+            val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
+            val params = Bundle().apply {
+                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+            }
+            val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             if (result == TextToSpeech.ERROR) {
                 android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
                 onSpeakingStateChanged?.invoke(false, null)
@@ -240,6 +243,12 @@ class SpeechManager(private val application: Application) {
 
             stopSpeaking()
 
+            // Destroy previous recognizer to avoid conflicts
+            try {
+                speechRecognizer?.destroy()
+            } catch (_: Exception) {}
+            speechRecognizer = null
+
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
@@ -299,6 +308,8 @@ class SpeechManager(private val application: Application) {
     fun stopListening() {
         try {
             speechRecognizer?.stopListening()
+            speechRecognizer?.destroy()
+            speechRecognizer = null
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Stop listening error: ${e.message}", e)
         }
