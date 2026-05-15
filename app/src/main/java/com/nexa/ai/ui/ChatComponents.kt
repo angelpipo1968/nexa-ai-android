@@ -32,6 +32,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -218,6 +222,49 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
     }
 }
 
+// ═══════════════════════════════════════
+//  MESSAGE IMAGE RENDERING
+// ═══════════════════════════════════════
+
+private sealed class MessageSegment {
+    data class Text(val content: String) : MessageSegment()
+    data class Image(val url: String, val alt: String) : MessageSegment()
+}
+
+@Composable
+private fun MessageImage(url: String, alt: String) {
+    val context = LocalContext.current
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+    ) {
+        Column {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(url)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = alt.ifEmpty { "Generated image" },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 300.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            if (alt.isNotEmpty()) {
+                Text(
+                    alt,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     isDarkTheme: Boolean = true, themeMode: ThemeMode = ThemeMode.DARK,
@@ -312,9 +359,42 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()
                 } else {
-                    val markdownText = rememberMarkdownText(message.content)
-                    Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp,
-                        color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
+                    // Split content into text and image segments
+                    val imagePattern = Regex("!\\[([^]]*)]\\((https?://[^)]+)\\)")
+                    val segments = mutableListOf<MessageSegment>()
+                    var lastIndex = 0
+
+                    imagePattern.findAll(message.content).forEach { match ->
+                        // Add text before this image
+                        if (match.range.first > lastIndex) {
+                            val textBefore = message.content.substring(lastIndex, match.range.first)
+                            if (textBefore.isNotBlank()) segments.add(MessageSegment.Text(textBefore))
+                        }
+                        // Add the image
+                        segments.add(MessageSegment.Image(match.groupValues[2], match.groupValues[1]))
+                        lastIndex = match.range.last + 1
+                    }
+                    // Add remaining text
+                    if (lastIndex < message.content.length) {
+                        val remaining = message.content.substring(lastIndex)
+                        if (remaining.isNotBlank()) segments.add(MessageSegment.Text(remaining))
+                    }
+
+                    // Render segments
+                    segments.forEach { segment ->
+                        when (segment) {
+                            is MessageSegment.Text -> {
+                                val markdownText = rememberMarkdownText(segment.content)
+                                Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp,
+                                    color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
+                            }
+                            is MessageSegment.Image -> {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                MessageImage(url = segment.url, alt = segment.alt)
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+                    }
                 }
                 // Action buttons INSIDE the message bubble, after the text
                 if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
