@@ -19,6 +19,10 @@ class SpeechManager(private val application: Application) {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
+    // State machine to prevent listen/speak collisions
+    private enum class AudioState { IDLE, LISTENING, SPEAKING }
+    @Volatile private var audioState = AudioState.IDLE
+
     // Callbacks
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
     var onSpeakingStateChanged: ((Boolean, String?) -> Unit)? = null
@@ -56,13 +60,16 @@ class SpeechManager(private val application: Application) {
 
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
+                            audioState = AudioState.SPEAKING
                             onSpeakingStateChanged?.invoke(true, utteranceId)
                         }
                         override fun onDone(utteranceId: String?) {
+                            audioState = AudioState.IDLE
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                         @Deprecated("Deprecated")
                         override fun onError(utteranceId: String?) {
+                            audioState = AudioState.IDLE
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                     })
@@ -172,9 +179,14 @@ class SpeechManager(private val application: Application) {
             return
         }
 
+        // CRITICAL: stop listening before speaking to avoid mic/voice collision
+        stopListeningInternal()
         stopSpeaking()
+
         val cleaned = cleanForSpeech(text)
         if (cleaned.isBlank()) return
+
+        audioState = AudioState.SPEAKING
 
         try {
             val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
@@ -184,16 +196,21 @@ class SpeechManager(private val application: Application) {
             val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             if (result == TextToSpeech.ERROR) {
                 android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
+                audioState = AudioState.IDLE
                 onSpeakingStateChanged?.invoke(false, null)
             }
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "TTS speak error: ${e.message}", e)
+            audioState = AudioState.IDLE
             onSpeakingStateChanged?.invoke(false, null)
         }
     }
 
     fun stopSpeaking() {
-        tts?.stop()
+        try {
+            tts?.stop()
+        } catch (_: Exception) {}
+        audioState = AudioState.IDLE
         onSpeakingStateChanged?.invoke(false, null)
     }
 
@@ -235,19 +252,26 @@ class SpeechManager(private val application: Application) {
     // ═══════════════════════════════════════
 
     fun startListening() {
+        // Don't start listening if we're currently speaking
+        if (audioState == AudioState.SPEAKING) return
+        if (audioState == AudioState.LISTENING) return
+
         try {
             if (!SpeechRecognizer.isRecognitionAvailable(application)) {
                 onError?.invoke("voice_unavailable")
                 return
             }
 
-            stopSpeaking()
+            // Stop any TTS first
+            try { tts?.stop() } catch (_: Exception) {}
 
             // Destroy previous recognizer to avoid conflicts
             try {
                 speechRecognizer?.destroy()
             } catch (_: Exception) {}
             speechRecognizer = null
+
+            audioState = AudioState.LISTENING
 
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
                 setRecognitionListener(object : RecognitionListener {
@@ -258,9 +282,11 @@ class SpeechManager(private val application: Application) {
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {
+                        audioState = AudioState.IDLE
                         onListeningStateChanged?.invoke(false)
                     }
                     override fun onError(error: Int) {
+                        audioState = AudioState.IDLE
                         onListeningStateChanged?.invoke(false)
                         when (error) {
                             SpeechRecognizer.ERROR_NO_MATCH,
@@ -306,6 +332,11 @@ class SpeechManager(private val application: Application) {
     }
 
     fun stopListening() {
+        stopListeningInternal()
+        onListeningStateChanged?.invoke(false)
+    }
+
+    private fun stopListeningInternal() {
         try {
             speechRecognizer?.stopListening()
             speechRecognizer?.destroy()
@@ -313,7 +344,9 @@ class SpeechManager(private val application: Application) {
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Stop listening error: ${e.message}", e)
         }
-        onListeningStateChanged?.invoke(false)
+        if (audioState == AudioState.LISTENING) {
+            audioState = AudioState.IDLE
+        }
     }
 
     fun destroy() {

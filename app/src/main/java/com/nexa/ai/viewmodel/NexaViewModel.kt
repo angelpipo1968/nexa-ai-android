@@ -81,11 +81,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
-            // Voice mode: when AI finishes speaking, restart listening
+            // Voice mode: when AI finishes speaking, wait then restart listening
             if (!isSpeaking && _uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(400)
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking) {
+                    kotlinx.coroutines.delay(800) // Longer delay to let TTS fully stop
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening
+                        && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
                 }
@@ -99,10 +100,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         speechManager.onError = { errorKey ->
             if (_uiState.value.voiceMode) {
-                // In voice mode, silently retry after a short delay
+                // In voice mode, silently retry after a delay
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(800)
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                    kotlinx.coroutines.delay(1200) // Longer delay to let things settle
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening
+                        && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
                 }
@@ -118,8 +120,9 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(500)
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                    kotlinx.coroutines.delay(800) // Longer delay
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening
+                        && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
                 }
