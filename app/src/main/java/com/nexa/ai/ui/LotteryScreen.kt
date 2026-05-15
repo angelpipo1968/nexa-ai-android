@@ -197,7 +197,8 @@ fun LotteryScreen(
                                 extraNumbers = extraNumbers,
                                 drawDate = lastDrawDate,
                                 nextDrawDate = nextDrawDate,
-                                jackpot = nextJackpot
+                                jackpot = nextJackpot,
+                                language = language
                             )
                         }
                     }
@@ -205,7 +206,7 @@ fun LotteryScreen(
                     // Recommended numbers
                     if (recommendedNumbers.isNotEmpty()) {
                         item {
-                            RecommendedCard(numbers = recommendedNumbers)
+                            RecommendedCard(numbers = recommendedNumbers, language = language)
                         }
                     }
 
@@ -230,7 +231,7 @@ fun LotteryScreen(
                     }
 
                     items(generatedTickets.size) { index ->
-                        TicketCard(ticketNumber = index + 1, ticket = generatedTickets[index])
+                        TicketCard(ticketNumber = index + 1, ticket = generatedTickets[index], language = language)
                     }
                 }
             }
@@ -271,7 +272,7 @@ private fun ActionButton(text: String, icon: androidx.compose.ui.graphics.vector
 }
 
 @Composable
-private fun ResultCard(numbers: List<String>, extraNumbers: List<String>, drawDate: String?, nextDrawDate: String?, jackpot: String?) {
+private fun ResultCard(numbers: List<String>, extraNumbers: List<String>, drawDate: String?, nextDrawDate: String?, jackpot: String?, language: AppLanguage) {
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally,
@@ -309,7 +310,7 @@ private fun ResultCard(numbers: List<String>, extraNumbers: List<String>, drawDa
 }
 
 @Composable
-private fun RecommendedCard(numbers: List<String>) {
+private fun RecommendedCard(numbers: List<String>, language: AppLanguage) {
     Surface(shape = RoundedCornerShape(14.dp), color = NexaAccent.copy(alpha = 0.04f),
         border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.1f))) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
@@ -341,7 +342,7 @@ private fun Ball(number: String, isBonus: Boolean = false) {
 }
 
 @Composable
-private fun TicketCard(ticketNumber: Int, ticket: LotteryTicket) {
+private fun TicketCard(ticketNumber: Int, ticket: LotteryTicket, language: AppLanguage) {
     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
         Column(modifier = Modifier.padding(16.dp)) {
