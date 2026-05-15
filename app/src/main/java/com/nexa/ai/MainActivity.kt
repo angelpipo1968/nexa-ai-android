@@ -29,6 +29,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        // Permission result handled — notifications will work if granted
+    }
+
     private val pickFile = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -43,6 +49,15 @@ class MainActivity : ComponentActivity() {
 
         // Install crash logger — saves to /sdcard/Documents/nexa_crash_log.txt
         CrashHandler.install(this)
+
+        // Request notification permission (Android 13+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()

@@ -164,6 +164,7 @@ function getSystemPrompt(language) {
 - Max 500 tokens per response to keep answers concise
 
 SPECIAL CAPABILITIES:
+- URL ANALYSIS: When the user shares a URL, you receive the page content automatically. Analyze it thoroughly: explain what the page is about, detect issues (broken links, errors, security problems, performance issues), summarize key content, answer questions about it, help debug code found on the page, or translate content. Be proactive — if you see a problem, point it out.
 - LOTTERY: You can check lottery results (Powerball, EuroMillones, etc.) and generate recommended numbers.
 - FLIGHTS: When the user asks about flights, air routes, or flight status, ALWAYS include the flight information provided in the context. If no flight data is available, suggest the user provide more details (origin city, destination, date).
 
@@ -186,6 +187,7 @@ FLIGHT RESPONSE FORMAT:
 - Máximo 500 tokens por respuesta para mantener las respuestas concisas
 
 CAPACIDADES ESPECIALES:
+- ANÁLISIS DE URLs: Cuando el usuario comparte una URL, recibes el contenido de la página automáticamente. Analízalo a fondo: explica de qué trata la página, detecta problemas (enlaces rotos, errores, problemas de seguridad, rendimiento), resume el contenido clave, responde preguntas sobre él, ayuda a depurar código encontrado en la página, o traduce contenido. Sé proactivo — si ves un problema, señálalo.
 - LOTERÍA: Puedes consultar resultados de loterías (Melate, EuroMillones, Powerball, etc.) y generar números recomendados.
 - VUELOS: Cuando el usuario pregunte por vuelos, rutas aéreas, o el estado de un vuelo, SIEMPRE incluye la información de vuelos que te proporciono en el contexto. Si no hay datos de vuelos disponibles, sugiérele al usuario que proporcione más detalles (ciudad origen, destino, fecha).
 
@@ -384,6 +386,127 @@ function formatFlightContext(flights) {
   });
   ctx += '[FIN DATOS DE VUELOS]\n';
   return ctx;
+}
+
+// ═══════════════════════════════════════
+//  URL DETECTION & CONTENT FETCHING
+// ═══════════════════════════════════════
+
+function detectUrls(text) {
+  const urlPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+  const urls = text.match(urlPattern);
+  if (!urls) return [];
+  // Deduplicate
+  return [...new Set(urls)];
+}
+
+async function fetchUrlContent(url) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const resp = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+      },
+      redirect: 'follow',
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) return null;
+
+    const contentType = resp.headers.get('content-type') || '';
+    const rawBody = await resp.text();
+
+    // Extract readable text from HTML
+    let content = rawBody;
+
+    if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
+      // Remove scripts, styles, nav, footer, ads
+      content = content
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+        .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+        .replace(/<header[\s\S]*?<\/header>/gi, '')
+        .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+        .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+        // Extract title
+        .replace(/<title[^>]*>([\s\S]*?)<\/title>/gi, (match, title) => {
+          return `\n[TÍTULO: ${title.trim()}]\n`;
+        })
+        // Extract meta description
+        .replace(/<meta[^>]*name=["']description["'][^>]*content=["']([\s\S]*?)["'][^>]*>/gi, (match, desc) => {
+          return `\n[DESCRIPCIÓN: ${desc.trim()}]\n`;
+        })
+        // Extract headings
+        .replace(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, (match, text) => {
+          return `\n## ${text.replace(/<[^>]+>/g, '').trim()}\n`;
+        })
+        // Convert paragraphs
+        .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (match, text) => {
+          return `\n${text.replace(/<[^>]+>/g, '').trim()}\n`;
+        })
+        // Convert links to text
+        .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, href, text) => {
+          return `${text.replace(/<[^>]+>/g, '').trim()} (${href})`;
+        })
+        // Convert list items
+        .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, text) => {
+          return `\n• ${text.replace(/<[^>]+>/g, '').trim()}`;
+        })
+        // Convert code blocks
+        .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (match, code) => {
+          return `\`${code.trim()}\``;
+        })
+        .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (match, code) => {
+          return `\n\`\`\`\n${code.replace(/<[^>]+>/g, '').trim()}\n\`\`\`\n`;
+        })
+        // Remove remaining HTML tags
+        .replace(/<[^>]+>/g, ' ')
+        // Decode HTML entities
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#\d+;/g, '')
+        // Clean up whitespace
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
+    }
+    // For non-HTML (plain text, JSON, etc.) just use as-is
+    else if (contentType.includes('text/plain') || contentType.includes('application/json')) {
+      content = rawBody;
+    }
+    else {
+      return null; // binary content
+    }
+
+    // Limit content length
+    if (content.length > 6000) {
+      content = content.slice(0, 6000) + '\n\n[... contenido truncado]';
+    }
+
+    if (content.length < 50) return null; // Too short, probably not useful
+
+    return content;
+  } catch (err) {
+    console.error('URL fetch error:', url, err.message);
+    return null;
+  }
+}
+
+function formatUrlContext(url, content) {
+  if (!content) return '';
+  return `\n\n[CONTENIDO DE URL]\nURL: ${url}\n\n${content}\n[FIN CONTENIDO DE URL]\n`;
 }
 
 // ═══════════════════════════════════════
@@ -937,6 +1060,33 @@ export default async function handler(req) {
             sanitizedMessages[sysIdx] = {
               ...sanitizedMessages[sysIdx],
               content: sanitizedMessages[sysIdx].content + devdocsContext,
+            };
+          }
+        }
+      }
+
+      // Detect URLs in message and fetch their content
+      const urls = detectUrls(lastUserMsg.content);
+      if (urls.length > 0) {
+        // Fetch up to 3 URLs to avoid timeouts
+        const urlsToFetch = urls.slice(0, 3);
+        const fetchResults = await Promise.allSettled(
+          urlsToFetch.map(url => fetchUrlContent(url))
+        );
+
+        let urlContext = '';
+        fetchResults.forEach((result, i) => {
+          if (result.status === 'fulfilled' && result.value) {
+            urlContext += formatUrlContext(urlsToFetch[i], result.value);
+          }
+        });
+
+        if (urlContext) {
+          const sysIdx = sanitizedMessages.findIndex(m => m.role === 'system');
+          if (sysIdx >= 0) {
+            sanitizedMessages[sysIdx] = {
+              ...sanitizedMessages[sysIdx],
+              content: sanitizedMessages[sysIdx].content + urlContext,
             };
           }
         }
