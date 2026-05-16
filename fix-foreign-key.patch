@@ -1,0 +1,109 @@
+From 335a6ceb9e580dbdcf92829ba4471bebbbd5e463 Mon Sep 17 00:00:00 2001
+From: NEXA Fix <fix@nexa.ai>
+Date: Thu, 14 May 2026 22:54:52 +0800
+Subject: [PATCH] fix: FOREIGN KEY constraint failed en insertMessages
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Envuelve save() en db.withTransaction para atomicidad
+- Agrega deleteAllMessages() antes de deleteAll() para evitar mensajes huérfanos
+- Mueve activeSessionStore.edit fuera de la transacción Room
+---
+ .../java/com/nexa/ai/data/SessionStore.kt     | 53 +++++++++++--------
+ .../com/nexa/ai/data/local/NexaDatabase.kt    |  3 ++
+ 2 files changed, 33 insertions(+), 23 deletions(-)
+
+diff --git a/app/src/main/java/com/nexa/ai/data/SessionStore.kt b/app/src/main/java/com/nexa/ai/data/SessionStore.kt
+index 1486250..736a69c 100644
+--- a/app/src/main/java/com/nexa/ai/data/SessionStore.kt
++++ b/app/src/main/java/com/nexa/ai/data/SessionStore.kt
+@@ -10,6 +10,7 @@ import com.nexa.ai.data.local.MessageEntity
+ import com.nexa.ai.data.local.NexaDatabase
+ import com.nexa.ai.data.local.SessionEntity
+ import com.nexa.ai.data.local.SessionWithMessages
++import androidx.room.withTransaction
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.flow.map
+@@ -54,34 +55,40 @@ class SessionStore(private val context: Context) {
+ 
+     /** Save all sessions and the active session ID. Used for bulk updates. */
+     suspend fun save(sessions: List<PersistedSession>, activeId: String?) {
+-        // Clear existing data
+-        dao.deleteAll()
++        // Transacción Room: todo o nada — previene FOREIGN KEY constraint failed
++        db.withTransaction {
++            // 1. Limpiar mensajes PRIMERO (por si CASCADE falla o hay timing issues)
++            dao.deleteAllMessages()
+ 
+-        // Insert all sessions and messages
+-        for (session in sessions) {
+-            dao.insertSession(
+-                SessionEntity(
+-                    id = session.id,
+-                    title = session.title,
+-                    createdAt = session.createdAt,
+-                    updatedAt = session.updatedAt
+-                )
+-            )
+-            if (session.messages.isNotEmpty()) {
+-                dao.insertMessages(
+-                    session.messages.map { msg ->
+-                        MessageEntity(
+-                            sessionId = session.id,
+-                            messageId = msg.id,
+-                            role = msg.role,
+-                            content = msg.content
+-                        )
+-                    }
++            // 2. Limpiar sesiones
++            dao.deleteAll()
++
++            // 3. Re-insertar todo de forma segura
++            for (session in sessions) {
++                dao.insertSession(
++                    SessionEntity(
++                        id = session.id,
++                        title = session.title,
++                        createdAt = session.createdAt,
++                        updatedAt = session.updatedAt
++                    )
+                 )
++                if (session.messages.isNotEmpty()) {
++                    dao.insertMessages(
++                        session.messages.map { msg ->
++                            MessageEntity(
++                                sessionId = session.id,
++                                messageId = msg.id,
++                                role = msg.role,
++                                content = msg.content
++                            )
++                        }
++                    )
++                }
+             }
+         }
+ 
+-        // Save active session ID
++        // Guardar active session ID fuera de la transacción Room
+         if (activeId != null) {
+             context.activeSessionStore.edit { prefs ->
+                 prefs[KEY_ACTIVE_ID] = activeId
+diff --git a/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt b/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt
+index 804da75..bd8cb7e 100644
+--- a/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt
++++ b/app/src/main/java/com/nexa/ai/data/local/NexaDatabase.kt
+@@ -55,6 +55,9 @@ interface SessionDao {
+     @Query("DELETE FROM sessions")
+     suspend fun deleteAll()
+ 
++    @Query("DELETE FROM messages")
++    suspend fun deleteAllMessages()
++
+     @Query("DELETE FROM messages WHERE sessionId = :sessionId")
+     suspend fun deleteMessagesForSession(sessionId: String)
+ }
+-- 
+2.43.0
+
