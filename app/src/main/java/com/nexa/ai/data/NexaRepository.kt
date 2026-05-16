@@ -36,7 +36,10 @@ class NexaRepository {
         .build()
 
     private val gson = Gson()
-    private val TAG = "NexaRepository"
+
+    companion object {
+        private const val TAG = "NexaRepository"
+    }
 
     fun sendMessage(
         messages: List<ChatMessage>,
