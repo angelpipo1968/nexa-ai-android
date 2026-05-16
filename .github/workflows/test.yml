@@ -21,17 +21,13 @@ jobs:
         distribution: 'temurin'
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
+      uses: gradle/actions/setup-gradle@v4
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
     - name: Run unit tests
       run: ./gradlew test
-
-    - name: Run detekt
-      run: ./gradlew detekt
-      continue-on-error: true
 
     - name: Upload test results
       if: always()
