@@ -61,7 +61,6 @@ fun ChatMainScreen(
     onClearChat: () -> Unit,
     onDismissError: () -> Unit,
     onToggleDrawer: () -> Unit,
-    onCloseDrawer: () -> Unit,
     onCreateSession: () -> Unit,
     onSwitchSession: (String) -> Unit,
     onDeleteSession: (String) -> Unit,
@@ -69,7 +68,6 @@ fun ChatMainScreen(
     onSetLanguage: (AppLanguage) -> Unit,
     onSetVoiceType: (VoiceType) -> Unit,
     onCycleTheme: () -> Unit,
-    onSetThemeMode: (ThemeMode) -> Unit = {},
     onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit,
     onCopyMessage: (String) -> Unit,
@@ -90,7 +88,6 @@ fun ChatMainScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
 
-    // Sync drawer: ViewModel → UI only (avoid double-sync race condition)
     LaunchedEffect(uiState.drawerOpen) {
         if (uiState.drawerOpen && drawerState.isClosed) drawerState.open()
         else if (!uiState.drawerOpen && drawerState.isOpen) drawerState.close()
@@ -117,10 +114,12 @@ fun ChatMainScreen(
     ) {
         Scaffold(
             topBar = {
-                ChatTopBar(uiState = uiState, onToggleDrawer = onToggleDrawer,
-                    onToggleAutoSpeak = onToggleAutoSpeak, onStopSpeaking = onStopSpeaking,
-                    onClearChat = onClearChat, onSurpriseMe = onSurpriseMe,
-                    onToggleSettings = onToggleSettings)
+                ChatTopBar(
+                    uiState = uiState, 
+                    isDarkTheme = isDarkTheme, 
+                    onToggleDrawer = onToggleDrawer,
+                    onClearChat = onClearChat
+                )
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
@@ -130,7 +129,6 @@ fun ChatMainScreen(
                         ErrorBanner(uiState.error ?: "", onDismissError)
                     }
 
-                    // Pull-to-refresh gesture for clearing chat
                     val haptic = LocalHapticFeedback.current
                     var pullOffset by remember { mutableStateOf(0f) }
                     val animatedPullOffset by animateFloatAsState(
@@ -165,7 +163,6 @@ fun ChatMainScreen(
                                 }
                             }
                     ) {
-                        // Pull indicator
                         if (animatedPullOffset > 20f) {
                             val progress = (animatedPullOffset / pullThreshold).coerceAtMost(1f)
                             val infiniteTransition = rememberInfiniteTransition(label = "pullGlow")
@@ -229,19 +226,10 @@ fun ChatMainScreen(
                         onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
                 }
 
-                // Voice Mode Overlay
                 if (uiState.voiceMode) {
                     VoiceModeOverlay(
                         uiState = uiState,
                         onStopVoiceMode = onStopVoiceMode
-                    )
-                }
-
-                // Voice Mode FAB (when not in voice mode)
-                if (!uiState.voiceMode) {
-                    VoiceModeFab(
-                        onToggleVoiceMode = onToggleVoiceMode,
-                        language = uiState.language
                     )
                 }
             }
@@ -261,7 +249,6 @@ fun VoiceModeOverlay(
     val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
     val haptic = LocalHapticFeedback.current
 
-    // Haptic on state change
     var prevState by remember { mutableStateOf("") }
     val currentState = when {
         uiState.isListening -> "listening"
@@ -276,7 +263,6 @@ fun VoiceModeOverlay(
         prevState = currentState
     }
 
-    // ── Orb animations ──
     val ring1Scale by infiniteTransition.animateFloat(
         initialValue = 0.9f, targetValue = 1.1f,
         animationSpec = infiniteRepeatable(tween(2200, easing = EaseInOut), RepeatMode.Reverse),
@@ -303,7 +289,6 @@ fun VoiceModeOverlay(
         label = "coreScale"
     )
 
-    // ── Wave animation ──
     val wavePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2f * Math.PI).toFloat(),
@@ -316,14 +301,12 @@ fun VoiceModeOverlay(
         label = "waveAmp"
     )
 
-    // ── Rotation for outer ring ──
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 360f,
         animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
         label = "rotation"
     )
 
-    // ── Swipe down to dismiss ──
     var swipeOffset by remember { mutableStateOf(0f) }
     val animatedSwipe by animateFloatAsState(
         targetValue = swipeOffset,
@@ -331,15 +314,14 @@ fun VoiceModeOverlay(
         label = "swipe"
     )
 
-    // ── State logic ──
     val isListening = uiState.isListening
     val isThinking = uiState.isThinking
     val isSpeaking = uiState.isSpeaking
 
     val accentColor = when {
-        isListening -> NexaAccent           // Green
-        isThinking -> Color(0xFF7C6AFF)     // Violet
-        isSpeaking -> Color(0xFF00E5D0)     // Cyan
+        isListening -> NexaAccent
+        isThinking -> Color(0xFF7C6AFF)
+        isSpeaking -> Color(0xFF00E5D0)
         else -> NexaAccent
     }
     val accentDim = accentColor.copy(alpha = 0.15f)
@@ -352,7 +334,6 @@ fun VoiceModeOverlay(
         else -> NexaStrings.get("voice_mode_hint", uiState.language)
     }
 
-    // ── Live transcript: last 3 messages ──
     val recentMessages = uiState.messages.takeLast(3)
 
     Box(
@@ -379,7 +360,6 @@ fun VoiceModeOverlay(
             .graphicsLayer { translationY = animatedSwipe * 0.3f; alpha = 1f - (swipeOffset / 600f) },
         contentAlignment = Alignment.Center
     ) {
-        // ── Background subtle grid ──
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
@@ -403,10 +383,7 @@ fun VoiceModeOverlay(
         ) {
             Spacer(modifier = Modifier.weight(0.8f))
 
-            // ═══ THE ORB ═══
             Box(contentAlignment = Alignment.Center) {
-
-                // Outermost ring — slow rotation, dashed
                 Box(
                     modifier = Modifier
                         .size(220.dp)
@@ -432,7 +409,6 @@ fun VoiceModeOverlay(
                         }
                 )
 
-                // Ring 3
                 Box(
                     modifier = Modifier
                         .size((170 * ring3Scale).dp)
@@ -441,7 +417,6 @@ fun VoiceModeOverlay(
                         .background(accentDim)
                 )
 
-                // Ring 2
                 Box(
                     modifier = Modifier
                         .size((140 * ring2Scale).dp)
@@ -450,7 +425,6 @@ fun VoiceModeOverlay(
                         .background(accentMid)
                 )
 
-                // Ring 1
                 Box(
                     modifier = Modifier
                         .size((110 * ring1Scale).dp)
@@ -459,7 +433,6 @@ fun VoiceModeOverlay(
                         .background(accentColor.copy(alpha = 0.2f))
                 )
 
-                // Sound wave visualization ring
                 Canvas(
                     modifier = Modifier
                         .size(160.dp)
@@ -489,7 +462,6 @@ fun VoiceModeOverlay(
                     }
                 }
 
-                // Core orb
                 Box(
                     modifier = Modifier
                         .size((80 * coreScale).dp)
@@ -521,7 +493,6 @@ fun VoiceModeOverlay(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ═══ STATUS TEXT ═══
             AnimatedContent(
                 targetState = stateLabel,
                 transitionSpec = {
@@ -539,7 +510,6 @@ fun VoiceModeOverlay(
                 )
             }
 
-            // Conversation counter
             val msgCount = uiState.messages.size
             if (msgCount > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
@@ -554,7 +524,6 @@ fun VoiceModeOverlay(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ═══ LIVE TRANSCRIPT ═══
             if (recentMessages.isNotEmpty()) {
                 Column(
                     modifier = Modifier
@@ -585,13 +554,11 @@ fun VoiceModeOverlay(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ═══ BOTTOM BAR ═══
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(bottom = 50.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Swipe hint (only when not swiping)
                 if (swipeOffset < 10f) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -617,7 +584,6 @@ fun VoiceModeOverlay(
                     }
                 }
 
-                // Stop button
                 Surface(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -653,62 +619,6 @@ fun VoiceModeOverlay(
 }
 
 // ═══════════════════════════════════════
-//  VOICE MODE FAB — FUTURIST
-// ═══════════════════════════════════════
-
-@Composable
-fun VoiceModeFab(
-    onToggleVoiceMode: () -> Unit,
-    language: AppLanguage
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomEnd
-    ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "fabPulse")
-        val glowAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.08f, targetValue = 0.22f,
-            animationSpec = infiniteRepeatable(tween(2200, easing = EaseInOut), RepeatMode.Reverse),
-            label = "fabGlow"
-        )
-        val ringScale by infiniteTransition.animateFloat(
-            initialValue = 0.9f, targetValue = 1.15f,
-            animationSpec = infiniteRepeatable(tween(2800, easing = EaseInOut), RepeatMode.Reverse),
-            label = "fabRing"
-        )
-
-        Box(contentAlignment = Alignment.Center) {
-            // Outer pulse ring
-            Box(
-                modifier = Modifier
-                    .size((64 * ringScale).dp)
-                    .clip(CircleShape)
-                    .background(NexaAccent.copy(alpha = glowAlpha * 0.4f))
-            )
-            // Main button
-            Surface(
-                onClick = onToggleVoiceMode,
-                shape = CircleShape,
-                color = Color(0xFF0D1117),
-                border = BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f + glowAlpha)),
-                modifier = Modifier
-                    .padding(end = 20.dp, bottom = 80.dp)
-                    .size(56.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = NexaStrings.get("voice_mode", language),
-                        modifier = Modifier.size(22.dp),
-                        tint = NexaAccent.copy(alpha = 0.8f + glowAlpha * 0.5f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════
 //  DRAWER
 // ═══════════════════════════════════════
 
@@ -732,7 +642,6 @@ fun DrawerContent(
         sessions.filter { it.title.contains(searchQuery, ignoreCase = true) || it.messages.any { m -> m.content.contains(searchQuery, ignoreCase = true) } }
 
     ModalDrawerSheet(modifier = Modifier.width(300.dp), drawerContainerColor = MaterialTheme.colorScheme.surface) {
-        // Header with parallax effect
         val drawerListState = rememberLazyListState()
         val headerParallaxOffset by remember {
             derivedStateOf { (drawerListState.firstVisibleItemScrollOffset * 0.4f) }
@@ -760,7 +669,6 @@ fun DrawerContent(
         ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                // Animated glow on drawer logo
                 val infiniteTransition = rememberInfiniteTransition(label = "drawerGlow")
                 val glowAlpha by infiniteTransition.animateFloat(
                     initialValue = 0.10f, targetValue = 0.22f,
@@ -787,7 +695,6 @@ fun DrawerContent(
             }
         }
 
-        // New chat button
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable { onNewChat() },
             shape = RoundedCornerShape(14.dp), color = NexaAccent.copy(alpha = 0.06f),
             border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.12f))) {
@@ -801,7 +708,6 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Search bar
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
             border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
@@ -833,7 +739,6 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Session list
         if (filteredSessions.isEmpty()) {
             Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -856,24 +761,6 @@ fun DrawerContent(
             }
         }
 
-        // Lottery button (hidden - uncomment to restore)
-        // Surface(
-        //     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-        //         .clickable { onNavigateToLottery(); onClose() },
-        //     shape = RoundedCornerShape(12.dp),
-        //     color = NexaAccent.copy(alpha = 0.04f),
-        //     border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.08f))
-        // ) {
-        //     Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-        //         verticalAlignment = Alignment.CenterVertically,
-        //         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        //         Text("🎰", fontSize = 16.sp)
-        //         Text("Lotería", fontSize = 13.sp, fontWeight = FontWeight.Medium,
-        //             color = NexaAccent.copy(alpha = 0.7f))
-        //     }
-        // }
-
-        // Bottom actions
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -986,8 +873,7 @@ fun ChatSessionItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatTopBar(uiState: NexaUiState, onToggleDrawer: () -> Unit, onToggleAutoSpeak: () -> Unit,
-    onStopSpeaking: () -> Unit, onClearChat: () -> Unit, onSurpriseMe: () -> Unit, onToggleSettings: () -> Unit) {
+fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () -> Unit, onClearChat: () -> Unit) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1001,8 +887,9 @@ fun ChatTopBar(uiState: NexaUiState, onToggleDrawer: () -> Unit, onToggleAutoSpe
                     Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 3.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
-                        Text(NexaStrings.get("online", uiState.language), fontSize = 7.sp,
-                            color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 1.5.sp, fontWeight = FontWeight.SemiBold)
+                        Text(NexaStrings.get("online", uiState.language), fontSize = 8.sp,
+                            color = if (isDarkTheme) NexaAccent.copy(alpha = 0.7f) else Color(0xFF00A36C), 
+                            letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1014,7 +901,14 @@ fun ChatTopBar(uiState: NexaUiState, onToggleDrawer: () -> Unit, onToggleAutoSpe
             }
         },
         actions = {
-            // Action buttons moved below assistant messages
+            IconButton(onClick = onClearChat) {
+                Icon(
+                    imageVector = Icons.Default.DeleteSweep,
+                    contentDescription = NexaStrings.get("clear_chat", uiState.language),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )

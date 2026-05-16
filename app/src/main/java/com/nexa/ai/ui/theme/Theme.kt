@@ -52,19 +52,19 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = NexaAccentDark,
     onPrimary = Color.White,
-    background = Color(0xFFF8F9FC),
+    background = Color(0xFFF2F4F7), // Light grayish/silver instead of pure white
     surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFF0F1F5),
-    surfaceContainerLow = Color(0xFFFAFBFE),
-    surfaceContainer = Color(0xFFF5F6FA),
-    surfaceContainerHigh = Color(0xFFECEEF4),
-    onBackground = Color(0xFF0A0A12),
-    onSurface = Color(0xFF0A0A12),
-    onSurfaceVariant = Color(0xFF5A5A70),
-    outline = Color(0xFFE0E2EA),
-    outlineVariant = Color(0xFFD0D2DA),
-    error = Color(0xFFE53E5A),
-    inverseSurface = Color(0xFF0A0A12),
+    surfaceVariant = Color(0xFFE8EAED),
+    surfaceContainerLow = Color(0xFFF8F9FB),
+    surfaceContainer = Color(0xFFF1F3F5),
+    surfaceContainerHigh = Color(0xFFE9ECEF),
+    onBackground = Color(0xFF1A1C1E),
+    onSurface = Color(0xFF1A1C1E),
+    onSurfaceVariant = Color(0xFF44474E), // Darker gray for better contrast
+    outline = Color(0xFF74777F),
+    outlineVariant = Color(0xFFC4C6D0),
+    error = Color(0xFFBA1A1A),
+    inverseSurface = Color(0xFF2F3033),
 )
 
 /** User message bubble color — must be opaque enough for white text readability. */

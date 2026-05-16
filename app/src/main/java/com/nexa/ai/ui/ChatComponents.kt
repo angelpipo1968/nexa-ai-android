@@ -163,18 +163,18 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
         // Minimal brand text
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("NEXA", fontSize = 14.sp, fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), letterSpacing = 6.sp)
-            Box(modifier = Modifier.width(24.dp).height(0.5.dp).background(NexaAccent.copy(alpha = 0.15f)))
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), letterSpacing = 6.sp)
+            Box(modifier = Modifier.width(30.dp).height(1.dp).background(NexaAccent.copy(alpha = 0.5f)))
         }
 
         // Welcome message
         Text(
             NexaStrings.get("welcome_msg", lang),
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
             textAlign = TextAlign.Center,
             letterSpacing = 0.3.sp,
-            lineHeight = 20.sp
+            lineHeight = 22.sp
         )
 
         // Voice activation hint (below welcome text)
@@ -208,15 +208,15 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
                     Icons.Default.Mic,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = NexaAccent.copy(alpha = 0.6f)
+                    tint = NexaAccent.copy(alpha = 0.9f)
                 )
             }
             Text(
                 NexaStrings.get("activate_voice", lang),
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 letterSpacing = 0.5.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -700,12 +700,12 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                 }
 
                 // Text input
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)), modifier = Modifier.weight(1f)) {
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)), modifier = Modifier.weight(1f)) {
                     Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         TextField(value = text, onValueChange = onTextChange,
                             modifier = Modifier.weight(1f).defaultMinSize(minHeight = 42.dp),
-                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
+                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
                             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),

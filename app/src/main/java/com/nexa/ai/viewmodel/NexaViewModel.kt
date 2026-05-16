@@ -77,10 +77,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
-            // Voice mode: when AI finishes speaking, restart listening
+            // Voice mode: when AI finishes speaking, restart listening with a safer delay
             if (!isSpeaking && _uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(400)
+                    kotlinx.coroutines.delay(1000) // Increased delay to prevent echo/cutoff
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking) {
                         speechManager.startListening()
                     }
@@ -95,9 +95,9 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         speechManager.onError = { errorKey ->
             if (_uiState.value.voiceMode) {
-                // In voice mode, silently retry after a short delay
+                // In voice mode, silently retry after a safer delay
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(800)
+                    kotlinx.coroutines.delay(1200)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
@@ -114,7 +114,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(500)
+                    kotlinx.coroutines.delay(800)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }

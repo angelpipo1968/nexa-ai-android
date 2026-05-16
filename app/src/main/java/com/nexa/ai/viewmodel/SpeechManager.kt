@@ -238,6 +238,9 @@ class SpeechManager(private val application: Application) {
                 return
             }
 
+            // Cleanup previous recognizer if any
+            speechRecognizer?.destroy()
+            
             stopSpeaking()
 
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
@@ -258,14 +261,24 @@ class SpeechManager(private val application: Application) {
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
                                 onRecognitionEnded?.invoke()
                             }
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY, 11 -> {
+                                // Error 11 is SERVER_DISCONNECTED. Wait and retry.
+                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                    onRecognitionEnded?.invoke()
+                                }, 800)
+                            }
                             else -> onError?.invoke("voice_error: $error")
                         }
                     }
                     override fun onResults(results: Bundle?) {
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull() ?: return
-                        onInputTextChanged?.invoke(text)
-                        onSpeechResult?.invoke(text)
+                        val text = matches?.firstOrNull()
+                        if (!text.isNullOrBlank()) {
+                            onInputTextChanged?.invoke(text)
+                            onSpeechResult?.invoke(text)
+                        } else {
+                            onRecognitionEnded?.invoke()
+                        }
                     }
                     override fun onPartialResults(partialResults: Bundle?) {
                         val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -286,6 +299,10 @@ class SpeechManager(private val application: Application) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                // Add extra parameters to reduce cutting off
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
             }
 
             speechRecognizer?.startListening(intent)

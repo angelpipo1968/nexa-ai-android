@@ -30,9 +30,10 @@ data class ChatRequest(
 class NexaRepository {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS) // Aumentamos el tiempo de espera
         .readTimeout(0, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true) // Reintentar automáticamente si falla la red
         .build()
 
     private val gson = Gson()
@@ -105,29 +106,20 @@ class NexaRepository {
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 Log.e(TAG, "SSE Failure: ${t?.message}", t)
+                // Si es un error de red común, no matamos el chat, intentamos terminarlo con gracia
                 try {
                     when {
-                        response?.code == 401 -> {
-                            trySend(StreamEvent.AuthExpired)
-                        }
-                        response?.code == 429 -> {
-                            trySend(StreamEvent.Error("rate_limit"))
-                        }
-                        t != null -> {
-                            trySend(StreamEvent.Error("connection_error:${t.localizedMessage}"))
-                        }
+                        response?.code == 401 -> trySend(StreamEvent.AuthExpired)
+                        response?.code == 429 -> trySend(StreamEvent.Error("rate_limit"))
                         else -> {
-                            trySend(StreamEvent.Error("server_error:${response?.code}"))
+                            // En lugar de dar error fatal, mandamos "Done" para que lo que haya llegado se lea
+                            trySend(StreamEvent.Done)
                         }
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error sending failure event", e)
                 }
-                try {
-                    close(t)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error closing flow", e)
-                }
+                close()
             }
         }
 
