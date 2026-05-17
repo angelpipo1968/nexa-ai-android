@@ -554,7 +554,7 @@ private fun FuturisticCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.60f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
@@ -600,7 +600,7 @@ private fun FuturisticPill(
         color = if (selected) accent.copy(alpha = 0.07f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
         border = if (selected) BorderStroke(1.5.dp, accent.copy(alpha = 0.30f))
-        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
     ) {
         Box(
             modifier = Modifier
@@ -675,10 +675,10 @@ private fun VoiceCard(
                 )
             },
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) accent.copy(alpha = 0.05f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
+        color = if (selected) accent.copy(alpha = 0.08f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = if (selected) BorderStroke(1.5.dp, accent.copy(alpha = 0.35f))
-        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
     ) {
         Box(
             modifier = if (selected) Modifier.drawBehind {
@@ -711,14 +711,14 @@ private fun VoiceCard(
                     Icon(
                         Icons.Default.Person, null,
                         modifier = Modifier.size(16.dp),
-                        tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     )
                 }
                 Text(
                     label,
                     fontSize = 10.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selected) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f),
+                    color = if (selected) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center,
                     letterSpacing = 0.3.sp
                 )
@@ -770,10 +770,10 @@ private fun RowScope.ThemeOption(
             onClick()
         },
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) accent.copy(alpha = 0.05f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
+        color = if (selected) accent.copy(alpha = 0.08f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = if (selected) BorderStroke(1.5.dp, accent.copy(alpha = 0.35f))
-        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
     ) {
         Box(
             modifier = if (selected) Modifier.drawBehind {
@@ -963,7 +963,7 @@ private fun MinimalIconButton(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
         modifier = Modifier.size(40.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {

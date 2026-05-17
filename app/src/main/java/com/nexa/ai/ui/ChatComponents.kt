@@ -183,6 +183,7 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(top = 12.dp).clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                 .clickable { onActivateVoiceMode() }
                 .padding(horizontal = 24.dp, vertical = 12.dp)
         ) {
@@ -709,7 +710,7 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                     Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         TextField(value = text, onValueChange = onTextChange,
                             modifier = Modifier.weight(1f).defaultMinSize(minHeight = btnSize),
-                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
+                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
                             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
