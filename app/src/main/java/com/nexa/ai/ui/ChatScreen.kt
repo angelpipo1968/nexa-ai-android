@@ -680,11 +680,11 @@ fun DrawerContent(
                     .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.03f)))),
                     contentAlignment = Alignment.Center) { Text("⚡", fontSize = 20.sp) }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 3.sp)
+                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
                     if (user.isLoggedIn) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent))
-                            Text(user.displayName, fontSize = 10.sp, color = NexaAccent.copy(alpha = 0.7f),
+                            Text(user.displayName, fontSize = 10.sp, color = NexaAccent.copy(alpha = 0.9f),
                                 fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
                         }
                     }
@@ -780,7 +780,7 @@ fun DrawerContent(
                 .padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Settings, contentDescription = NexaStrings.get("settings", lang),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                 Text(NexaStrings.get("settings", lang), fontSize = 12.sp, fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), letterSpacing = 0.3.sp)
             }
@@ -896,11 +896,11 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
                     .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.04f)))),
                     contentAlignment = Alignment.Center) { Text("⚡", fontSize = 16.sp) }
                 Column {
-                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 3.sp)
+                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
                         Text(NexaStrings.get("online", uiState.language), fontSize = 8.sp,
-                            color = if (isDarkTheme) NexaAccent.copy(alpha = 0.7f) else Color(0xFF00A36C), 
+                            color = if (isDarkTheme) NexaAccent.copy(alpha = 0.8f) else Color(0xFF007A4D), 
                             letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -909,7 +909,7 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
         navigationIcon = {
             IconButton(onClick = onToggleDrawer) {
                 Icon(Icons.Default.Menu, contentDescription = NexaStrings.get("menu", uiState.language),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
             }
         },
         actions = {
@@ -917,7 +917,7 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
                 Icon(
                     imageVector = Icons.Default.DeleteSweep,
                     contentDescription = NexaStrings.get("clear_chat", uiState.language),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                     modifier = Modifier.size(24.dp)
                 )
             }

@@ -50,25 +50,25 @@ private val DarkColorScheme = darkColorScheme(
 
 // ── Custom Light Theme ──
 private val LightColorScheme = lightColorScheme(
-    primary = NexaAccentDark,
+    primary = Color(0xFF00875A),        // Darker green for better contrast on white
     onPrimary = Color.White,
-    background = Color(0xFFF2F4F7), // Light grayish/silver instead of pure white
+    background = Color(0xFFF5F6F8),     // Subtle off-white
     surface = Color(0xFFFFFFFF),
     surfaceVariant = Color(0xFFE8EAED),
     surfaceContainerLow = Color(0xFFF8F9FB),
     surfaceContainer = Color(0xFFF1F3F5),
     surfaceContainerHigh = Color(0xFFE9ECEF),
-    onBackground = Color(0xFF1A1C1E),
-    onSurface = Color(0xFF1A1C1E),
-    onSurfaceVariant = Color(0xFF44474E), // Darker gray for better contrast
-    outline = Color(0xFF74777F),
-    outlineVariant = Color(0xFFC4C6D0),
+    onBackground = Color(0xFF111111),   // Near-black for max contrast
+    onSurface = Color(0xFF111111),      // Near-black for max contrast
+    onSurfaceVariant = Color(0xFF333333), // Dark gray, not medium gray
+    outline = Color(0xFF666666),        // Visible borders
+    outlineVariant = Color(0xFFBBBBBB),
     error = Color(0xFFBA1A1A),
     inverseSurface = Color(0xFF2F3033),
 )
 
 /** User message bubble color — must be opaque enough for white text readability. */
-val NexaUserBubbleLight = Color(0xFF00C896)   // Solid accent for light theme user bubbles
+val NexaUserBubbleLight = Color(0xFF00875A)   // Darker green for light theme user bubbles
 val NexaUserBubbleDark = NexaAccent.copy(alpha = 0.12f)  // Subtle accent for dark theme
 
 // ═══════════════════════════════════════
