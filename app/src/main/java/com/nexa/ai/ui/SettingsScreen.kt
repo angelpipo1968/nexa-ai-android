@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -373,7 +374,7 @@ fun SettingsScreen(
                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.VolumeUp, null,
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, null,
                                     modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -405,7 +406,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                     modifier = Modifier.size(32.dp)) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp, null,
+                            if (isSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp, null,
                             modifier = Modifier.size(16.dp),
                             tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -433,7 +434,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                             onClick = { showMsgMenu = false; onCopy() }
                         )
                         DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("read_aloud", language)) } },
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("read_aloud", language)) } },
                             onClick = { showMsgMenu = false; onSpeak() }
                         )
                         DropdownMenuItem(

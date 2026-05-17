@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -67,7 +68,7 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.Start
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = NexaStrings.get("back", language),
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = NexaStrings.get("back", language),
                         tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f))
                 }
             }
@@ -160,7 +161,7 @@ fun RegisterScreen(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.Start) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = NexaStrings.get("back", language),
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = NexaStrings.get("back", language),
                         tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f))
                 }
             }
