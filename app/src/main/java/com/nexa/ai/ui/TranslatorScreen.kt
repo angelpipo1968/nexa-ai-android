@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.AdaptivePadding
+import com.nexa.ai.ui.adaptiveText
 import com.nexa.ai.viewmodel.AppLanguage
 import kotlinx.coroutines.*
 import org.json.JSONObject
@@ -271,7 +273,7 @@ fun TranslatorScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         sourceText.ifBlank { "Toca el micrófono para hablar..." },
-                        fontSize = 18.sp,
+                        fontSize = adaptiveText(18.sp),
                         fontWeight = if (sourceText.isNotBlank()) FontWeight.Medium else FontWeight.Normal,
                         color = if (sourceText.isNotBlank()) MaterialTheme.colorScheme.onSurface
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -311,7 +313,7 @@ fun TranslatorScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         translatedText.ifBlank { "Traducción aparecerá aquí..." },
-                        fontSize = 18.sp,
+                        fontSize = adaptiveText(18.sp),
                         fontWeight = if (translatedText.isNotBlank()) FontWeight.Medium else FontWeight.Normal,
                         color = if (translatedText.isNotBlank()) MaterialTheme.colorScheme.onSurface
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)

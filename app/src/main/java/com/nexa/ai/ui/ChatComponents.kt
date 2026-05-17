@@ -162,7 +162,7 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
 
         // Minimal brand text
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("NEXA", fontSize = 14.sp, fontWeight = FontWeight.Black,
+            Text("NEXA", fontSize = adaptiveText(14.sp), fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface, letterSpacing = 6.sp)
             Box(modifier = Modifier.width(30.dp).height(1.dp).background(NexaAccent.copy(alpha = 0.5f)))
         }
@@ -170,7 +170,7 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
         // Welcome message
         Text(
             NexaStrings.get("welcome_msg", lang),
-            fontSize = 14.sp,
+            fontSize = adaptiveText(14.sp),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
             textAlign = TextAlign.Center,
             letterSpacing = 0.3.sp,
@@ -663,10 +663,13 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
     onAttachFile: () -> Unit, onClearAttachment: () -> Unit) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var showMenu by remember { mutableStateOf(false) }
+    val hPad = AdaptivePadding.horizontal()
+    val vPad = AdaptivePadding.vertical()
+    val btnSize = AdaptivePadding.button()
 
     Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
         shadowElevation = 0.dp, border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(horizontal = hPad, vertical = vPad)) {
             // Attachment preview
             AnimatedVisibility(visible = pendingAttachment != null) {
                 Surface(shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.08f),
@@ -690,8 +693,8 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                 // Attach menu
                 Box {
                     Surface(onClick = { showMenu = true }, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)), modifier = Modifier.size(36.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(17.dp)) }
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)), modifier = Modifier.size(btnSize)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(btnSize * 0.47f)) }
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
@@ -704,14 +707,14 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)), modifier = Modifier.weight(1f)) {
                     Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         TextField(value = text, onValueChange = onTextChange,
-                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = 36.dp),
+                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = btnSize),
                             placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
                             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
                             maxLines = 4, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp))
                         Surface(onClick = { if (isListening) onStopListening() else onStartListening() }, shape = CircleShape,
-                            color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else Color.Transparent, modifier = Modifier.size(32.dp)) {
+                            color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else Color.Transparent, modifier = Modifier.size(btnSize * 0.89f)) {
                             Box(contentAlignment = Alignment.Center) { Icon(if (isListening) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = null, tint = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp)) }
                         }
                     }
@@ -721,8 +724,8 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                 val canSend = text.isNotBlank() || pendingAttachment != null
                 Surface(onClick = { onSend(); keyboardController?.hide() }, enabled = canSend, shape = CircleShape,
                     color = if (canSend) NexaAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    border = if (canSend) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else null, modifier = Modifier.size(36.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(16.dp)) }
+                    border = if (canSend) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else null, modifier = Modifier.size(btnSize)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(btnSize * 0.44f)) }
                 }
             }
 

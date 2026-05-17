@@ -680,7 +680,7 @@ fun DrawerContent(
                     .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.03f)))),
                     contentAlignment = Alignment.Center) { Text("⚡", fontSize = 20.sp) }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = adaptiveText(18.sp), letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
                     if (user.isLoggedIn) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent))
@@ -896,7 +896,7 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
                     .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.04f)))),
                     contentAlignment = Alignment.Center) { Text("⚡", fontSize = 16.sp) }
                 Column {
-                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = adaptiveText(15.sp), letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
                         Text(NexaStrings.get("online", uiState.language), fontSize = 8.sp,
