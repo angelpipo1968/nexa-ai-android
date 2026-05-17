@@ -1218,6 +1218,7 @@ export default async function handler(req) {
     }
 
     // Detect flight queries and fetch real data
+    let toolContext = '';
     const lastUserMsg = [...sanitizedMessages].reverse().find(m => m.role === 'user');
     if (lastUserMsg) {
       const flightQuery = detectFlightQuery(lastUserMsg.content);
@@ -1232,6 +1233,46 @@ export default async function handler(req) {
               content: sanitizedMessages[sysIdx].content + flightContext,
             };
           }
+        }
+      }
+
+      // Detect translation requests ("translate X to Y", "traduce X al Y")
+      const translateMatch = lastUserMsg.content.match(
+        /(?:translate|traduc(?:e|ir|irme)?|trad|翻[译訳]|번역|übersetzen|traduire|tradurre|翻译)[\s\S]*?(?:['""](.+?)['""]|(?:(?:to|al|a|en|into|em|auf|en|in|翻|に|으로)\s+)([a-zA-Záéíóúñü]+[a-zA-Záéíóúñü\s]*))$/i
+      );
+      if (translateMatch) {
+        const textToTranslate = translateMatch[1] || lastUserMsg.content.replace(
+          /(?:translate|traduc(?:e|ir|irme)?|trad|翻[译訳]|번역|übersetzen|traduire|tradurre)[\s]*/i, ''
+        ).replace(/\s+(?:to|al|a|en|into|em|auf|翻|に|으로)\s+[a-zA-Záéíóúñü\s]+$/i, '').trim();
+        
+        const targetLangRaw = translateMatch[2] || 'en';
+        
+        const LANG_CODES = {
+          'english':'en','español':'es','spanish':'es','portugués':'pt','portuguese':'pt','français':'fr','french':'fr',
+          'deutsch':'de','german':'de','italiano':'it','italian':'it','中文':'zh','chinese':'zh','japonés':'ja','japanese':'ja',
+          'coreano':'ko','korean':'ko','ruso':'ru','russian':'ru','árabe':'ar','arabic':'ar','hindi':'hi','turco':'tr','turkish':'tr',
+          'tailandés':'th','thai':'th','vietnamita':'vi','vietnamese':'vi','indonesio':'id','indonesian':'id','malayo':'ms','malay':'ms',
+          'holandés':'nl','dutch':'nl','polaco':'pl','polish':'pl','checo':'cs','czech':'cs','rumano':'ro','romanian':'ro',
+          'húngaro':'hu','hungarian':'hu','griego':'el','greek':'el','sueco':'sv','swedish':'sv','noruego':'no','norwegian':'no',
+          'danés':'da','danish':'da','finés':'fi','finnish':'fi','ucraniano':'uk','ukrainian':'uk','hebreo':'he','hebrew':'he',
+          'persa':'fa','persian':'fa','bengalí':'bn','bengali':'bn','urdu':'ur','swahili':'sw',
+          'inglés':'en','frances':'fr','aleman':'de',
+        };
+        
+        const targetCode = LANG_CODES[targetLangRaw.toLowerCase()] || targetLangRaw.slice(0,2).toLowerCase();
+        
+        try {
+          const transRes = await fetch(
+            'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(textToTranslate) + '&langpair=auto|' + targetCode,
+            { signal: AbortSignal.timeout(8000) }
+          );
+          const transData = await transRes.json();
+          const translated = transData.responseData?.translatedText;
+          if (translated && translated !== textToTranslate) {
+            toolContext += `\n[TRADUCCIÓN AUTOMÁTICA]:\nOriginal: ${textToTranslate}\nTraducido (${targetLangRaw}): ${translated}\nFuente: MyMemory API\n`;
+          }
+        } catch (e) {
+          console.error('[TRANSLATE] Error:', e.message);
         }
       }
 
@@ -1348,6 +1389,12 @@ export default async function handler(req) {
           }
         }
       }
+    }
+
+    // Inject tool context (translations, etc.) into the last user message
+    if (toolContext) {
+      const lastIdx = sanitizedMessages.length - 1;
+      sanitizedMessages[lastIdx].content += `\n\n[CONTEXTO ADICIONAL]:\n${toolContext}`;
     }
 
     // Fallback order: anthropic first, then others
