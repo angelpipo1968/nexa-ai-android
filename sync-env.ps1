@@ -1,26 +1,34 @@
-# sync-env.ps1 — Sincroniza todas las API keys a Vercel de una sola vez
+# sync-env.ps1 — Sincroniza todas las API keys a Vercel
 # Uso: .\sync-env.ps1
 # Requiere: Vercel CLI instalado (npm i -g vercel)
-# Las keys se separan por coma para rotación automática
+# Formato: KEY, KEY_2, KEY_3 (una key por variable)
 
 Write-Host "🚀 Sincronizando API keys a Vercel..." -ForegroundColor Cyan
 Write-Host ""
 
 # ─── CONFIGURACIÓN ───
-# Editá estos valores con tus keys reales (separadas por coma si tenés varias)
+# Editá con tus keys reales. Cada key va en su propia variable.
 
 $envVars = @{
-    # Groq (3 keys separadas por coma)
-    "GROQ_API_KEY" = "gsk_xxx,gsk_yyy,gsk_zzz"
+    # ── GROQ (3 keys) ──
+    "GROQ_API_KEY"   = "gsk_key1_aqui"
+    "GROQ_API_KEY_2" = "gsk_key2_aqui"
+    "GROQ_API_KEY_3" = "gsk_key3_aqui"
 
-    # OpenAI (3 keys separadas por coma)
-    "OPENAI_API_KEY" = "sk-xxx,sk-yyy,sk-zzz"
+    # ── OPENAI (3 keys) ──
+    "OPENAI_API_KEY"   = "sk_key1_aqui"
+    "OPENAI_API_KEY_2" = "sk_key2_aqui"
+    "OPENAI_API_KEY_3" = "sk_key3_aqui"
 
-    # Anthropic (3 keys separadas por coma)
-    "ANTHROPIC_API_KEY" = "sk-ant-xxx,sk-ant-yyy,sk-ant-zzz"
+    # ── ANTHROPIC (3 keys) ──
+    "ANTHROPIC_API_KEY"   = "sk-ant_key1_aqui"
+    "ANTHROPIC_API_KEY_2" = "sk-ant_key2_aqui"
+    "ANTHROPIC_API_KEY_3" = "sk-ant_key3_aqui"
 
-    # Google Gemini (3 keys separadas por coma)
-    "GEMINI_API_KEY" = "AIza-xxx,AIza-yyy,AIza-zzz"
+    # ── GEMINI (3 keys) ──
+    "GEMINI_API_KEY"   = "AIza_key1_aqui"
+    "GEMINI_API_KEY_2" = "AIza_key2_aqui"
+    "GEMINI_API_KEY_3" = "AIza_key3_aqui"
 }
 
 # ─── SINCRONIZACIÓN ───
@@ -30,18 +38,18 @@ $failed = 0
 foreach ($name in $envVars.Keys) {
     $value = $envVars[$name]
 
-    # Saltear si no se editó (tiene placeholder)
-    if ($value -match "xxx|yyy|zzz") {
-        Write-Host "⏭️  Saltando $name (placeholder detectado)" -ForegroundColor Yellow
+    # Saltear si tiene placeholder
+    if ($value -match "key[123]_aqui") {
+        Write-Host "⏭️  Saltando $name (placeholder)" -ForegroundColor Yellow
         continue
     }
 
     Write-Host "📤 Subiendo $name..." -NoNewline
 
-    # Eliminar la variable existente primero (ignorar error si no existe)
+    # Eliminar existente (ignorar si no existe)
     echo $value | vercel env rm $name production --yes 2>$null
 
-    # Agregar la nueva
+    # Agregar nueva
     $result = echo $value | vercel env add $name production --yes 2>&1
 
     if ($LASTEXITCODE -eq 0) {
@@ -58,5 +66,5 @@ Write-Host ""
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
 Write-Host "✅ Sincronizadas: $success  |  ❌ Fallidas: $failed" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "💡 Después de sincronizar, hacés redeploy en Vercel:" -ForegroundColor Yellow
+Write-Host "💡 Después, redeploy:" -ForegroundColor Yellow
 Write-Host "   vercel --prod" -ForegroundColor White
