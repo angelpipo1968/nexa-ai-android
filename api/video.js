@@ -3,8 +3,8 @@
 // Supports: Luma AI (free trial), Replicate, Minimax
 
 export const config = {
-  runtime: 'edge';
-};
+  runtime: 'edge',
+  };
 
 const PROVIDERS = {
   luma: {
