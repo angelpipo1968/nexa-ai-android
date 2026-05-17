@@ -76,6 +76,18 @@ const PROVIDERS = {
 
 const FALLBACK_ORDER = ['openrouter', 'groq', 'zai', 'anthropic', 'gemini', 'deepseek', 'openai'];
 
+// ─── Key Rotation: Soporte para múltiples keys separadas por coma ───
+function getKeyList(envValue: string | undefined): string[] {
+    if (!envValue) return [];
+    return envValue.split(',').map(k => k.trim()).filter(k => k.length > 0);
+}
+
+function getRandomKey(envValue: string | undefined): string | undefined {
+    const keys = getKeyList(envValue);
+    if (keys.length === 0) return undefined;
+    return keys[Math.floor(Math.random() * keys.length)];
+}
+
 // ─── Tool Integration: Detect and execute tools before AI responds ───
 async function processTools(userMessage: string): Promise<string | null> {
     const intent = detectIntent(userMessage);
@@ -118,8 +130,12 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
             
             for (const providerKey of FALLBACK_ORDER) {
                 const config = (PROVIDERS as any)[providerKey];
-                const key = keys[config.keyEnv];
-                if (!key) continue;
+                const keyList = getKeyList(keys[config.keyEnv]);
+                if (keyList.length === 0) continue;
+                
+                // Intentar cada key del proveedor antes de pasar al siguiente
+                for (let keyIdx = 0; keyIdx < keyList.length; keyIdx++) {
+                const key = keyList[keyIdx];
                 try {
                     logger.info(`Attempting chat with ${providerKey}`, 'chat', { requestId });
                     
@@ -241,7 +257,11 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                             return;
                         }
                     }
-                } catch (e: any) { logger.warn(`Provider ${providerKey} failed: ${e.message}`, 'chat', { requestId }); }
+                } catch (e: any) {
+                    logger.warn(`Provider ${providerKey} key[${keyIdx}] failed: ${e.message}`, 'chat', { requestId });
+                    continue; // Try next key for same provider
+                }
+                } // end key rotation loop
             }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Todos los proveedores fallaron.' })}\n\n`));
             controller.close();
@@ -570,6 +590,7 @@ Hora Local: ${timeStr}
 
         if (!messages.find((m: any) => m.role === 'system')) messages.unshift({ role: 'system', content: getSystemPrompt(mode as any) });
         
+        // Keys con soporte de rotación (separadas por coma en Vercel)
         const keys = { 
             GROQ_API_KEY: process.env.GROQ_API_KEY, 
             GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY, 
