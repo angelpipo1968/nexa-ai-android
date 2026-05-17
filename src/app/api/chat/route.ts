@@ -77,13 +77,29 @@ const PROVIDERS = {
 const FALLBACK_ORDER = ['openrouter', 'groq', 'zai', 'anthropic', 'gemini', 'deepseek', 'openai'];
 
 // ─── Key Rotation: Soporte para múltiples keys separadas por coma ───
-function getKeyList(envValue: string | undefined): string[] {
+function getKeyList(envValue: string | undefined, envKey?: string): string[] {
+    // Collect keys from: KEY, KEY_2, KEY_3 (separate env vars in Vercel)
+    const keys: string[] = [];
+    
+    // Also check _2 and _3 suffixed versions
+    if (envKey) {
+        for (let i = 1; i <= 5; i++) {
+            const suffix = i === 1 ? '' : `_${i}`;
+            const val = process.env[`${envKey}${suffix}`];
+            if (val) {
+                // Support comma-separated within each var too
+                val.split(',').map(k => k.trim()).filter(k => k.length > 0).forEach(k => keys.push(k));
+            }
+        }
+        return keys;
+    }
+    
     if (!envValue) return [];
     return envValue.split(',').map(k => k.trim()).filter(k => k.length > 0);
 }
 
-function getRandomKey(envValue: string | undefined): string | undefined {
-    const keys = getKeyList(envValue);
+function getRandomKey(envValue: string | undefined, envKey?: string): string | undefined {
+    const keys = getKeyList(envValue, envKey);
     if (keys.length === 0) return undefined;
     return keys[Math.floor(Math.random() * keys.length)];
 }
@@ -130,7 +146,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
             
             for (const providerKey of FALLBACK_ORDER) {
                 const config = (PROVIDERS as any)[providerKey];
-                const keyList = getKeyList(keys[config.keyEnv]);
+                const keyList = getKeyList(keys[config.keyEnv], config.keyEnv);
                 if (keyList.length === 0) continue;
                 
                 // Intentar cada key del proveedor antes de pasar al siguiente
@@ -294,7 +310,7 @@ Hora Local: ${timeStr}
 --------------------------------------------------\n\n`;
 
         // --- DETECTOR DE INTENCIONES AVANZADO (NEXA BRAIN V4) ---
-        const groqKey = getRandomKey(process.env.GROQ_API_KEY);
+        const groqKey = getRandomKey(process.env.GROQ_API_KEY, 'GROQ_API_KEY');
         let selectedTools: string[] = [];
         if (groqKey) {
             try {
@@ -335,7 +351,7 @@ Hora Local: ${timeStr}
             try {
                 const extractionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY)}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY, 'GROQ_API_KEY')}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
                         messages: [{ role: 'system', content: 'Extract city in JSON: {"city": "Name"}. Only JSON.' }, { role: 'user', content: userQuery }],
@@ -353,7 +369,7 @@ Hora Local: ${timeStr}
             try {
                 const promptRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY)}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY, 'GROQ_API_KEY')}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
                         messages: [{ role: 'system', content: 'Crea un prompt descriptivo en inglés para DALL-E basado en el pedido del usuario. Solo el prompt.' }, { role: 'user', content: userQuery }],
@@ -370,7 +386,7 @@ Hora Local: ${timeStr}
             try {
                 const extractionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY)}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY, 'GROQ_API_KEY')}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
                         messages: [{ role: 'system', content: 'Extract IATA origin/dest and date (YYYY-MM-DD): {"origin": "IATA", "destination": "IATA", "date": "YYYY-MM-DD"}.' }, { role: 'user', content: userQuery }],
@@ -590,7 +606,7 @@ Hora Local: ${timeStr}
 
         if (!messages.find((m: any) => m.role === 'system')) messages.unshift({ role: 'system', content: getSystemPrompt(mode as any) });
         
-        // Keys con soporte de rotación (separadas por coma en Vercel)
+        // Keys con soporte de rotación (KEY, KEY_2, KEY_3 en Vercel)
         const keys = { 
             GROQ_API_KEY: process.env.GROQ_API_KEY, 
             GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY, 
@@ -601,7 +617,7 @@ Hora Local: ${timeStr}
         };
         // Log key availability for debugging
         for (const [k, v] of Object.entries(keys)) {
-            const count = getKeyList(v).length;
+            const count = getKeyList(v, k).length;
             if (count > 0) logger.info(`${k}: ${count} key(s) available`, 'keys');
         }
         const stream = createStream(requestId, messages, keys);
