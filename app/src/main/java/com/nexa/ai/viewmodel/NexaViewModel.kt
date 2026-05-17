@@ -250,11 +250,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun navigateToLottery() {
+        _uiState.value = _uiState.value.copy(currentScreen = Screen.LOTTERY, drawerOpen = false)
+    }
+
     fun navigateToTranslator() {
         _uiState.value = _uiState.value.copy(currentScreen = Screen.TRANSLATOR, drawerOpen = false)
-    }
-        _uiState.value = _uiState.value.copy(currentScreen = Screen.LOTTERY, drawerOpen = false)
-    
     }
     
 
