@@ -97,7 +97,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             if (_uiState.value.voiceMode) {
                 // In voice mode, silently retry after a safer delay
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(1200)
+                    kotlinx.coroutines.delay(2000) // Longer delay to prevent rapid cycling
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
@@ -114,7 +114,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(800)
+                    kotlinx.coroutines.delay(1500) // Longer delay to prevent flicker
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }

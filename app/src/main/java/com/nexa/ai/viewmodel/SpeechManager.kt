@@ -252,10 +252,16 @@ class SpeechManager(private val application: Application) {
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {
-                        onListeningStateChanged?.invoke(false)
+                        // Don't change state here — let onResults/onRecognitionEnded handle it
+                        // This prevents UI flicker between "listening" and "idle" during pauses
                     }
                     override fun onError(error: Int) {
-                        onListeningStateChanged?.invoke(false)
+                        // Only report false for real errors, not for timeout/no-match (handled by onRecognitionEnded)
+                        if (error != SpeechRecognizer.ERROR_NO_MATCH && 
+                            error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT &&
+                            error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                            onListeningStateChanged?.invoke(false)
+                        }
                         when (error) {
                             SpeechRecognizer.ERROR_NO_MATCH,
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
@@ -271,6 +277,7 @@ class SpeechManager(private val application: Application) {
                         }
                     }
                     override fun onResults(results: Bundle?) {
+                        onListeningStateChanged?.invoke(false)
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull()
                         if (!text.isNullOrBlank()) {
@@ -300,9 +307,9 @@ class SpeechManager(private val application: Application) {
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 // Add extra parameters to reduce cutting off
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3500L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
             }
 
             speechRecognizer?.startListening(intent)
