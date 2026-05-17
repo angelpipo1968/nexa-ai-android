@@ -40,7 +40,7 @@ object NexaStrings {
         "voice_error" to "Error de voz", "connection_error" to "Error de conexión", "unknown" to "desconocido",
         "export_pdf_title" to "Exportar PDF", "generated_by" to "Generado por NEXA PRO",
         "rate_limit" to "Límite de mensajes alcanzado. Intenta más tarde.", "server_error" to "Error del servidor",
-        "voice_mode" to "Modo Conversación", "voice_mode_on" to "Modo conversación activado",
+        "translator" to "Traductor en Vivo", "voice_mode" to "Modo Conversación", "voice_mode_on" to "Modo conversación activado",
         "voice_mode_off" to "Modo conversación desactivado", "voice_mode_hint" to "Habla libremente",
         "voice_mode_listening" to "Escuchando", "voice_mode_thinking" to "Pensando",
         "voice_mode_speaking" to "Respondiendo", "tap_to_stop" to "Tocar para detener",

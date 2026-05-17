@@ -38,7 +38,7 @@ fun NexaChatScreen(
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToChat: () -> Unit,
-    onNavigateToLottery: () -> Unit = {},
+    onNavigateToLottery: () -> Unit = {}, onNavigateToTranslator: () -> Unit = {},
     onUpdateLoginEmail: (String) -> Unit,
     onUpdateLoginPassword: (String) -> Unit,
     onLogin: () -> Unit,
@@ -106,7 +106,7 @@ fun NexaChatScreen(
             onCopyMessage = onCopyMessage, onExportMessage = onExportMessage,
             onSurpriseMe = onSurpriseMe, onSetDrawerView = onSetDrawerView,
             onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
-            onNavigateToLottery = onNavigateToLottery,
+            onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
             onPinSession = onPinSession, onRenameSession = onRenameSession,
             onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
             onShareSession = onShareSession, onDownloadSession = onDownloadSession,
@@ -124,6 +124,9 @@ fun NexaChatScreen(
             onSetThemeMode = onSetThemeMode,
             onToggleAutoSpeak = onToggleAutoSpeak,
             onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout
+        )
+        Screen.TRANSLATOR -> TranslatorScreen(
+            onBack = onNavigateToChat
         )
     }
 

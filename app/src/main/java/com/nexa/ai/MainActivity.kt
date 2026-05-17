@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
                         onNavigateToRegister = { viewModel.navigateToRegister() },
                         onNavigateToChat = { viewModel.navigateToChat() },
                         onNavigateToLottery = { viewModel.navigateToLottery() },
+                        onNavigateToTranslator = { viewModel.navigateToTranslator() },
                         onUpdateLoginEmail = { viewModel.updateLoginEmail(it) },
                         onUpdateLoginPassword = { viewModel.updateLoginPassword(it) },
                         onLogin = { viewModel.login() },

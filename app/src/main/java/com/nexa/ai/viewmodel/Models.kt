@@ -39,7 +39,7 @@ data class UserData(
     val isLoggedIn: Boolean = false
 )
 
-enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY, SETTINGS }
+enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY, SETTINGS, TRANSLATOR }
 
 // ═══════════════════════════════════════
 //  UI STATE

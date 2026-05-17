@@ -77,6 +77,7 @@ fun ChatMainScreen(
     onAttachFile: () -> Unit,
     onClearAttachment: () -> Unit = {},
     onNavigateToLottery: () -> Unit = {},
+    onNavigateToTranslator: () -> Unit = {},
     onPinSession: (String) -> Unit = {},
     onRenameSession: (String) -> Unit = {},
     onCloneSession: (String) -> Unit = {},
@@ -104,7 +105,7 @@ fun ChatMainScreen(
                 onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
                 onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
                 onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
-                onNavigateToLottery = onNavigateToLottery,
+                onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
                 onPinSession = onPinSession, onRenameSession = onRenameSession,
                 onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
                 onShareSession = onShareSession, onDownloadSession = onDownloadSession
@@ -628,7 +629,7 @@ fun DrawerContent(
     onDeleteSession: (String) -> Unit, onClose: () -> Unit, onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit, onSetLanguage: (AppLanguage) -> Unit, onSetVoiceType: (VoiceType) -> Unit,
     onToggleTheme: () -> Unit, onToggleSettings: () -> Unit, onToggleAutoSpeak: () -> Unit,
-    onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {},
+    onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {}, onNavigateToTranslator: () -> Unit = {},
     onPinSession: (String) -> Unit = {}, onRenameSession: (String) -> Unit = {},
     onCloneSession: (String) -> Unit = {}, onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {}, onDownloadSession: (String) -> Unit = {}
@@ -761,6 +762,17 @@ fun DrawerContent(
             }
         }
 
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+        // Translator button
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp)).clickable { onNavigateToTranslator(); onClose() }
+            .padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Language, contentDescription = "Traductor",
+                tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+            Text("🌍 Traductor en Vivo", fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                color = NexaAccent.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
