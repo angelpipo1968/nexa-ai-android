@@ -146,6 +146,101 @@ const PROVIDERS = {
 };
 
 // ═══════════════════════════════════════
+//  AUTO-LANGUAGE DETECTION — Country to Language mapping
+const COUNTRY_LANG = {
+  // Spanish
+  MX:'es', ES:'es', AR:'es', CO:'es', CL:'es', PE:'es', VE:'es', EC:'es', GT:'es', CU:'es',
+  BO:'es', DO:'es', HN:'es', PY:'es', SV:'es', NI:'es', CR:'es', PA:'es', UY:'es', PR:'es',
+  GQ:'es',
+  // English
+  US:'en', GB:'en', AU:'en', CA:'en', NZ:'en', IE:'en', ZA:'en', JM:'en', SG:'en', IN:'en',
+  PH:'en', NG:'en', KE:'en', GH:'en', TZ:'en', UG:'en', ZM:'en', BW:'en', MT:'en',
+  // Portuguese
+  BR:'pt', PT:'pt', AO:'pt', MZ:'pt', CV:'pt', GW:'pt', TL:'pt', ST:'pt',
+  // French
+  FR:'fr', BE:'fr', CH:'fr', LU:'fr', MC:'fr', SN:'fr', CI:'fr', CM:'fr', MG:'fr', BF:'fr',
+  NE:'fr', ML:'fr', TD:'fr', GN:'fr', RW:'fr', HT:'fr', DJ:'fr', KM:'fr', SC:'fr', VU:'fr',
+  // German
+  DE:'de', AT:'de', LI:'de',
+  // Italian
+  IT:'it', SM:'it', VA:'it',
+  // Chinese
+  CN:'zh', TW:'zh', HK:'zh', MO:'zh',
+  // Japanese
+  JP:'ja',
+  // Korean
+  KR:'ko',
+  // Russian
+  RU:'ru', BY:'ru', KZ:'ru', KG:'ru', TJ:'ru', UZ:'ru', TM:'ru', MD:'ru',
+  // Arabic
+  SA:'ar', AE:'ar', EG:'ar', MA:'ar', DZ:'ar', TN:'ar', IQ:'ar', SY:'ar', JO:'ar', LB:'ar',
+  KW:'ar', QA:'ar', BH:'ar', OM:'ar', YE:'ar', LY:'ar', SD:'ar', PS:'ar',
+  // Hindi
+  IN:'hi',
+  // Turkish
+  TR:'tr', CY:'tr',
+  // Thai
+  TH:'th',
+  // Vietnamese
+  VN:'vi',
+  // Indonesian/Malay
+  ID:'id', MY:'ms',
+  // Dutch
+  NL:'nl', SR:'nl', AW:'nl',
+  // Polish
+  PL:'pl',
+  // Czech
+  CZ:'cs',
+  // Romanian
+  RO:'ro', MD:'ro',
+  // Hungarian
+  HU:'hu',
+  // Greek
+  GR:'el', CY:'el',
+  // Swedish
+  SE:'sv',
+  // Norwegian
+  NO:'no',
+  // Danish
+  DK:'da',
+  // Finnish
+  FI:'fi',
+  // Ukrainian
+  UA:'uk',
+  // Hebrew
+  IL:'he',
+  // Persian/Farsi
+  IR:'fa', AF:'fa',
+  // Bengali
+  BD:'bn',
+  // Urdu
+  PK:'ur',
+  // Swahili
+  TZ:'sw', KE:'sw', UG:'sw', RW:'sw',
+};
+
+const LANG_NAMES = {
+  es:'español', en:'English', pt:'português', fr:'français', de:'Deutsch', it:'italiano',
+  zh:'中文', ja:'日本語', ko:'한국어', ru:'русский', ar:'العربية', hi:'हिन्दी',
+  tr:'Türkçe', th:'ไทย', vi:'Tiếng Việt', id:'Bahasa Indonesia', ms:'Bahasa Melayu',
+  nl:'Nederlands', pl:'polski', cs:'čeština', ro:'română', magyar:'magyar', el:'ελληνικά',
+  sv:'svenska', no:'norsk', da:'dansk', fi:'suomi', uk:'українська', he:'עברית',
+  fa:'فارسی', bn:'বাংলা', ur:'اردو', sw:'Kiswahili',
+};
+
+async function detectLanguage(req) {
+  try {
+    const forwarded = req.headers.get('x-forwarded-for') || '';
+    const ip = forwarded.split(',')[0].trim() || '8.8.8.8';
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=countryCode`, { signal: AbortSignal.timeout(3000) });
+    const data = await res.json();
+    const lang = COUNTRY_LANG[data.countryCode] || 'es';
+    return lang;
+  } catch {
+    return 'es';
+  }
+}
+
 //  SYSTEM PROMPT — MASTER (language-aware)
 // ═══════════════════════════════════════
 
@@ -1108,9 +1203,18 @@ export default async function handler(req) {
       });
     }
 
+    // Auto-detect language from user's country (if not explicitly provided)
+    const detectedLang = language || await detectLanguage(req);
+    const langName = LANG_NAMES[detectedLang] || 'español';
+
     // Add system prompt if not present (language-aware)
     if (!sanitizedMessages.some(m => m.role === 'system')) {
-      sanitizedMessages.unshift({ role: 'system', content: getSystemPrompt(language) });
+      sanitizedMessages.unshift({ role: 'system', content: getSystemPrompt(detectedLang) });
+    }
+
+    // Inject auto-translate instruction if language is not Spanish
+    if (detectedLang !== 'es') {
+      sanitizedMessages.unshift({ role: 'system', content: `IMPORTANT: You MUST respond ONLY in ${langName} (${detectedLang}). Do NOT use Spanish. Translate all your responses to ${langName}.` });
     }
 
     // Detect flight queries and fetch real data
