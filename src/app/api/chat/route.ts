@@ -294,7 +294,7 @@ Hora Local: ${timeStr}
 --------------------------------------------------\n\n`;
 
         // --- DETECTOR DE INTENCIONES AVANZADO (NEXA BRAIN V4) ---
-        const groqKey = process.env.GROQ_API_KEY;
+        const groqKey = getRandomKey(process.env.GROQ_API_KEY);
         let selectedTools: string[] = [];
         if (groqKey) {
             try {
@@ -335,7 +335,7 @@ Hora Local: ${timeStr}
             try {
                 const extractionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY)}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
                         messages: [{ role: 'system', content: 'Extract city in JSON: {"city": "Name"}. Only JSON.' }, { role: 'user', content: userQuery }],
@@ -353,7 +353,7 @@ Hora Local: ${timeStr}
             try {
                 const promptRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY)}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
                         messages: [{ role: 'system', content: 'Crea un prompt descriptivo en inglés para DALL-E basado en el pedido del usuario. Solo el prompt.' }, { role: 'user', content: userQuery }],
@@ -370,7 +370,7 @@ Hora Local: ${timeStr}
             try {
                 const extractionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY)}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
                         messages: [{ role: 'system', content: 'Extract IATA origin/dest and date (YYYY-MM-DD): {"origin": "IATA", "destination": "IATA", "date": "YYYY-MM-DD"}.' }, { role: 'user', content: userQuery }],
@@ -599,6 +599,11 @@ Hora Local: ${timeStr}
             OPENAI_API_KEY: process.env.OPENAI_API_KEY,
             ZAI_API_KEY: process.env.ZAI_API_KEY
         };
+        // Log key availability for debugging
+        for (const [k, v] of Object.entries(keys)) {
+            const count = getKeyList(v).length;
+            if (count > 0) logger.info(`${k}: ${count} key(s) available`, 'keys');
+        }
         const stream = createStream(requestId, messages, keys);
         return new Response(stream, { headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
     } catch (e: any) {
