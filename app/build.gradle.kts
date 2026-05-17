@@ -16,7 +16,7 @@ android {
         versionCode = 35
         versionName = "3.5"
 
-        buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://nexa-ai.dev\"")
     }
 
     buildTypes {
