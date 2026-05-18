@@ -81,11 +81,14 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
-            // Voice mode: when AI finishes speaking, restart listening with a safer delay
+            
+            // Voice mode: restart listening AFTER AI finishes speaking
             if (!isSpeaking && _uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(2000) // Tiempo para que el usuario respire
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking) {
+                    // Safety delay before restarting mic to prevent hearing itself
+                    kotlinx.coroutines.delay(1000) 
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening && 
+                        !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
                 }
@@ -506,10 +509,37 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         if (now - lastSendTimestamp < sendCooldownMs) return
         lastSendTimestamp = now
 
-        // ¡NUEVA SEGURIDAD PARA VOZ! Callar la IA y apagar micrófono antes de enviar
+        // Callar la IA y apagar micrófono antes de enviar
         if (_uiState.value.voiceMode) {
             speechManager.stopListening()
             speechManager.stopSpeaking()
+        }
+
+        // --- VOICE COMMAND DETECTION ---
+        if (_uiState.value.voiceMode) {
+            val cmd = content.lowercase().trim()
+            val lang = _uiState.value.language
+            
+            if (cmd.contains("limpiar chat") || cmd.contains("borra el chat") || cmd.contains("clear chat")) {
+                clearChat()
+                speak(if (lang == AppLanguage.SPANISH) "Chat borrado" else "Chat cleared")
+                return
+            }
+            if (cmd.contains("exportar pdf") || cmd.contains("p d f") || cmd.contains("export pdf")) {
+                val lastMsg = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                if (lastMsg != null) {
+                    exportToPdf(lastMsg)
+                    speak(if (lang == AppLanguage.SPANISH) "Exportando documento" else "Exporting document")
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "No hay nada que exportar" else "Nothing to export")
+                }
+                return
+            }
+            if (cmd.contains("detener manos libres") || cmd.contains("stop hands free")) {
+                stopVoiceMode()
+                speak(if (lang == AppLanguage.SPANISH) "Modo manos libres desactivado" else "Hands free mode off")
+                return
+            }
         }
 
         val attachmentName = _uiState.value.pendingAttachment
