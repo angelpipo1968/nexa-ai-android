@@ -249,12 +249,11 @@ class SpeechManager(private val application: Application) {
                         onListeningStateChanged?.invoke(true)
                     }
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() {
-                        // Don't change state here — let onResults/onRecognitionEnded handle it
-                        // This prevents UI flicker between "listening" and "idle" during pauses
+                    override fun onRmsChanged(rmsdB: Float) {
+                        // System is alive and hearing sound if rmsdB > 2f
                     }
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {
                         // Only report false for real errors, not for timeout/no-match (handled by onRecognitionEnded)
                         if (error != SpeechRecognizer.ERROR_NO_MATCH && 
@@ -304,16 +303,14 @@ class SpeechManager(private val application: Application) {
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
+                // Ensure we get partial results for better responsiveness
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                // Use a standard max results to avoid confusion
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 
-                // --- ANTI-CUTOFF OPTIMIZATIONS ---
-                // Increase silence timeout to 8 seconds (very generous for thinking)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 8000L)
-                // Increase "possible" silence (shorter pauses) to 6 seconds
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
-                // Force a minimum recording time of 2 seconds to avoid accidental taps/noises
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
+                // Balance timeouts — not too short to cut off, not too long to hang
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
             }
 
             speechRecognizer?.startListening(intent)
