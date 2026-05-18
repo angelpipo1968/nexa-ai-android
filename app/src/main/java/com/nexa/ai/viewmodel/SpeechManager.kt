@@ -250,36 +250,27 @@ class SpeechManager(private val application: Application) {
                     }
                     override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {
-                        // System is alive and hearing sound if rmsdB > 2f
+                        // Monitor energy levels to prevent premature cut-offs
                     }
                     override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() {}
+                    override fun onEndOfSpeech() {
+                        // We ignore this and wait for onResults
+                    }
                     override fun onError(error: Int) {
-                        // Only report false for real errors, not for timeout/no-match (handled by onRecognitionEnded)
-                        if (error != SpeechRecognizer.ERROR_NO_MATCH && 
-                            error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT &&
-                            error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                        if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || 
+                            error == SpeechRecognizer.ERROR_NO_MATCH) {
                             onListeningStateChanged?.invoke(false)
-                        }
-                        when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH,
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                                onRecognitionEnded?.invoke()
-                            }
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY, 11 -> {
-                                // Error 11 is SERVER_DISCONNECTED. Wait and retry.
-                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                    onRecognitionEnded?.invoke()
-                                }, 800)
-                            }
-                            else -> onError?.invoke("voice_error: $error")
+                            onRecognitionEnded?.invoke()
+                        } else if (error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                            onListeningStateChanged?.invoke(false)
+                            onError?.invoke("voice_error: $error")
                         }
                     }
                     override fun onResults(results: Bundle?) {
-                        onListeningStateChanged?.invoke(false)
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull()
                         if (!text.isNullOrBlank()) {
+                            onListeningStateChanged?.invoke(false)
                             onInputTextChanged?.invoke(text)
                             onSpeechResult?.invoke(text)
                         } else {
@@ -303,21 +294,15 @@ class SpeechManager(private val application: Application) {
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
-                // Ensure we get partial results for better responsiveness
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                // Use a standard max results to avoid confusion
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-
-                // CRITICAL: Set calling package to ensure extras are respected
+                
+                // FORCE ANDROID TO BE PATIENT
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, application.packageName)
-
-                // Better silence detection logic (Energy-based simulation)
-                // 5 seconds of absolute silence before cutting off
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                // 4 seconds of "possible" silence (pauses between words)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
-                // Minimum recording length to avoid accidental trigger
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 7000L)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
+                putExtra("android.speech.extra.DICTATION_MODE", true)
             }
 
             speechRecognizer?.startListening(intent)
