@@ -12,10 +12,12 @@ export interface LocationData {
     query: string; // IP
 }
 
-export async function getUserLocation(): Promise<LocationData | null> {
+export async function getUserLocation(clientIp?: string): Promise<LocationData | null> {
     try {
         // Usamos ip-api.com (Gratis para uso no comercial)
-        const res = await fetch('http://ip-api.com/json/');
+        // Si se proporciona la IP del cliente, la usamos; si no, ip-api detecta la IP del servidor
+        const url = clientIp ? `http://ip-api.com/json/${clientIp}` : 'http://ip-api.com/json/';
+        const res = await fetch(url);
         const data = await res.json();
         
         if (data.status === 'fail') return null;

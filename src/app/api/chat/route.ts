@@ -160,7 +160,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                         const res = await fetch(config.url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-                            body: JSON.stringify({ model: config.model, messages, stream: true, temperature: 0.7 }),
+                            body: JSON.stringify({ model: config.model, messages, stream: true, temperature: 0.7, max_tokens: 4096 }),
                         });
                         if (res.ok && res.body) {
                             const reader = res.body.getReader();
@@ -302,7 +302,11 @@ export async function POST(req: NextRequest) {
         let toolContext = "";
 
         // 0. CONTEXTO DE UBICACIÓN Y TIEMPO (Auto-Inyectado)
-        const location = await getUserLocation();
+        // Extraer IP real del cliente (no la del servidor Vercel)
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || req.headers.get('x-real-ip')
+            || undefined;
+        const location = await getUserLocation(clientIp);
         const timeStr = await getLocalTime(location?.timezone);
         toolContext += `[CONTEXTO ACTUAL DEL USUARIO]:
 Ubicación: ${location?.city || 'Desconocida'}, ${location?.country || 'Desconocida'}

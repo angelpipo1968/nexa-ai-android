@@ -80,7 +80,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             // Voice mode: when AI finishes speaking, restart listening with a safer delay
             if (!isSpeaking && _uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(1000) // Increased delay to prevent echo/cutoff
+                    kotlinx.coroutines.delay(2000) // Longer delay to let user prepare
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking) {
                         speechManager.startListening()
                     }
