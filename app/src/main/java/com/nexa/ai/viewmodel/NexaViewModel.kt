@@ -34,8 +34,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
-    private var voiceRetryCount = 0 // ¡NUEVO! Para evitar bucle infinito de Error 5
-    private val maxVoiceRetries = 10 // Increased tolerance to keep it online
+    private var voiceRetryCount = 0 
+    private val maxVoiceRetries = 10 
+    
+    // --- CHAT GPT RECOMMENDATION: DEBOUNCE LOGIC ---
+    private var speechDebounceJob: kotlinx.coroutines.Job? = null
+    private val speechDebounceTimeMs = 800L // Time to wait for "real" silence before processing
 
     private val surprisePromptsEs = listOf(
         "Cuéntame algo fascinante sobre el universo",
@@ -97,15 +101,18 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         
         speechManager.onSpeechResult = { text ->
             if (_uiState.value.voiceMode) {
-                speechManager.stopListening() // ¡FORZAMOS APAGAR EL MICRÓFONO PRIMERO!
-                if (text.trim().length >= 2) {
-                    viewModelScope.launch {
-                        kotlinx.coroutines.delay(300) // Pequeña pausa para que el audio se libere
+                // Apply "Debounce" logic to avoid rapid/accidental triggers
+                speechDebounceJob?.cancel()
+                speechDebounceJob = viewModelScope.launch {
+                    kotlinx.coroutines.delay(speechDebounceTimeMs)
+                    
+                    speechManager.stopListening() // Force stop before processing
+                    
+                    if (text.trim().length >= 2) {
+                        kotlinx.coroutines.delay(300) 
                         sendMessage(text)
-                    }
-                } else {
-                    // Retry listening if it was too short (ruido)
-                    viewModelScope.launch {
+                    } else {
+                        // Accidental noise, restart listening with delay
                         kotlinx.coroutines.delay(1000)
                         if (_uiState.value.voiceMode && !_uiState.value.isListening) {
                             speechManager.startListening()
