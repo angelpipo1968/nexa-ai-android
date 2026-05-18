@@ -93,8 +93,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 if (text.trim().length >= 2) {
                     sendMessage(text)
                 } else {
-                    // Retry listening if it was too short to be a message
-                    speechManager.startListening()
+                    // Retry listening with a small delay if it was too short
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(1000)
+                        if (_uiState.value.voiceMode && !_uiState.value.isListening) {
+                            speechManager.startListening()
+                        }
+                    }
                 }
             } else {
                 sendMessage(text)
@@ -124,8 +129,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(1500) // Longer delay to prevent flicker
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                    // Standard delay for all restarts to maintain stability
+                    kotlinx.coroutines.delay(2000)
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening && 
+                        !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
                 }

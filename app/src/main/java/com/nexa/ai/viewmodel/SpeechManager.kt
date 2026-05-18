@@ -258,11 +258,11 @@ class SpeechManager(private val application: Application) {
                     }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {
-                        isCurrentlyListening = false
-                        onListeningStateChanged?.invoke(false)
+                        // DON'T change state here. Wait for results or error to avoid UI flicker.
                     }
                     override fun onError(error: Int) {
                         isCurrentlyListening = false
+                        // Only notify UI of "not listening" on real end
                         onListeningStateChanged?.invoke(false)
                         
                         if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || 
