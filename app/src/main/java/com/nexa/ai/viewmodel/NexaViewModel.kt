@@ -34,6 +34,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
+    private var voiceRetryCount = 0 // ¡NUEVO! Para evitar bucle infinito de Error 5
+    private val maxVoiceRetries = 2 // Máximo de reintentos antes de apagar manos libres
 
     private val surprisePromptsEs = listOf(
         "Cuéntame algo fascinante sobre el universo",
@@ -74,26 +76,32 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private fun setupSpeechCallbacks() {
         speechManager.onListeningStateChanged = { isListening ->
             _uiState.value = _uiState.value.copy(isListening = isListening)
+            if (isListening) voiceRetryCount = 0 // ¡Reiniciamos el contador si empieza a escuchar bien!
         }
+        
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
             // Voice mode: when AI finishes speaking, restart listening with a safer delay
             if (!isSpeaking && _uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(2000) // Longer delay to let user prepare
+                    kotlinx.coroutines.delay(2000) // Tiempo para que el usuario respire
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking) {
                         speechManager.startListening()
                     }
                 }
             }
         }
+        
         speechManager.onSpeechResult = { text ->
             if (_uiState.value.voiceMode) {
-                // Ignore extremely short inputs (noises/accidents) in voice mode
+                speechManager.stopListening() // ¡FORZAMOS APAGAR EL MICRÓFONO PRIMERO!
                 if (text.trim().length >= 2) {
-                    sendMessage(text)
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(300) // Pequeña pausa para que el audio se libere
+                        sendMessage(text)
+                    }
                 } else {
-                    // Retry listening with a small delay if it was too short
+                    // Retry listening if it was too short (ruido)
                     viewModelScope.launch {
                         kotlinx.coroutines.delay(1000)
                         if (_uiState.value.voiceMode && !_uiState.value.isListening) {
@@ -105,16 +113,26 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 sendMessage(text)
             }
         }
+        
         speechManager.onSpeechPartial = { text ->
             _uiState.value = _uiState.value.copy(inputText = text)
         }
+        
         speechManager.onError = { errorKey ->
             if (_uiState.value.voiceMode) {
-                // In voice mode, silently retry after a safer delay
-                viewModelScope.launch {
-                    kotlinx.coroutines.delay(2000) // Longer delay to prevent rapid cycling
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
-                        speechManager.startListening()
+                voiceRetryCount++ // ¡Sumamos un error!
+                
+                if (voiceRetryCount >= maxVoiceRetries) {
+                    // Si falla muchas veces, apagamos modo voz para no volver loco al usuario
+                    _uiState.value = _uiState.value.copy(voiceMode = false)
+                    speechManager.stopListening()
+                } else {
+                    // Reintento normal
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(2000) 
+                        if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                            speechManager.startListening()
+                        }
                     }
                 }
             } else {
@@ -122,14 +140,15 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(error = NexaStrings.get(errorKey, lang))
             }
         }
+        
         speechManager.onInputTextChanged = { text ->
             _uiState.value = _uiState.value.copy(inputText = text)
         }
+        
         // Voice mode: retry on recognition ended without match
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    // Standard delay for all restarts to maintain stability
                     kotlinx.coroutines.delay(2000)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && 
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
@@ -486,6 +505,12 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val now = System.currentTimeMillis()
         if (now - lastSendTimestamp < sendCooldownMs) return
         lastSendTimestamp = now
+
+        // ¡NUEVA SEGURIDAD PARA VOZ! Callar la IA y apagar micrófono antes de enviar
+        if (_uiState.value.voiceMode) {
+            speechManager.stopListening()
+            speechManager.stopSpeaking()
+        }
 
         val attachmentName = _uiState.value.pendingAttachment
         val fullContent = if (attachmentName != null) {
