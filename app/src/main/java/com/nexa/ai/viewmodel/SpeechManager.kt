@@ -262,11 +262,19 @@ class SpeechManager(private val application: Application) {
                     }
                     override fun onError(error: Int) {
                         isCurrentlyListening = false
-                        // Only notify UI of "not listening" on real end
                         onListeningStateChanged?.invoke(false)
                         
+                        // Error 5 (ERROR_CLIENT) recovery: destroy and nullify to force fresh start next time
+                        if (error == 5) {
+                            try {
+                                speechRecognizer?.cancel()
+                                speechRecognizer?.destroy()
+                            } catch (_: Exception) {}
+                            speechRecognizer = null
+                        }
+
                         if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || 
-                            error == SpeechRecognizer.ERROR_NO_MATCH) {
+                            error == SpeechRecognizer.ERROR_NO_MATCH || error == 5) {
                             onRecognitionEnded?.invoke()
                         } else if (error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
                             onError?.invoke("voice_error: $error")

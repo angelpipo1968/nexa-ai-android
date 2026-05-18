@@ -35,7 +35,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
     private var voiceRetryCount = 0 // ¡NUEVO! Para evitar bucle infinito de Error 5
-    private val maxVoiceRetries = 2 // Máximo de reintentos antes de apagar manos libres
+    private val maxVoiceRetries = 10 // Increased tolerance to keep it online
 
     private val surprisePromptsEs = listOf(
         "Cuéntame algo fascinante sobre el universo",
