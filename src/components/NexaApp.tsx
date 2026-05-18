@@ -601,10 +601,30 @@ export function NexaApp() {
 
     const stopSpeaking = useCallback(() => {
         if (typeof window === 'undefined' || !window.speechSynthesis) return;
+        speechQueueRef.current = [];
+        isSpeakingQueueRef.current = false;
         window.speechSynthesis.cancel();
         // cancel() is async and onend may not fire reliably — force-reset state immediately
         setSpeaking(false);
         setSpeakingMsgId(null);
+    }, []);
+
+    // Queue system for chunked speech (fixes Android WebView cutoff)
+    const speechQueueRef = useRef<SpeechSynthesisUtterance[]>([]);
+    const isSpeakingQueueRef = useRef(false);
+
+    const processSpeechQueue = useCallback(() => {
+        if (speechQueueRef.current.length === 0) {
+            isSpeakingQueueRef.current = false;
+            setSpeaking(false);
+            setSpeakingMsgId(null);
+            return;
+        }
+        isSpeakingQueueRef.current = true;
+        const u = speechQueueRef.current.shift()!;
+        u.onend = () => processSpeechQueue();
+        u.onerror = () => processSpeechQueue();
+        window.speechSynthesis.speak(u);
     }, []);
 
     const speak = (text: string, msgId?: string) => {
@@ -620,8 +640,8 @@ export function NexaApp() {
             const cleaned = cleanForSpeech(text);
             if (!cleaned) return;
             setSpeakingMsgId(msgId ?? null);
-            const u = new SpeechSynthesisUtterance(cleaned);
-            u.lang = lang === 'es' ? 'es-ES' : 'en-US';
+            setSpeaking(true);
+
             const langVoices = availableVoices.filter(v => v.lang.includes(lang.split('-')[0]));
             const genderedVoices = langVoices.filter(v => {
                 const n = v.name.toLowerCase();
@@ -629,12 +649,39 @@ export function NexaApp() {
                 return n.includes('female') || n.includes('katerina') || n.includes('sofia') || n.includes('helena');
             });
             const filtered = genderedVoices.length > 0 ? genderedVoices : langVoices;
-            const v = filtered[voiceIndex % filtered.length] || filtered[0] || (availableVoices.length > 0 ? availableVoices[0] : null);
-            if (v) u.voice = v;
-            u.onerror = () => { setSpeaking(false); setSpeakingMsgId(null); };
-            u.onstart = () => setSpeaking(true);
-            u.onend = () => { setSpeaking(false); setSpeakingMsgId(null); if (autoSend && !msgId) setTimeout(toggleRec, 500); };
-            window.speechSynthesis.speak(u);
+            const selectedVoice = filtered[voiceIndex % filtered.length] || filtered[0] || (availableVoices.length > 0 ? availableVoices[0] : null);
+
+            // Split text into chunks of ~200 chars at sentence boundaries
+            const maxChunk = 200;
+            const chunks: string[] = [];
+            let remaining = cleaned;
+            while (remaining.length > 0) {
+                if (remaining.length <= maxChunk) {
+                    chunks.push(remaining);
+                    break;
+                }
+                // Find last sentence boundary within maxChunk
+                let splitAt = -1;
+                for (const sep of ['. ', '! ', '? ', '.\n', '!\n', '?\n', '\n']) {
+                    const idx = remaining.lastIndexOf(sep, maxChunk);
+                    if (idx > splitAt) splitAt = idx + sep.length;
+                }
+                if (splitAt <= 0) splitAt = maxChunk; // No boundary found, hard split
+                chunks.push(remaining.slice(0, splitAt));
+                remaining = remaining.slice(splitAt).trimStart();
+            }
+
+            // Create utterances for each chunk
+            speechQueueRef.current = chunks.map(chunk => {
+                const u = new SpeechSynthesisUtterance(chunk);
+                u.lang = lang === 'es' ? 'es-ES' : 'en-US';
+                if (selectedVoice) u.voice = selectedVoice;
+                u.rate = 1;
+                u.pitch = 1;
+                return u;
+            });
+
+            processSpeechQueue();
         } catch { setSpeaking(false); setSpeakingMsgId(null); }
     };
 
