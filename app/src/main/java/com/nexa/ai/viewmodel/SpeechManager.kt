@@ -18,6 +18,7 @@ class SpeechManager(private val application: Application) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var isCurrentlyListening = false
 
     // Callbacks
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
@@ -232,12 +233,15 @@ class SpeechManager(private val application: Application) {
     // ═══════════════════════════════════════
 
     fun startListening() {
+        if (isCurrentlyListening) return // Prevents ERROR_CLIENT (Error 5)
+        
         try {
             if (!SpeechRecognizer.isRecognitionAvailable(application)) {
                 onError?.invoke("voice_unavailable")
                 return
             }
 
+            isCurrentlyListening = true
             // Cleanup previous recognizer if any
             speechRecognizer?.destroy()
             
@@ -254,23 +258,28 @@ class SpeechManager(private val application: Application) {
                     }
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {
-                        // We ignore this and wait for onResults
+                        isCurrentlyListening = false
+                        onListeningStateChanged?.invoke(false)
                     }
                     override fun onError(error: Int) {
+                        isCurrentlyListening = false
+                        onListeningStateChanged?.invoke(false)
+                        
                         if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || 
                             error == SpeechRecognizer.ERROR_NO_MATCH) {
-                            onListeningStateChanged?.invoke(false)
                             onRecognitionEnded?.invoke()
                         } else if (error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
-                            onListeningStateChanged?.invoke(false)
                             onError?.invoke("voice_error: $error")
                         }
                     }
                     override fun onResults(results: Bundle?) {
+                        isCurrentlyListening = false
+                        onListeningStateChanged?.invoke(false)
+                        
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull()
+                        
                         if (!text.isNullOrBlank()) {
-                            onListeningStateChanged?.invoke(false)
                             onInputTextChanged?.invoke(text)
                             onSpeechResult?.invoke(text)
                         } else {
@@ -297,16 +306,19 @@ class SpeechManager(private val application: Application) {
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 
-                // FORCE ANDROID TO BE PATIENT
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, application.packageName)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 7000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
+                
+                // Optimized silence detection (as suggested)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+                
+                // Ensure dictation mode for better long speech handling
                 putExtra("android.speech.extra.DICTATION_MODE", true)
             }
 
             speechRecognizer?.startListening(intent)
         } catch (e: Exception) {
+            isCurrentlyListening = false
             android.util.Log.e("SpeechManager", "Speech recognition error: ${e.message}", e)
             onListeningStateChanged?.invoke(false)
             onError?.invoke("voice_error")
@@ -319,6 +331,7 @@ class SpeechManager(private val application: Application) {
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Stop listening error: ${e.message}", e)
         }
+        isCurrentlyListening = false
         onListeningStateChanged?.invoke(false)
     }
 
