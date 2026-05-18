@@ -32,7 +32,7 @@ const THEME_PRESETS = {
 type ThemePreset = keyof typeof THEME_PRESETS;
 
 const THEMES = {
-    light: { bg: '#ffffff', surf: '#f8f9fa', border: '#e5e7eb', text: '#111827', sec: '#6b7280', muted: '#9ca3af', inputBg: '#f3f4f6' },
+    light: { bg: '#ffffff', surf: '#f0f2f5', border: '#d1d5db', text: '#0f172a', sec: '#475569', muted: '#64748b', inputBg: '#e8eaed' },
     dark: { bg: '#0a0a0a', surf: '#141414', border: '#1f1f1f', text: '#f0f0f0', sec: '#888', muted: '#555', inputBg: '#111' },
     ultra: { bg: '#000000', surf: '#080808', border: '#141414', text: '#e0e0e0', sec: '#666', muted: '#333', inputBg: '#050505' },
 };
