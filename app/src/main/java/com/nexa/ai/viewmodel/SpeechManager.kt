@@ -308,9 +308,11 @@ class SpeechManager(private val application: Application) {
                 // Use a standard max results to avoid confusion
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 
-                // Balance timeouts — not too short to cut off, not too long to hang
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+                // Increase sensitivity and silences for a more natural conversation
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+                // Force minimum length to avoid "ghost" activations
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
             }
 
             speechRecognizer?.startListening(intent)
