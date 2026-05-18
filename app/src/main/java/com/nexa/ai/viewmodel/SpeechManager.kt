@@ -307,12 +307,17 @@ class SpeechManager(private val application: Application) {
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 // Use a standard max results to avoid confusion
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                
-                // Increase sensitivity and silences for a more natural conversation
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+
+                // CRITICAL: Set calling package to ensure extras are respected
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, application.packageName)
+
+                // Better silence detection logic (Energy-based simulation)
+                // 5 seconds of absolute silence before cutting off
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+                // 4 seconds of "possible" silence (pauses between words)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
-                // Force minimum length to avoid "ghost" activations
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
+                // Minimum recording length to avoid accidental trigger
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
             }
 
             speechRecognizer?.startListening(intent)
