@@ -56,6 +56,7 @@ fun NexaChatScreen(
     onSetDrawerView: (Int) -> Unit,
     onAttachFile: () -> Unit,
     onClearAttachment: () -> Unit = {},
+    onInterruptVoice: () -> Unit = {},
     onPinSession: (String) -> Unit = {},
     onRenameSession: (String) -> Unit = {},
     onCloneSession: (String) -> Unit = {},

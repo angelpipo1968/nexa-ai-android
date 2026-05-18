@@ -86,11 +86,11 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
             
-            // Voice mode: restart listening AFTER AI finishes speaking
+            // Voice mode: restart listening AFTER AI finishes speaking (INSTANT RESTART)
             if (!isSpeaking && _uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    // Safety delay before restarting mic to prevent hearing itself
-                    kotlinx.coroutines.delay(1000) 
+                    // Minimal delay (300ms) to ensure audio hardware is ready
+                    kotlinx.coroutines.delay(300) 
                     if (_uiState.value.voiceMode && !_uiState.value.isListening && 
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
@@ -680,6 +680,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(voiceMode = false)
         speechManager.stopListening()
         speechManager.stopSpeaking()
+    }
+
+    fun interruptVoice() {
+        if (_uiState.value.isSpeaking) {
+            speechManager.stopSpeaking()
+            // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening
+        }
     }
 
     fun clearChat() {

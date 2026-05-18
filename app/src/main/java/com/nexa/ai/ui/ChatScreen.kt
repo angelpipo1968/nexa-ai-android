@@ -246,10 +246,12 @@ fun ChatMainScreen(
 @Composable
 fun VoiceModeOverlay(
     uiState: NexaUiState,
-    onStopVoiceMode: () -> Unit
+    onStopVoiceMode: () -> Unit,
+    onInterrupt: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
     var prevState by remember { mutableStateOf("") }
     val currentState = when {
@@ -342,6 +344,11 @@ fun VoiceModeOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0A0A0F))
+            .clickable {
+                if (isSpeaking) {
+                    onInterrupt()
+                }
+            }
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragEnd = {

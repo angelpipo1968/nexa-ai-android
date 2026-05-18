@@ -115,6 +115,7 @@ class MainActivity : ComponentActivity() {
                         onSetDrawerView = { viewModel.setDrawerView(it) },
                         onAttachFile = { pickFile.launch("*/*") },
                         onClearAttachment = { viewModel.clearPendingAttachment() },
+                        onInterruptVoice = { viewModel.interruptVoice() },
                         onToggleVoiceMode = {
                             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                                 == PackageManager.PERMISSION_GRANTED
