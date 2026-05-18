@@ -270,7 +270,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        VoiceType.entries.filter { it.name.contains("MALE") }.forEach { voice ->
+                        VoiceType.entries.filter { it.name.startsWith("MALE") }.forEach { voice ->
                             val selected = uiState.voiceType == voice
                             VoiceCard(
                                 voice = voice,
@@ -640,7 +640,7 @@ private fun VoiceCard(
 ) {
     val accent = LocalAccentColor.current
     val haptic = LocalHapticFeedback.current
-    val isMale = voice.name.contains("MALE")
+    val isMale = voice.name.startsWith("MALE")
 
     // Press scale animation
     var pressed by remember { mutableStateOf(false) }
