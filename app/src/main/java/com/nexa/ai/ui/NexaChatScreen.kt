@@ -111,6 +111,7 @@ fun NexaChatScreen(
             onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
             onShareSession = onShareSession, onDownloadSession = onDownloadSession,
             onRegenerate = onRegenerate,
+            onInterruptVoice = onInterruptVoice,
             onToggleVoiceMode = onToggleVoiceMode, onStopVoiceMode = onStopVoiceMode)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,

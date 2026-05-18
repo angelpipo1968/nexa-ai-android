@@ -59,6 +59,7 @@ fun ChatMainScreen(
     onSpeakMessage: (String, String) -> Unit,
     onToggleVoiceMode: () -> Unit = {},
     onStopVoiceMode: () -> Unit = {},
+    onInterruptVoice: () -> Unit = {},
     onClearChat: () -> Unit,
     onDismissError: () -> Unit,
     onToggleDrawer: () -> Unit,
@@ -231,7 +232,8 @@ fun ChatMainScreen(
                 if (uiState.voiceMode) {
                     VoiceModeOverlay(
                         uiState = uiState,
-                        onStopVoiceMode = onStopVoiceMode
+                        onStopVoiceMode = onStopVoiceMode,
+                        onInterrupt = onInterruptVoice
                     )
                 }
             }
