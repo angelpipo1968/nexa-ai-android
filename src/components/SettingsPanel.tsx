@@ -634,13 +634,17 @@ export function SettingsPanel({
     // ═══════════════════════════════════════════
 
     function VoicePage() {
-        const voices = [
-            { id: 'Katerina', desc: 'Femenina, natural, cálida', icon: '🎙️', color: C.accent },
+        const maleVoices = [
             { id: 'Diego', desc: 'Masculina, profunda, profesional', icon: '🎤', color: C.blue },
-            { id: 'Sofia', desc: 'Femenina, joven, energética', icon: '🎵', color: C.pink },
             { id: 'Carlos', desc: 'Masculina, clara, neutra', icon: '📢', color: C.purple },
             { id: 'Paulo', desc: 'Masculina, brasileña, amigable', icon: '🇧🇷', color: C.yellow },
         ];
+        const femaleVoices = [
+            { id: 'Katerina', desc: 'Femenina, natural, cálida', icon: '🎙️', color: C.accent },
+            { id: 'Sofia', desc: 'Femenina, joven, energética', icon: '🎵', color: C.pink },
+            { id: 'Helena', desc: 'Femenina, elegante, profesional', icon: '🎶', color: C.cyan },
+        ];
+        const allVoices = [...maleVoices, ...femaleVoices];
 
         return (
             <>
@@ -668,7 +672,11 @@ export function SettingsPanel({
                         </div>
 
                         <Card>
-                            {voices.map((v, i) => (
+                            {/* Hombres */}
+                            <div style={{ padding: '8px 14px 4px', fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+                                🧔 Hombres
+                            </div>
+                            {maleVoices.map((v, i) => (
                                 <React.Fragment key={v.id}>
                                     <button onClick={() => setVoice(v.id)} style={{
                                         width: '100%', display: 'flex', alignItems: 'center',
@@ -698,7 +706,45 @@ export function SettingsPanel({
                                             </motion.div>
                                         )}
                                     </button>
-                                    {i < voices.length - 1 && <Divider />}
+                                    {i < maleVoices.length - 1 && <Divider />}
+                                </React.Fragment>
+                            ))}
+                            <Divider />
+                            {/* Mujeres */}
+                            <div style={{ padding: '8px 14px 4px', fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+                                👩 Mujeres
+                            </div>
+                            {femaleVoices.map((v, i) => (
+                                <React.Fragment key={v.id}>
+                                    <button onClick={() => setVoice(v.id)} style={{
+                                        width: '100%', display: 'flex', alignItems: 'center',
+                                        gap: 12, padding: '13px 14px',
+                                        background: voice === v.id ? `${v.color}10` : 'transparent',
+                                        border: 'none', cursor: 'pointer', textAlign: 'left',
+                                        transition: 'background 0.15s',
+                                    }}>
+                                        <div style={{
+                                            width: 38, height: 38, borderRadius: 10,
+                                            background: voice === v.id ? `${v.color}18` : C.bg,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 18,
+                                        }}>
+                                            {v.icon}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{
+                                                fontSize: 13, fontWeight: 600,
+                                                color: voice === v.id ? v.color : C.text,
+                                            }}>{v.id}</div>
+                                            <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>{v.desc}</div>
+                                        </div>
+                                        {voice === v.id && (
+                                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                                                <Check size={16} color={v.color} />
+                                            </motion.div>
+                                        )}
+                                    </button>
+                                    {i < femaleVoices.length - 1 && <Divider />}
                                 </React.Fragment>
                             ))}
                         </Card>
