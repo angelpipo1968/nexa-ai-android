@@ -39,9 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nexa.ai.BuildConfig
 import com.nexa.ai.ui.theme.NexaAccent
-import com.nexa.ai.ui.theme.NexaAccentDark
-import com.nexa.ai.ui.theme.NexaAccentLight
 import com.nexa.ai.ui.theme.dynamicPrimaryColor
 import com.nexa.ai.viewmodel.*
 
@@ -137,7 +136,7 @@ fun SettingsScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
 
                 // ── Brand (staggered index 0) ──
@@ -446,7 +445,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        "NEXA PRO v2.4.0",
+                        "NEXA PRO v${BuildConfig.VERSION_NAME}",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 3.sp,
