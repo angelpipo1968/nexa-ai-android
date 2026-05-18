@@ -88,7 +88,17 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         speechManager.onSpeechResult = { text ->
-            sendMessage(text)
+            if (_uiState.value.voiceMode) {
+                // Ignore extremely short inputs (noises/accidents) in voice mode
+                if (text.trim().length >= 2) {
+                    sendMessage(text)
+                } else {
+                    // Retry listening if it was too short to be a message
+                    speechManager.startListening()
+                }
+            } else {
+                sendMessage(text)
+            }
         }
         speechManager.onSpeechPartial = { text ->
             _uiState.value = _uiState.value.copy(inputText = text)
@@ -553,7 +563,15 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                             _uiState.value = _uiState.value.copy(isThinking = false)
 
                             if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
-                                speak(fullResponse, assistantId)
+                                // Add a tiny "breathing" delay before speaking in voice mode
+                                if (_uiState.value.voiceMode) {
+                                    viewModelScope.launch {
+                                        kotlinx.coroutines.delay(500)
+                                        speak(fullResponse, assistantId)
+                                    }
+                                } else {
+                                    speak(fullResponse, assistantId)
+                                }
                             }
                         }
                     }

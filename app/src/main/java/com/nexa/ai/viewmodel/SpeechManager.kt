@@ -306,10 +306,14 @@ class SpeechManager(private val application: Application) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                // Add extra parameters to reduce cutting off
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3000L)
+                
+                // --- ANTI-CUTOFF OPTIMIZATIONS ---
+                // Increase silence timeout to 8 seconds (very generous for thinking)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 8000L)
+                // Increase "possible" silence (shorter pauses) to 6 seconds
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
+                // Force a minimum recording time of 2 seconds to avoid accidental taps/noises
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
             }
 
             speechRecognizer?.startListening(intent)
