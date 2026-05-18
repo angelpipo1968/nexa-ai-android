@@ -29,12 +29,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -135,15 +133,15 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
 
-                // ── Brand (staggered index 0) ──
+                // ── Brand ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 0) { Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -184,248 +182,294 @@ fun SettingsScreen(
                         )
                     }
                 }
-                } // StaggeredFadeIn brand
+                }
 
                 // ════════════════════════════════
-                //  LANGUAGE (staggered index 1)
+                //  LANGUAGE
                 // ════════════════════════════════
                 StaggeredFadeIn(visible = sectionsVisible, index = 1) {
-                SectionLabel(NexaStrings.get("language", uiState.language).uppercase())
-                FuturisticCard {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        listOf(
-                            AppLanguage.SPANISH to "🇪🇸  Español",
-                            AppLanguage.ENGLISH to "🇺🇸  English"
-                        ).forEach { (lang, label) ->
-                            val selected = uiState.language == lang
-                            FuturisticPill(
-                                label = label,
-                                selected = selected,
-                                accent = effectiveAccent,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSetLanguage(lang) }
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionLabel(NexaStrings.get("language", uiState.language).uppercase())
+                    FuturisticCard {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf(
+                                AppLanguage.SPANISH to "🇪🇸  Español",
+                                AppLanguage.ENGLISH to "🇺🇸  English"
+                            ).forEach { (lang, label) ->
+                                val selected = uiState.language == lang
+                                FuturisticPill(
+                                    label = label,
+                                    selected = selected,
+                                    accent = effectiveAccent,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onSetLanguage(lang) }
+                                )
+                            }
                         }
                     }
                 }
-                } // StaggeredFadeIn language
+                }
 
                 // ════════════════════════════════
-                //  VOICE (staggered index 2)
+                //  VOICE
                 // ════════════════════════════════
                 StaggeredFadeIn(visible = sectionsVisible, index = 2) {
-                SectionLabel(NexaStrings.get("voice", uiState.language).uppercase())
-                FuturisticCard {
-                    // Compact voice selector - all in one row per gender
-                    Text(
-                        NexaStrings.get("male_label", uiState.language),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        VoiceType.entries.filter { it.name.startsWith("MALE") }.forEach { voice ->
-                            val selected = uiState.voiceType == voice
-                            CompactVoicePill(
-                                label = NexaStrings.get(voice.name.lowercase(), uiState.language),
-                                selected = selected,
-                                accent = effectiveAccent,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSetVoiceType(voice) }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        NexaStrings.get("female_label", uiState.language),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        VoiceType.entries.filter { it.name.contains("FEMALE") }.forEach { voice ->
-                            val selected = uiState.voiceType == voice
-                            CompactVoicePill(
-                                label = NexaStrings.get(voice.name.lowercase(), uiState.language),
-                                selected = selected,
-                                accent = effectiveAccent,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSetVoiceType(voice) }
-                            )
-                        }
-                    }
-                }
-                } // StaggeredFadeIn voice
-
-                // ════════════════════════════════
-                //  THEME (staggered index 3)
-                // ════════════════════════════════
-                StaggeredFadeIn(visible = sectionsVisible, index = 3) {
-                SectionLabel(NexaStrings.get("theme", uiState.language).uppercase())
-                FuturisticCard {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        ThemeOption(
-                            label = NexaStrings.get("dark", uiState.language),
-                            emoji = "🌙",
-                            previewTop = Color(0xFF1A1A24),
-                            previewBottom = Color(0xFF0D0D12),
-                            selected = uiState.themeMode == ThemeMode.DARK,
-                            onClick = { onSetThemeMode(ThemeMode.DARK) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ThemeOption(
-                            label = NexaStrings.get("light", uiState.language),
-                            emoji = "☀️",
-                            previewTop = Color(0xFFF8F9FC),
-                            previewBottom = Color(0xFFFFFFFF),
-                            selected = uiState.themeMode == ThemeMode.LIGHT,
-                            onClick = { onSetThemeMode(ThemeMode.LIGHT) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ThemeOption(
-                            label = NexaStrings.get("system", uiState.language),
-                            emoji = "⚙️",
-                            previewTop = Color(0xFF1A1A24),
-                            previewBottom = Color(0xFFF8F9FC),
-                            selected = uiState.themeMode == ThemeMode.SYSTEM,
-                            onClick = { onSetThemeMode(ThemeMode.SYSTEM) },
-                            isSystem = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                } // StaggeredFadeIn theme
-
-                // ════════════════════════════════
-                //  PREFERENCES (staggered index 4)
-                // ════════════════════════════════
-                StaggeredFadeIn(visible = sectionsVisible, index = 4) {
-                SectionLabel(
-                    NexaStrings.get("preferences", uiState.language)
-                )
-                FuturisticCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionLabel(NexaStrings.get("voice", uiState.language).uppercase())
+                    FuturisticCard {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.VolumeUp, null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Column {
-                                Text(
-                                    NexaStrings.get("auto_speak", uiState.language),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    NexaStrings.get("auto_speak_desc", uiState.language),
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    lineHeight = 14.sp
-                                )
-                            }
-                        }
-                        FuturisticSwitch(
-                            checked = uiState.autoSpeak,
-                            onCheckedChange = { onToggleAutoSpeak() }
-                        )
-                    }
-                }
-                } // StaggeredFadeIn preferences
-
-                // ════════════════════════════════
-                //  DANGER ZONE (staggered index 5)
-                // ════════════════════════════════
-                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
-                SectionLabel(
-                    NexaStrings.get("danger_zone", uiState.language),
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
-                )
-                FuturisticCard {
-                    // Clear chat
-                    DangerButton(
-                        icon = Icons.Default.Delete,
-                        label = NexaStrings.get("clear_chat", uiState.language),
-                        onClick = onClearChat
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Login / Logout
-                    if (uiState.user.isLoggedIn) {
-                        DangerButton(
-                            icon = Icons.AutoMirrored.Filled.ExitToApp,
-                            label = NexaStrings.get("logout", uiState.language),
-                            subtitle = uiState.user.email,
-                            onClick = onLogout
-                        )
-                    } else {
-                        val accent = LocalAccentColor.current
-                        Surface(
-                            onClick = onNavigateToLogin,
-                            shape = RoundedCornerShape(14.dp),
-                            color = accent.copy(alpha = 0.06f),
-                            border = BorderStroke(1.dp, accent.copy(alpha = 0.15f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(30.dp)
+                                        .size(28.dp)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(accent.copy(alpha = 0.10f)),
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Person, null,
-                                        modifier = Modifier.size(15.dp), tint = accent)
+                                    Icon(Icons.Default.Mic, null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Text(
-                                    NexaStrings.get("login", uiState.language),
-                                    color = accent,
+                                    NexaStrings.get("voice", uiState.language),
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                                     letterSpacing = 0.5.sp
+                                )
+                            }
+                            Text(
+                                NexaStrings.get(uiState.voiceType.name.lowercase(), uiState.language),
+                                fontSize = 10.sp,
+                                color = effectiveAccent.copy(alpha = 0.6f),
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Male section
+                        Text(
+                            NexaStrings.get("male_label", uiState.language),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 2.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            VoiceType.entries.filter { it.name.startsWith("MALE") }.forEach { voice ->
+                                val selected = uiState.voiceType == voice
+                                CompactVoicePill(
+                                    label = NexaStrings.get(voice.name.lowercase(), uiState.language),
+                                    selected = selected,
+                                    accent = effectiveAccent,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onSetVoiceType(voice) }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Female section
+                        Text(
+                            NexaStrings.get("female_label", uiState.language),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 2.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            VoiceType.entries.filter { it.name.contains("FEMALE") }.forEach { voice ->
+                                val selected = uiState.voiceType == voice
+                                CompactVoicePill(
+                                    label = NexaStrings.get(voice.name.lowercase(), uiState.language),
+                                    selected = selected,
+                                    accent = effectiveAccent,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onSetVoiceType(voice) }
                                 )
                             }
                         }
                     }
                 }
-                } // StaggeredFadeIn danger zone
+                }
 
-                // ── Version (staggered index 6) ──
+                // ════════════════════════════════
+                //  THEME
+                // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 3) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionLabel(NexaStrings.get("theme", uiState.language).uppercase())
+                    FuturisticCard {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            ThemeOption(
+                                label = NexaStrings.get("dark", uiState.language),
+                                emoji = "🌙",
+                                previewTop = Color(0xFF1A1A24),
+                                previewBottom = Color(0xFF0D0D12),
+                                selected = uiState.themeMode == ThemeMode.DARK,
+                                onClick = { onSetThemeMode(ThemeMode.DARK) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            ThemeOption(
+                                label = NexaStrings.get("light", uiState.language),
+                                emoji = "☀️",
+                                previewTop = Color(0xFFF8F9FC),
+                                previewBottom = Color(0xFFFFFFFF),
+                                selected = uiState.themeMode == ThemeMode.LIGHT,
+                                onClick = { onSetThemeMode(ThemeMode.LIGHT) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            ThemeOption(
+                                label = NexaStrings.get("system", uiState.language),
+                                emoji = "⚙️",
+                                previewTop = Color(0xFF1A1A24),
+                                previewBottom = Color(0xFFF8F9FC),
+                                selected = uiState.themeMode == ThemeMode.SYSTEM,
+                                onClick = { onSetThemeMode(ThemeMode.SYSTEM) },
+                                isSystem = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+                }
+
+                // ════════════════════════════════
+                //  PREFERENCES
+                // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 4) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionLabel(NexaStrings.get("preferences", uiState.language))
+                    FuturisticCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.VolumeUp, null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column {
+                                    Text(
+                                        NexaStrings.get("auto_speak", uiState.language),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        NexaStrings.get("auto_speak_desc", uiState.language),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+                            FuturisticSwitch(
+                                checked = uiState.autoSpeak,
+                                onCheckedChange = { onToggleAutoSpeak() }
+                            )
+                        }
+                    }
+                }
+                }
+
+                // ════════════════════════════════
+                //  DANGER ZONE
+                // ════════════════════════════════
+                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionLabel(
+                        NexaStrings.get("danger_zone", uiState.language),
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
+                    )
+                    FuturisticCard {
+                        // Clear chat
+                        DangerButton(
+                            icon = Icons.Default.Delete,
+                            label = NexaStrings.get("clear_chat", uiState.language),
+                            onClick = onClearChat
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Login / Logout
+                        if (uiState.user.isLoggedIn) {
+                            DangerButton(
+                                icon = Icons.AutoMirrored.Filled.ExitToApp,
+                                label = NexaStrings.get("logout", uiState.language),
+                                subtitle = uiState.user.email,
+                                onClick = onLogout
+                            )
+                        } else {
+                            val accent = LocalAccentColor.current
+                            Surface(
+                                onClick = onNavigateToLogin,
+                                shape = RoundedCornerShape(14.dp),
+                                color = accent.copy(alpha = 0.06f),
+                                border = BorderStroke(1.dp, accent.copy(alpha = 0.15f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(accent.copy(alpha = 0.10f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Person, null,
+                                            modifier = Modifier.size(16.dp), tint = accent)
+                                    }
+                                    Text(
+                                        NexaStrings.get("login", uiState.language),
+                                        color = accent,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                }
+
+                // ── Version ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 6) {
                 Column(
                     modifier = Modifier
@@ -452,9 +496,9 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
                     )
                 }
-                } // StaggeredFadeIn version
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -499,14 +543,14 @@ private fun StaggeredFadeIn(
 }
 
 @Composable
-private fun SectionLabel(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)) {
+private fun SectionLabel(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)) {
     Text(
         text,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
         letterSpacing = 3.sp,
         color = color,
-        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
     )
 }
 
@@ -515,10 +559,10 @@ private fun FuturisticCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.60f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
             content()
         }
     }
@@ -561,7 +605,7 @@ private fun FuturisticPill(
         color = if (selected) accent.copy(alpha = 0.07f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
         border = if (selected) BorderStroke(1.5.dp, accent.copy(alpha = 0.30f))
-        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
     ) {
         Box(
             modifier = Modifier
@@ -637,9 +681,9 @@ private fun VoiceCard(
             },
         shape = RoundedCornerShape(14.dp),
         color = if (selected) accent.copy(alpha = 0.08f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
         border = if (selected) BorderStroke(1.5.dp, accent.copy(alpha = 0.35f))
-        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.10f))
     ) {
         Box(
             modifier = if (selected) Modifier.drawBehind {
@@ -773,7 +817,7 @@ private fun RowScope.ThemeOption(
         color = if (selected) accent.copy(alpha = 0.08f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = if (selected) BorderStroke(1.5.dp, accent.copy(alpha = 0.35f))
-        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
     ) {
         Box(
             modifier = if (selected) Modifier.drawBehind {
@@ -916,37 +960,37 @@ private fun DangerButton(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.error.copy(alpha = 0.04f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.08f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.10f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(30.dp)
+                    .size(32.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.error.copy(alpha = 0.06f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.55f))
             }
             Column {
                 Text(
                     label,
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.60f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.70f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
                 )
                 if (subtitle != null) {
                     Text(
                         subtitle,
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.30f)
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f)
                     )
                 }
             }
@@ -963,7 +1007,7 @@ private fun MinimalIconButton(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.10f)),
         modifier = Modifier.size(40.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
