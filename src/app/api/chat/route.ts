@@ -13,6 +13,7 @@ import { getNASAAPOD, searchMarsPhotos } from '@/lib/nexa-core/nasa';
 import { getStockPrice, getCryptoPrice } from '@/lib/nexa-core/finance';
 import { getLotteryResults } from '@/lib/nexa-core/lottery';
 import { searchSkyscannerFlights } from '@/lib/nexa-core/skyscanner';
+import { searchGoogleFlights } from '@/lib/nexa-core/google-flights';
 import { searchWikipedia, getCountryData } from '@/lib/nexa-core/knowledge';
 import { getMemories, extractAndSaveFacts, logActivity } from '@/lib/nexa-core/memory';
 import { auditCode } from '@/lib/nexa-core/repairer';
@@ -393,16 +394,23 @@ Hora Local: ${timeStr}
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getRandomKey(process.env.GROQ_API_KEY, 'GROQ_API_KEY')}` },
                     body: JSON.stringify({
                         model: 'llama-3.3-70b-versatile',
-                        messages: [{ role: 'system', content: 'Extract IATA origin/dest and date (YYYY-MM-DD): {"origin": "IATA", "destination": "IATA", "date": "YYYY-MM-DD"}.' }, { role: 'user', content: userQuery }],
+                        messages: [{ role: 'system', content: 'Extract IATA origin/dest, date and optional return date (YYYY-MM-DD): {"origin": "IATA", "destination": "IATA", "date": "YYYY-MM-DD", "returnDate": "YYYY-MM-DD or null"}. If origin not specified use LAS.' }, { role: 'user', content: userQuery }],
                         response_format: { type: "json_object" }
                     }),
                 });
                 const info = JSON.parse((await extractionRes.json()).choices[0].message.content);
                 
                 if (info.destination) {
-                    // Siempre buscar precios y vuelos con Skyscanner
-                    toolContext += await searchSkyscannerFlights(info.origin || 'LAS', info.destination, info.date || new Date().toISOString().split('T')[0]) + "\n";
-                    // También buscar estado de vuelos en tiempo real
+                    const flightDate = info.date || new Date().toISOString().split('T')[0];
+                    // Buscar en Google Flights (precios + links de reserva)
+                    try {
+                        toolContext += await searchGoogleFlights(info.origin || 'LAS', info.destination, flightDate, info.returnDate) + "\n";
+                    } catch {}
+                    // También buscar en Skyscanner (más opciones)
+                    try {
+                        toolContext += await searchSkyscannerFlights(info.origin || 'LAS', info.destination, flightDate) + "\n";
+                    } catch {}
+                    // Estado de vuelos en tiempo real
                     try {
                         toolContext += await searchFlights(info.origin || 'LAS', info.destination) + "\n";
                     } catch {}
