@@ -137,14 +137,14 @@ fun SettingsScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
 
                 // ── Brand (staggered index 0) ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 0) { Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                    modifier = Modifier.padding(top = 4.dp, bottom = 0.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -255,7 +255,7 @@ fun SettingsScreen(
                             letterSpacing = 1.sp
                         )
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Male section
                     Text(
@@ -264,7 +264,7 @@ fun SettingsScreen(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -282,7 +282,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Female section
                     Text(
@@ -291,7 +291,7 @@ fun SettingsScreen(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -469,7 +469,7 @@ fun SettingsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp),
+                        .padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
@@ -493,7 +493,7 @@ fun SettingsScreen(
                 }
                 } // StaggeredFadeIn version
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -557,7 +557,7 @@ private fun FuturisticCard(content: @Composable ColumnScope.() -> Unit) {
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             content()
         }
     }
