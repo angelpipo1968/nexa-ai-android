@@ -137,14 +137,14 @@ fun SettingsScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
 
                 // ── Brand (staggered index 0) ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 0) { Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 4.dp, bottom = 0.dp)
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                 ) {
                     Box(
                         modifier = Modifier
