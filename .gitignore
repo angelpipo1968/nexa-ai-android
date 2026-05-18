@@ -37,3 +37,5 @@ screenshot.jpg
 temp/
 __pycache__/
 *.pyc
+app-debug.zip
+app-debug.apk

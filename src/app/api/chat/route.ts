@@ -386,7 +386,7 @@ Hora Local: ${timeStr}
         }
 
         // 3. VUELOS (Estado y Precios)
-        if (lowerQuery.includes('vuelo') || lowerQuery.includes('viaje') || lowerQuery.includes('avión') || lowerQuery.includes('avión')) {
+        if (lowerQuery.includes('vuelo') || lowerQuery.includes('viaje') || lowerQuery.includes('pasaje') || lowerQuery.includes('avión') || lowerQuery.includes('boleto') || lowerQuery.includes('aerolinea') || lowerQuery.includes('aerolínea')) {
             try {
                 const extractionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
@@ -400,11 +400,12 @@ Hora Local: ${timeStr}
                 const info = JSON.parse((await extractionRes.json()).choices[0].message.content);
                 
                 if (info.destination) {
-                    if (lowerQuery.includes('precio') || lowerQuery.includes('barato') || lowerQuery.includes('cuanto cuesta')) {
-                        toolContext += await searchSkyscannerFlights(info.origin || 'MEX', info.destination, info.date || new Date().toISOString().split('T')[0]) + "\n";
-                    } else {
+                    // Siempre buscar precios y vuelos con Skyscanner
+                    toolContext += await searchSkyscannerFlights(info.origin || 'LAS', info.destination, info.date || new Date().toISOString().split('T')[0]) + "\n";
+                    // También buscar estado de vuelos en tiempo real
+                    try {
                         toolContext += await searchFlights(info.origin || 'LAS', info.destination) + "\n";
-                    }
+                    } catch {}
                 }
             } catch {}
         }
