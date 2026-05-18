@@ -220,89 +220,51 @@ fun SettingsScreen(
                 StaggeredFadeIn(visible = sectionsVisible, index = 2) {
                 SectionLabel(NexaStrings.get("voice", uiState.language).uppercase())
                 FuturisticCard {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Mic, null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(
-                                NexaStrings.get("voice", uiState.language),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                        Text(
-                            NexaStrings.get(uiState.voiceType.name.lowercase(), uiState.language),
-                            fontSize = 10.sp,
-                            color = effectiveAccent.copy(alpha = 0.6f),
-                            letterSpacing = 1.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Male section
+                    // Compact voice selector - all in one row per gender
                     Text(
                         NexaStrings.get("male_label", uiState.language),
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         VoiceType.entries.filter { it.name.startsWith("MALE") }.forEach { voice ->
                             val selected = uiState.voiceType == voice
-                            VoiceCard(
-                                voice = voice,
+                            CompactVoicePill(
                                 label = NexaStrings.get(voice.name.lowercase(), uiState.language),
                                 selected = selected,
+                                accent = effectiveAccent,
                                 modifier = Modifier.weight(1f),
                                 onClick = { onSetVoiceType(voice) }
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Female section
                     Text(
                         NexaStrings.get("female_label", uiState.language),
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         VoiceType.entries.filter { it.name.contains("FEMALE") }.forEach { voice ->
                             val selected = uiState.voiceType == voice
-                            VoiceCard(
-                                voice = voice,
+                            CompactVoicePill(
                                 label = NexaStrings.get(voice.name.lowercase(), uiState.language),
                                 selected = selected,
+                                accent = effectiveAccent,
                                 modifier = Modifier.weight(1f),
                                 onClick = { onSetVoiceType(voice) }
                             )
@@ -747,6 +709,45 @@ private fun VoiceCard(
                     Spacer(modifier = Modifier.height(4.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CompactVoicePill(
+    label: String,
+    selected: Boolean,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) accent.copy(alpha = 0.10f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+        border = if (selected) BorderStroke(1.dp, accent.copy(alpha = 0.35f))
+        else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                fontSize = 10.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (selected) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.60f),
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
         }
     }
 }
