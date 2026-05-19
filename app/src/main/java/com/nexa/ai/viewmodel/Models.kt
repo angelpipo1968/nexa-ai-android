@@ -40,6 +40,12 @@ data class UserData(
     val isLoggedIn: Boolean = false
 )
 
+/** AI provider: NEXA backend (nexa-ai.dev) or Pollinations.ai (free, no API key). */
+enum class AiProvider(val label: String, val baseUrl: String) {
+    NEXA("NEXA PRO", "https://www.nexa-ai.dev"),
+    POLLINATIONS("Pollinations AI", "https://text.pollinations.ai")
+}
+
 enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY, SETTINGS, TRANSLATOR }
 
 // ═══════════════════════════════════════
@@ -66,6 +72,7 @@ data class NexaUiState(
     val language: AppLanguage = AppLanguage.SPANISH,
     val voiceType: VoiceType = VoiceType.FEMALE_1,
     val themeMode: ThemeMode = ThemeMode.DARK,
+    val aiProvider: AiProvider = AiProvider.POLLINATIONS,
     val drawerOpen: Boolean = false,
     val drawerView: Int = 0,
     // Location
