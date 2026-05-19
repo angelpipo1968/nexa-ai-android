@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "3.9"
+        versionCode = 42
+        versionName = "4.2"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
@@ -23,6 +23,22 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    // Build a single universal APK that works on all device architectures
+    splits {
+        abi {
+            isEnable = false
+        }
+    }
+
+    bundle {
+        density {
+            enableSplit = false
+        }
+        abi {
+            enableSplit = false
         }
     }
 

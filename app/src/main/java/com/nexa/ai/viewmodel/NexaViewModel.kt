@@ -851,10 +851,18 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             try {
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
+                val apiKey = _uiState.value.apiKey.trim()
 
-                repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
-                    language = _uiState.value.language.code,
-                    systemPrompt = buildSystemPrompt()).collect { event ->
+                // API connection priority:
+                // 1. Direct Groq API (if user has API key) — fastest, best quality
+                // 2. Free Pollinations.ai API (no key needed) — always works
+                val flow = if (apiKey.isNotEmpty()) {
+                    repository.sendMessageDirect(allMessages, apiKey, _uiState.value.language.code)
+                } else {
+                    repository.sendMessageFree(allMessages, _uiState.value.language.code)
+                }
+
+                flow.collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
