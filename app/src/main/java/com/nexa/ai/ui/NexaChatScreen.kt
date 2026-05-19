@@ -68,6 +68,10 @@ fun NexaChatScreen(
     onRequestLocation: () -> Unit = {},
     onToggleNotifications: () -> Unit = {},
     onShareMessage: (String) -> Unit = {},
+    onToggleVolumeBoost: () -> Unit = {},
+    onSetSpeechRate: (Float) -> Unit = {},
+    onCaptureImage: () -> Unit = {},
+    onDismissPreview: () -> Unit = {},
     onQuickAction: (String) -> Unit = {}
 ) {
     // Update dialog
@@ -120,7 +124,9 @@ fun NexaChatScreen(
             onToggleVoiceMode = onToggleVoiceMode, onStopVoiceMode = onStopVoiceMode,
             onDismissVoiceHelp = onDismissVoiceHelp,
             onShareMessage = onShareMessage,
-            onQuickAction = onQuickAction)
+            onQuickAction = onQuickAction,
+            onCaptureImage = onCaptureImage,
+            onDismissPreview = onDismissPreview)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,
             isDarkTheme = isDark,
@@ -133,7 +139,8 @@ fun NexaChatScreen(
             onSetThemeMode = onSetThemeMode,
             onToggleAutoSpeak = onToggleAutoSpeak,
             onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
-            onRequestLocation = onRequestLocation, onToggleNotifications = onToggleNotifications
+            onRequestLocation = onRequestLocation, onToggleNotifications = onToggleNotifications,
+            onToggleVolumeBoost = onToggleVolumeBoost, onSetSpeechRate = onSetSpeechRate
         )
         Screen.TRANSLATOR -> TranslatorScreen(
             onBack = onNavigateToChat

@@ -66,8 +66,13 @@ fun NexaChatScreen(
     onDownloadSession: (String) -> Unit = {},
     onRegenerate: () -> Unit = {},
     onRequestLocation: () -> Unit = {},
-    onSetAiMode: (AiMode) -> Unit = {},
-    onDeleteAllData: () -> Unit = {}
+    onToggleNotifications: () -> Unit = {},
+    onShareMessage: (String) -> Unit = {},
+    onToggleVolumeBoost: () -> Unit = {},
+    onSetSpeechRate: (Float) -> Unit = {},
+    onCaptureImage: () -> Unit = {},
+    onDismissPreview: () -> Unit = {},
+    onQuickAction: (String) -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -117,7 +122,11 @@ fun NexaChatScreen(
             onRegenerate = onRegenerate,
             onInterruptVoice = onInterruptVoice,
             onToggleVoiceMode = onToggleVoiceMode, onStopVoiceMode = onStopVoiceMode,
-            onDismissVoiceHelp = onDismissVoiceHelp)
+            onDismissVoiceHelp = onDismissVoiceHelp,
+            onShareMessage = onShareMessage,
+            onQuickAction = onQuickAction,
+            onCaptureImage = onCaptureImage,
+            onDismissPreview = onDismissPreview)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,
             isDarkTheme = isDark,
@@ -130,36 +139,12 @@ fun NexaChatScreen(
             onSetThemeMode = onSetThemeMode,
             onToggleAutoSpeak = onToggleAutoSpeak,
             onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
-            onRequestLocation = onRequestLocation,
-            onSetAiMode = onSetAiMode,
-            onDeleteAllData = onDeleteAllData
+            onRequestLocation = onRequestLocation, onToggleNotifications = onToggleNotifications,
+            onToggleVolumeBoost = onToggleVolumeBoost, onSetSpeechRate = onSetSpeechRate
         )
         Screen.TRANSLATOR -> TranslatorScreen(
             onBack = onNavigateToChat
         )
-        Screen.CODE_ASSISTANT -> ChatMainScreen(
-            uiState = uiState.copy(aiMode = AiMode.CODING), isDarkTheme = isDark,
-            onSend = onSend, onInputChange = onInputChange,
-            onStartListening = onStartListening, onStopListening = onStopListening,
-            onToggleAutoSpeak = onToggleAutoSpeak, onStopSpeaking = onStopSpeaking,
-            onSpeakMessage = onSpeakMessage, onClearChat = onClearChat,
-            onDismissError = onDismissError, onToggleDrawer = onToggleDrawer,
-            onCreateSession = onCreateSession,
-            onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
-            onToggleSettings = onToggleSettings, onSetLanguage = onSetLanguage,
-            onSetVoiceType = onSetVoiceType, onCycleTheme = onCycleTheme,
-            onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
-            onCopyMessage = onCopyMessage, onExportMessage = onExportMessage,
-            onSurpriseMe = onSurpriseMe, onSetDrawerView = onSetDrawerView,
-            onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
-            onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
-            onPinSession = onPinSession, onRenameSession = onRenameSession,
-            onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
-            onShareSession = onShareSession, onDownloadSession = onDownloadSession,
-            onRegenerate = onRegenerate,
-            onInterruptVoice = onInterruptVoice,
-            onToggleVoiceMode = onToggleVoiceMode, onStopVoiceMode = onStopVoiceMode,
-            onDismissVoiceHelp = onDismissVoiceHelp)
     }
 
 }

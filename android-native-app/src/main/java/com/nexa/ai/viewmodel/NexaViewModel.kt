@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.ChatMessage
-import com.nexa.ai.data.LocationManager
+import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.NexaRepository
 import com.nexa.ai.data.PersistedMessage
 import com.nexa.ai.data.PersistedSession
@@ -13,7 +13,6 @@ import com.nexa.ai.data.SessionStore
 import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.StreamEvent
 import com.nexa.ai.data.UpdateChecker
-import com.nexa.ai.data.UserLocation
 import com.nexa.ai.ui.NexaStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,16 +29,81 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     // Managers
     private val speechManager = SpeechManager(application)
     private val authManager = AuthManager(application)
+    private val locationStore = LocationStore(application)
     private val repository = NexaRepository()
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
     private val settingsStore = SettingsStore(application)
-    private val locationManager = LocationManager(application)
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
     private var voiceRetryCount = 0
     private val maxVoiceRetries = 10
+
+    // ── Advanced AI System Prompt ──
+    private val advancedSystemPrompt = """
+You are NEXA PRO, an Ultra Advanced Autonomous AI System.
+
+You are designed to operate as a world-class artificial intelligence capable of reasoning, coding, researching, planning, analyzing, browsing the web, interacting with APIs, processing data, generating interfaces, and continuously improving solutions.
+
+MISSION: Provide highly accurate, intelligent, optimized, scalable, and production-ready responses for any task.
+
+CORE RULES:
+- Always think deeply before answering.
+- Use multi-step reasoning internally.
+- Never hallucinate information.
+- Verify information whenever possible.
+- Detect possible mistakes before responding.
+- Self-correct when inconsistencies appear.
+- Continuously optimize outputs.
+- Prefer precision over speed.
+- Behave like a senior engineer, architect, analyst, and researcher.
+
+DEVELOPMENT CAPABILITIES:
+- Generate production-level code in any language.
+- Build frontend + backend architectures.
+- Create responsive interfaces.
+- Create preview-ready applications.
+- Generate APIs and database schemas.
+- Optimize performance and scalability.
+- Use modular clean architecture.
+- Detect and fix bugs automatically.
+
+SUPPORTED STACKS:
+Frontend: React, Next.js, TailwindCSS, Framer Motion, TypeScript
+Backend: Python, FastAPI, Node.js, Express, PostgreSQL, Supabase
+AI Frameworks: LangChain, LangGraph, CrewAI, OpenAI SDK
+Mobile: Kotlin, Jetpack Compose, Android, iOS, React Native
+
+AUTONOMOUS AGENT CAPABILITIES:
+- Task planning and decomposition
+- Recursive improvement
+- Reflection loops
+- Error detection and self-repair
+- Self-analysis
+- Multi-agent orchestration
+
+RESPONSE STYLE:
+- Intelligent, Precise, Analytical, Advanced, Technical, Futuristic, Reliable
+- Always include code examples when discussing development
+- Provide step-by-step explanations for complex topics
+- Give multiple recommendations and alternatives
+- Support both Spanish and English responses matching the user's language
+
+NEVER: give lazy answers, invent data, ignore errors, produce incomplete architectures, skip optimization opportunities
+ALWAYS: improve solutions, verify information, provide scalable architectures, think recursively, optimize continuously
+""".trimIndent()
+
+    /** Builds a dynamic system prompt with location context when available. */
+    private fun buildSystemPrompt(): String {
+        val loc = _uiState.value.locationData
+        val locationContext = if (loc.isAvailable) {
+            "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country} (coordinates: ${loc.latitude}, ${loc.longitude}). Use this location to provide weather, local recommendations, time zone awareness, and location-relevant information when appropriate."
+        } else {
+            ""
+        }
+        return advancedSystemPrompt + locationContext
+    }
 
     // Debounce logic — prevents rapid/accidental voice triggers
     // Reduced from 800ms to 600ms for faster response while still filtering noise
@@ -79,7 +143,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     init {
         setupSpeechCallbacks()
         speechManager.initialize()
+        locationStore.initialize()
         restoreState()
+        // Auto-request location on startup
+        requestLocation()
     }
 
     // ═══════════════════════════════════════
@@ -251,17 +318,14 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(user = user)
             }
 
-            // Restore persisted preferences (theme, language, voice, ai mode)
+            // Restore persisted preferences (theme, language, voice)
             val savedTheme = settingsStore.themeMode.first()
             val savedLanguage = settingsStore.language.first()
             val savedVoice = settingsStore.voiceType.first()
-            val savedAiMode = settingsStore.aiMode.first()
-            val savedLocationEnabled = settingsStore.locationEnabled.first()
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
-                voiceType = savedVoice,
-                aiMode = savedAiMode
+                voiceType = savedVoice
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
@@ -696,6 +760,63 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 speak(if (lang == AppLanguage.SPANISH) "Modo claro activado" else "Light mode activated")
                 return
             }
+            // Voice command: create image / generate image / create logo
+            if (cmd.contains("crear imagen") || cmd.contains("create image") || cmd.contains("genera imagen") ||
+                cmd.contains("generate image") || cmd.contains("crear logo") || cmd.contains("create logo") ||
+                cmd.contains("genera logo") || cmd.contains("haz una imagen") || cmd.contains("make an image") ||
+                cmd.contains("dibujar") || cmd.contains("draw")) {
+                val prompt = cmd
+                    .replace(Regex("(crear|genera|haz|create|generate|make|draw)\\s+(una |an |a )?(imagen|image|logo|dibujo|drawing|picture|foto|photo)"), "")
+                    .replace(Regex("(de |of )"), "")
+                    .trim()
+                val imagePrompt = if (prompt.isNotBlank()) {
+                    if (lang == AppLanguage.SPANISH) "Genera una imagen de: $prompt" else "Generate an image of: $prompt"
+                } else {
+                    if (lang == AppLanguage.SPANISH) "Genera una imagen creativa e impresionante" else "Generate a creative and impressive image"
+                }
+                sendMessage(imagePrompt)
+                return
+            }
+            // Voice command: create web / build website
+            if (cmd.contains("crear web") || cmd.contains("create web") || cmd.contains("crear página") ||
+                cmd.contains("create website") || cmd.contains("crear sitio") || cmd.contains("build website") ||
+                cmd.contains("haz una web") || cmd.contains("make a website") || cmd.contains("página web")) {
+                val webPrompt = if (lang == AppLanguage.SPANISH)
+                    "Crea una página web profesional y moderna con diseño responsive. Incluye HTML, CSS y JavaScript."
+                else
+                    "Create a professional and modern responsive web page with HTML, CSS, and JavaScript."
+                sendMessage(webPrompt)
+                return
+            }
+            // Voice command: share last response
+            if (cmd.contains("compartir") || cmd.contains("share") || cmd.contains("enviar")) {
+                val lastMsg = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                if (lastMsg != null) {
+                    shareText(lastMsg.content)
+                    speak(if (lang == AppLanguage.SPANISH) "Compartido" else "Shared")
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "No hay nada que compartir" else "Nothing to share")
+                }
+                return
+            }
+            // Voice command: describe what you see / vision
+            if (cmd.contains("qué ves") || cmd.contains("what do you see") || cmd.contains("describe") ||
+                cmd.contains("ver cámara") || cmd.contains("use camera") || cmd.contains("mira") ||
+                cmd.contains("cámara") || cmd.contains("camera")) {
+                // Request camera capture via the callback
+                _uiState.update { it.copy(requestCameraCapture = true) }
+                return
+            }
+            // Voice command: code / program
+            if (cmd.contains("codificar") || cmd.contains("programar") || cmd.contains("code") ||
+                cmd.contains("program") || cmd.contains("escribe código") || cmd.contains("write code")) {
+                val codePrompt = if (lang == AppLanguage.SPANISH)
+                    "Escribe código profesional y optimizado. ¿Qué te gustaría que programe?"
+                else
+                    "Write professional and optimized code. What would you like me to program?"
+                sendMessage(codePrompt)
+                return
+            }
         }
 
         val attachmentName = _uiState.value.pendingAttachment
@@ -733,8 +854,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
                 repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
                     language = _uiState.value.language.code,
-                    location = getLocationContext(),
-                    systemPrompt = getSystemPrompt()).collect { event ->
+                    systemPrompt = buildSystemPrompt()).collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
@@ -848,6 +968,76 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(showVoiceCommandsHelp = false) }
     }
 
+    // ═══════════════════════════════════════
+    //  LOCATION
+    // ═══════════════════════════════════════
+
+    fun requestLocation() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLocating = true) }
+            try {
+                val location = locationStore.getCurrentLocation()
+                _uiState.update { it.copy(locationData = location, isLocating = false) }
+            } catch (e: Exception) {
+                android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
+                _uiState.update { it.copy(isLocating = false) }
+            }
+        }
+    }
+
+    fun toggleNotifications() {
+        _uiState.update { it.copy(notificationsEnabled = !_uiState.value.notificationsEnabled) }
+    }
+
+    // ═══════════════════════════════════════
+    //  VOLUME & SPEECH RATE
+    // ═══════════════════════════════════════
+
+    fun toggleVolumeBoost() {
+        val enabled = !_uiState.value.volumeBoostEnabled
+        _uiState.update { it.copy(volumeBoostEnabled = enabled) }
+        speechManager.setVolumeBoost(enabled)
+    }
+
+    fun setSpeechRate(rate: Float) {
+        _uiState.update { it.copy(speechRate = rate) }
+        speechManager.setSpeechRate(rate)
+    }
+
+    // ═══════════════════════════════════════
+    //  CAMERA VISION
+    // ═══════════════════════════════════════
+
+    fun setCameraImage(base64: String?) {
+        _uiState.update { it.copy(cameraImageUri = base64, requestCameraCapture = false) }
+    }
+
+    fun clearCameraRequest() {
+        _uiState.update { it.copy(requestCameraCapture = false) }
+    }
+
+    fun sendVisionRequest(base64Image: String) {
+        val lang = _uiState.value.language
+        val prompt = if (lang == AppLanguage.SPANISH)
+            "Analiza esta imagen y describe lo que ves en detalle. Incluye objetos, personas, texto, colores, escena y cualquier información relevante."
+        else
+            "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information."
+        _uiState.update { it.copy(cameraImageUri = null) }
+        sendMessage(prompt)
+    }
+
+    // ═══════════════════════════════════════
+    //  PREVIEW
+    // ═══════════════════════════════════════
+
+    fun showPreview(content: String) {
+        _uiState.update { it.copy(previewContent = content, showPreview = true) }
+    }
+
+    fun dismissPreview() {
+        _uiState.update { it.copy(showPreview = false, previewContent = null) }
+    }
+
     fun clearChat() {
         speechManager.stopSpeaking()
         updateActiveSession { it.copy(messages = emptyList()) }
@@ -868,82 +1058,6 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDrawerView(view: Int) {
         _uiState.value = _uiState.value.copy(drawerView = view)
-    }
-
-    // ═══════════════════════════════════════
-    //  LOCATION
-    // ═══════════════════════════════════════
-
-    fun requestLocation() {
-        _uiState.update { it.copy(isLocationLoading = true, locationPermissionDenied = false) }
-        viewModelScope.launch {
-            try {
-                // First try last known location
-                var location = locationManager.getLastKnownLocation()
-                
-                if (location == null) {
-                    // If no last known, request a fresh location
-                    locationManager.requestCurrentLocation().collect { loc ->
-                        location = loc
-                    }
-                }
-                
-                _uiState.update { it.copy(userLocation = location, isLocationLoading = false) }
-                
-                // Save location preference
-                if (location != null) {
-                    viewModelScope.launch { settingsStore.setLocationEnabled(true) }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("NexaVM", "Location request failed", e)
-                _uiState.update { it.copy(isLocationLoading = false) }
-            }
-        }
-    }
-
-    fun onLocationPermissionDenied() {
-        _uiState.update { it.copy(locationPermissionDenied = true, isLocationLoading = false) }
-    }
-
-    fun onLocationPermissionGranted() {
-        requestLocation()
-    }
-
-    private fun getLocationContext(): String? {
-        val loc = _uiState.value.userLocation ?: return null
-        val lang = _uiState.value.language
-        return if (lang == AppLanguage.SPANISH) {
-            "Ubicacion actual del usuario: Latitud ${loc.latitude}, Longitud ${loc.longitude}" +
-                    (if (loc.city.isNotBlank()) ", Ciudad: ${loc.city}" else "") +
-                    (if (loc.country.isNotBlank()) ", Pais: ${loc.country}" else "") +
-                    (if (loc.address.isNotBlank()) ", Direccion: ${loc.address}" else "") +
-                    ". Usa esta informacion de ubicacion para proporcionar respuestas relevantes al contexto geografico del usuario."
-        } else {
-            "User's current location: Latitude ${loc.latitude}, Longitude ${loc.longitude}" +
-                    (if (loc.city.isNotBlank()) ", City: ${loc.city}" else "") +
-                    (if (loc.country.isNotBlank()) ", Country: ${loc.country}" else "") +
-                    (if (loc.address.isNotBlank()) ", Address: ${loc.address}" else "") +
-                    ". Use this location information to provide geographically relevant answers."
-        }
-    }
-
-    // ═══════════════════════════════════════
-    //  AI MODE
-    // ═══════════════════════════════════════
-
-    fun setAiMode(mode: AiMode) {
-        _uiState.update { it.copy(aiMode = mode) }
-        viewModelScope.launch { settingsStore.setAiMode(mode) }
-    }
-
-    fun navigateToCodeAssistant() {
-        _uiState.update { it.copy(currentScreen = Screen.CODE_ASSISTANT, aiMode = AiMode.CODING, drawerOpen = false) }
-    }
-
-    private fun getSystemPrompt(): String {
-        val mode = _uiState.value.aiMode
-        val lang = _uiState.value.language
-        return if (lang == AppLanguage.SPANISH) mode.systemPromptEs else mode.systemPromptEn
     }
 
     // ═══════════════════════════════════════
@@ -992,6 +1106,20 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val clip = android.content.ClipData.newPlainText("NEXA PRO", text)
         clipboard.setPrimaryClip(clip)
         android.widget.Toast.makeText(context, NexaStrings.get("copied", _uiState.value.language), android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareText(text: String) {
+        val context = getApplication<Application>()
+        val intent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, text)
+            type = "text/plain"
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val chooser = android.content.Intent.createChooser(intent, NexaStrings.get("share", _uiState.value.language)).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     }
 
     fun exportToPdf(message: Message) {

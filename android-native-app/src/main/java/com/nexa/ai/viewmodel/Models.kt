@@ -1,7 +1,7 @@
 package com.nexa.ai.viewmodel
 
+import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.UpdateInfo
-import com.nexa.ai.data.UserLocation
 import java.util.UUID
 
 // ═══════════════════════════════════════
@@ -34,37 +34,13 @@ enum class AppLanguage(val code: String, val label: String) {
 /** Theme mode: DARK, LIGHT, or SYSTEM (follow device setting). */
 enum class ThemeMode { DARK, LIGHT, SYSTEM }
 
-/** AI Mode: controls the system prompt and behavior of the AI assistant. */
-enum class AiMode(val label: String, val systemPromptEs: String, val systemPromptEn: String) {
-    GENERAL(
-        "General",
-        "Eres NEXA, un asistente inteligente y amigable. Ayudas al usuario con cualquier pregunta o tarea de forma clara y concisa.",
-        "You are NEXA, an intelligent and friendly assistant. You help the user with any question or task in a clear and concise manner."
-    ),
-    CODING(
-        "Coding",
-        "Eres NEXA Code, un experto programador. Escribes código limpio, eficiente y bien documentado. Explicas conceptos técnicos de forma clara. Siempre proporcionas ejemplos de código completos y funcionales. Usas las mejores prácticas y patrones de diseño modernos.",
-        "You are NEXA Code, an expert programmer. You write clean, efficient, and well-documented code. You explain technical concepts clearly. You always provide complete and functional code examples. You use best practices and modern design patterns."
-    ),
-    CREATIVE(
-        "Creative",
-        "Eres NEXA Creative, un escritor e ideas creativas. Generas contenido original, historias, poemas, guiones y ideas innovadoras con estilo y creatividad.",
-        "You are NEXA Creative, a creative writer and ideas generator. You produce original content, stories, poems, scripts, and innovative ideas with style and creativity."
-    ),
-    ANALYST(
-        "Analyst",
-        "Eres NEXA Analyst, un analista de datos experto. Analizas información, generas insights, creas reportes y recomiendas acciones basadas en datos con rigor analítico.",
-        "You are NEXA Analyst, an expert data analyst. You analyze information, generate insights, create reports, and recommend data-driven actions with analytical rigor."
-    )
-}
-
 data class UserData(
     val email: String = "",
     val displayName: String = "",
     val isLoggedIn: Boolean = false
 )
 
-enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY, SETTINGS, TRANSLATOR, CODE_ASSISTANT }
+enum class Screen { CHAT, LOGIN, REGISTER, LOTTERY, SETTINGS, TRANSLATOR }
 
 // ═══════════════════════════════════════
 //  UI STATE
@@ -92,6 +68,20 @@ data class NexaUiState(
     val themeMode: ThemeMode = ThemeMode.DARK,
     val drawerOpen: Boolean = false,
     val drawerView: Int = 0,
+    // Location
+    val locationData: LocationStore.LocationData = LocationStore.LocationData(),
+    val isLocating: Boolean = false,
+    // Notifications
+    val notificationsEnabled: Boolean = true,
+    // Audio/Volume settings
+    val volumeBoostEnabled: Boolean = true,  // Volume boost for hands-free
+    val speechRate: Float = 1.0f,  // TTS speech rate 0.5f - 2.0f
+    // Camera
+    val cameraImageUri: String? = null,  // Base64 image from camera for vision
+    val requestCameraCapture: Boolean = false,  // Signal to UI to open camera
+    // Preview
+    val previewContent: String? = null,  // HTML/code content for preview
+    val showPreview: Boolean = false,  // Whether to show preview overlay
     // Auth
     val currentScreen: Screen = Screen.CHAT,
     val user: UserData = UserData(),
@@ -109,13 +99,7 @@ data class NexaUiState(
     val showVoiceCommandsHelp: Boolean = false,
     // Update
     val updateInfo: UpdateInfo? = null,
-    val showUpdateDialog: Boolean = false,
-    // Location
-    val userLocation: UserLocation? = null,
-    val isLocationLoading: Boolean = false,
-    val locationPermissionDenied: Boolean = false,
-    // AI Mode
-    val aiMode: AiMode = AiMode.GENERAL
+    val showUpdateDialog: Boolean = false
 ) {
     val activeSession: ChatSession?
         get() = sessions.find { it.id == activeSessionId }

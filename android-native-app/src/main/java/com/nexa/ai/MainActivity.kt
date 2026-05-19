@@ -2,7 +2,9 @@ package com.nexa.ai
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.nexa.ai.ui.NexaChatScreen
 import com.nexa.ai.ui.theme.NexaTheme
 import com.nexa.ai.viewmodel.NexaViewModel
+import java.io.ByteArrayOutputStream
 
 class MainActivity : ComponentActivity() {
 
@@ -36,14 +39,35 @@ class MainActivity : ComponentActivity() {
     }
 
     private val requestLocationPermission = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        val coarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
-        if (fineLocationGranted || coarseLocationGranted) {
-            viewModel.onLocationPermissionGranted()
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.requestLocation()
+        }
+    }
+
+    private val requestCameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            captureImage.launch(null)
         } else {
-            viewModel.onLocationPermissionDenied()
+            viewModel.clearCameraRequest()
+        }
+    }
+
+    private val captureImage = registerForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            // Convert bitmap to base64 for vision API
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
+            val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
+            viewModel.sendVisionRequest(base64)
+        } else {
+            viewModel.clearCameraRequest()
         }
     }
 
@@ -73,6 +97,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
+
+            // Handle camera capture request from voice command
+            if (uiState.requestCameraCapture) {
+                viewModel.clearCameraRequest()
+                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED
+                ) {
+                    captureImage.launch(null)
+                } else {
+                    requestCameraPermission.launch(Manifest.permission.CAMERA)
+                }
+            }
 
             NexaTheme(themeMode = uiState.themeMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -147,18 +183,48 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 viewModel.requestLocation()
                             } else {
-                                requestLocationPermission.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
+                                requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                             }
                         },
-                        onSetAiMode = { viewModel.setAiMode(it) },
-                        onDeleteAllData = {
-                            viewModel.clearChat()
-                            viewModel.logout()
+                        onToggleNotifications = { viewModel.toggleNotifications() },
+                        onShareMessage = { viewModel.shareText(it) },
+                        onToggleVolumeBoost = { viewModel.toggleVolumeBoost() },
+                        onSetSpeechRate = { viewModel.setSpeechRate(it) },
+                        onCaptureImage = {
+                            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                                == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                captureImage.launch(null)
+                            } else {
+                                requestCameraPermission.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                        onDismissPreview = { viewModel.dismissPreview() },
+                        onQuickAction = { action ->
+                            val lang = uiState.language
+                            val prompt = when (action) {
+                                "image" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Genera una imagen creativa e impresionante" else "Generate a creative and impressive image"
+                                "web" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Crea una página web profesional y moderna con diseño responsive. Incluye HTML, CSS y JavaScript completos." else "Create a professional and modern responsive web page with complete HTML, CSS, and JavaScript."
+                                "logo" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Genera un logo moderno y profesional. Describe el diseño y crea la imagen del logo." else "Generate a modern and professional logo. Describe the design and create the logo image."
+                                "code" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Escribe código profesional. ¿Qué proyecto te gustaría que programe?" else "Write professional code. What project would you like me to program?"
+                                "vision" -> {
+                                    // Open camera directly for vision
+                                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA)
+                                        == PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        captureImage.launch(null)
+                                    } else {
+                                        requestCameraPermission.launch(Manifest.permission.CAMERA)
+                                    }
+                                    return@NexaChatScreen
+                                }
+                                else -> return@NexaChatScreen
+                            }
+                            viewModel.sendMessage(prompt)
                         }
                     )
                 }

@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -89,7 +91,9 @@ fun ChatMainScreen(
     onDownloadSession: (String) -> Unit = {},
     onRegenerate: () -> Unit = {},
     onShareMessage: (String) -> Unit = {},
-    onQuickAction: (String) -> Unit = {}
+    onQuickAction: (String) -> Unit = {},
+    onCaptureImage: () -> Unit = {},
+    onDismissPreview: () -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -248,6 +252,15 @@ fun ChatMainScreen(
                     VoiceCommandsHelpOverlay(
                         language = uiState.language,
                         onDismiss = onDismissVoiceHelp
+                    )
+                }
+
+                // Preview overlay for HTML/code content
+                if (uiState.showPreview && uiState.previewContent != null) {
+                    PreviewOverlay(
+                        content = uiState.previewContent,
+                        language = uiState.language,
+                        onDismiss = onDismissPreview
                     )
                 }
             }
@@ -1136,6 +1149,108 @@ fun ErrorBanner(error: String, onDismiss: () -> Unit) {
             IconButton(onClick = onDismiss, modifier = Modifier.size(22.dp)) {
                 Icon(Icons.Default.Close, contentDescription = null,
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  PREVIEW OVERLAY — View generated HTML/code
+// ═══════════════════════════════════════
+
+@Composable
+fun PreviewOverlay(
+    content: String,
+    language: AppLanguage,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xE60A0A0F))
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Preview,
+                        contentDescription = null,
+                        tint = NexaAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        NexaStrings.get("preview", language).uppercase(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NexaAccent,
+                        letterSpacing = 2.sp
+                    )
+                }
+                Surface(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.White.copy(alpha = 0.06f),
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.White.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            NexaStrings.get("close", language),
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+
+            // Content in scrollable surface
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF12121A),
+                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        content,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
             }
         }
     }

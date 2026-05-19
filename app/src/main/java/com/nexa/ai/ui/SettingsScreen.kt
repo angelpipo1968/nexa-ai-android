@@ -64,7 +64,9 @@ fun SettingsScreen(
     onNavigateToLogin: () -> Unit,
     onLogout: () -> Unit,
     onRequestLocation: () -> Unit = {},
-    onToggleNotifications: () -> Unit = {}
+    onToggleNotifications: () -> Unit = {},
+    onToggleVolumeBoost: () -> Unit = {},
+    onSetSpeechRate: (Float) -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity
     val sectionSpacing = 28.dp
@@ -210,6 +212,18 @@ fun SettingsScreen(
                                 FuturisticSwitch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() })
                             }
                             Spacer(modifier = Modifier.height(16.dp))
+                            // Volume Boost
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(effectiveAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(16.dp), tint = effectiveAccent)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("volume_boost", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(NexaStrings.get("volume_boost_desc", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
+                                }
+                                FuturisticSwitch(checked = uiState.volumeBoostEnabled, onCheckedChange = { onToggleVolumeBoost() })
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
                             // Notifications
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
@@ -220,6 +234,27 @@ fun SettingsScreen(
                                     Text(NexaStrings.get("notifications_desc", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
                                 }
                                 FuturisticSwitch(checked = uiState.notificationsEnabled, onCheckedChange = { onToggleNotifications() })
+                            }
+                        }
+                    }
+                }
+
+                // ── Speech Rate ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("speech_rate", uiState.language).uppercase())
+                        FuturisticCard {
+                            Column {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    listOf(
+                                        0.7f to NexaStrings.get("speech_rate_slow", uiState.language),
+                                        1.0f to NexaStrings.get("speech_rate_normal", uiState.language),
+                                        1.3f to NexaStrings.get("speech_rate_fast", uiState.language)
+                                    ).forEach { (rate, label) ->
+                                        val selected = kotlin.math.abs(uiState.speechRate - rate) < 0.05f
+                                        FuturisticPill(label = label, selected = selected, accent = effectiveAccent, modifier = Modifier.weight(1f), onClick = { onSetSpeechRate(rate) })
+                                    }
+                                }
                             }
                         }
                     }

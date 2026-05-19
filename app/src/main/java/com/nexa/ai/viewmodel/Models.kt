@@ -73,6 +73,15 @@ data class NexaUiState(
     val isLocating: Boolean = false,
     // Notifications
     val notificationsEnabled: Boolean = true,
+    // Audio/Volume settings
+    val volumeBoostEnabled: Boolean = true,  // Volume boost for hands-free
+    val speechRate: Float = 1.0f,  // TTS speech rate 0.5f - 2.0f
+    // Camera
+    val cameraImageUri: String? = null,  // Base64 image from camera for vision
+    val requestCameraCapture: Boolean = false,  // Signal to UI to open camera
+    // Preview
+    val previewContent: String? = null,  // HTML/code content for preview
+    val showPreview: Boolean = false,  // Whether to show preview overlay
     // Auth
     val currentScreen: Screen = Screen.CHAT,
     val user: UserData = UserData(),

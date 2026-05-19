@@ -94,6 +94,17 @@ NEVER: give lazy answers, invent data, ignore errors, produce incomplete archite
 ALWAYS: improve solutions, verify information, provide scalable architectures, think recursively, optimize continuously
 """.trimIndent()
 
+    /** Builds a dynamic system prompt with location context when available. */
+    private fun buildSystemPrompt(): String {
+        val loc = _uiState.value.locationData
+        val locationContext = if (loc.isAvailable) {
+            "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country} (coordinates: ${loc.latitude}, ${loc.longitude}). Use this location to provide weather, local recommendations, time zone awareness, and location-relevant information when appropriate."
+        } else {
+            ""
+        }
+        return advancedSystemPrompt + locationContext
+    }
+
     // Debounce logic — prevents rapid/accidental voice triggers
     // Reduced from 800ms to 600ms for faster response while still filtering noise
     private var speechDebounceJob: kotlinx.coroutines.Job? = null
@@ -134,6 +145,8 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.initialize()
         locationStore.initialize()
         restoreState()
+        // Auto-request location on startup
+        requestLocation()
     }
 
     // ═══════════════════════════════════════
@@ -788,12 +801,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             }
             // Voice command: describe what you see / vision
             if (cmd.contains("qué ves") || cmd.contains("what do you see") || cmd.contains("describe") ||
-                cmd.contains("ver cámara") || cmd.contains("use camera") || cmd.contains("mira")) {
-                val visionPrompt = if (lang == AppLanguage.SPANISH)
-                    "El usuario quiere usar la cámara para que describas lo que ves. Nota: La función de visión en tiempo real requiere acceso a la cámara que se implementará en una futura actualización. Por ahora, puedo analizar imágenes si las subes como adjunto."
-                else
-                    "The user wants to use the camera for real-time vision. Note: Real-time camera vision will be implemented in a future update. For now, I can analyze images if you upload them as attachments."
-                sendMessage(visionPrompt)
+                cmd.contains("ver cámara") || cmd.contains("use camera") || cmd.contains("mira") ||
+                cmd.contains("cámara") || cmd.contains("camera")) {
+                // Request camera capture via the callback
+                _uiState.update { it.copy(requestCameraCapture = true) }
                 return
             }
             // Voice command: code / program
@@ -843,7 +854,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
                 repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
                     language = _uiState.value.language.code,
-                    systemPrompt = advancedSystemPrompt).collect { event ->
+                    systemPrompt = buildSystemPrompt()).collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
@@ -976,6 +987,55 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
     fun toggleNotifications() {
         _uiState.update { it.copy(notificationsEnabled = !_uiState.value.notificationsEnabled) }
+    }
+
+    // ═══════════════════════════════════════
+    //  VOLUME & SPEECH RATE
+    // ═══════════════════════════════════════
+
+    fun toggleVolumeBoost() {
+        val enabled = !_uiState.value.volumeBoostEnabled
+        _uiState.update { it.copy(volumeBoostEnabled = enabled) }
+        speechManager.setVolumeBoost(enabled)
+    }
+
+    fun setSpeechRate(rate: Float) {
+        _uiState.update { it.copy(speechRate = rate) }
+        speechManager.setSpeechRate(rate)
+    }
+
+    // ═══════════════════════════════════════
+    //  CAMERA VISION
+    // ═══════════════════════════════════════
+
+    fun setCameraImage(base64: String?) {
+        _uiState.update { it.copy(cameraImageUri = base64, requestCameraCapture = false) }
+    }
+
+    fun clearCameraRequest() {
+        _uiState.update { it.copy(requestCameraCapture = false) }
+    }
+
+    fun sendVisionRequest(base64Image: String) {
+        val lang = _uiState.value.language
+        val prompt = if (lang == AppLanguage.SPANISH)
+            "Analiza esta imagen y describe lo que ves en detalle. Incluye objetos, personas, texto, colores, escena y cualquier información relevante."
+        else
+            "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information."
+        _uiState.update { it.copy(cameraImageUri = null) }
+        sendMessage(prompt)
+    }
+
+    // ═══════════════════════════════════════
+    //  PREVIEW
+    // ═══════════════════════════════════════
+
+    fun showPreview(content: String) {
+        _uiState.update { it.copy(previewContent = content, showPreview = true) }
+    }
+
+    fun dismissPreview() {
+        _uiState.update { it.copy(showPreview = false, previewContent = null) }
     }
 
     fun clearChat() {
