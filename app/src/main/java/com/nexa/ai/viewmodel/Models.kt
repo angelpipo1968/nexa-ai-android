@@ -66,6 +66,8 @@ data class NexaUiState(
     val language: AppLanguage = AppLanguage.SPANISH,
     val voiceType: VoiceType = VoiceType.FEMALE_1,
     val themeMode: ThemeMode = ThemeMode.DARK,
+    val apiKey: String = "",
+    val apiKeyInput: String = "",
     val drawerOpen: Boolean = false,
     val drawerView: Int = 0,
     // Location

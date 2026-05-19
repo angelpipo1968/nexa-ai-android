@@ -22,6 +22,7 @@ class SettingsStore(private val context: Context) {
     private val KEY_THEME = stringPreferencesKey("theme_mode")
     private val KEY_LANGUAGE = stringPreferencesKey("language")
     private val KEY_VOICE = stringPreferencesKey("voice_type")
+    private val KEY_API_KEY = stringPreferencesKey("api_key")
 
     val themeMode: Flow<ThemeMode> = context.settingsStore.data.map { prefs ->
         try {
@@ -62,6 +63,16 @@ class SettingsStore(private val context: Context) {
     suspend fun setVoiceType(type: VoiceType) {
         context.settingsStore.edit { prefs ->
             prefs[KEY_VOICE] = type.name
+        }
+    }
+
+    val apiKey: Flow<String> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_API_KEY] ?: ""
+    }
+
+    suspend fun setApiKey(key: String) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_API_KEY] = key
         }
     }
 }
