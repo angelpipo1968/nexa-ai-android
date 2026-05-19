@@ -669,24 +669,61 @@ class SpeechManager(private val application: Application) {
     /**
      * Aggressively boosts all relevant audio streams to maximum volume
      * for hands-free/speaker mode. This is the key fix for "too low" volume.
+     *
+     * v3.9 improvements:
+     * - Force MODE_NORMAL before speaker switch (fixes Samsung/Xiaomi/OPPO routing)
+     * - Multiple re-apply cycles with delays (some OEMs reset routing)
+     * - STREAM_NOTIFICATION boost (Huawei/Honor devices route TTS here)
+     * - STREAM_SYSTEM boost (some devices use this for TTS in communication mode)
+     * - FLAG_SHOW_UI suppressed (no volume overlay shown to user)
+     * - Re-verify speaker state after each boost cycle
      */
     private fun boostVolumeForHandsFree() {
         try {
-            // Boost STREAM_MUSIC (used by TTS in default mode)
+            // ── STEP 1: Force audio mode to NORMAL before speaker switch ──
+            // MODE_IN_COMMUNICATION on many OEMs (Samsung, Xiaomi, OPPO, Huawei)
+            // routes audio to earpiece even with speaker ON.
+            // Switching to MODE_NORMAL allows speaker to work at full volume.
+            if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
+                try {
+                    audioManager.mode = AudioManager.MODE_NORMAL
+                } catch (_: Exception) {}
+            }
+
+            // ── STEP 2: Maximize ALL audio streams ──
+            // STREAM_MUSIC — primary stream for TTS in default mode
             val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
 
-            // Boost STREAM_VOICE_CALL (used by TTS when useVoiceCallStream=true)
+            // STREAM_VOICE_CALL — used when useVoiceCallStream=true
             val maxVoiceCall = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
             audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCall, 0)
 
-            // Boost STREAM_RING (some devices route TTS through this in communication mode)
+            // STREAM_RING — some devices route TTS through this in communication mode
             val maxRing = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
             try {
                 audioManager.setStreamVolume(AudioManager.STREAM_RING, maxRing, 0)
             } catch (_: Exception) {}
 
-            // On Android 12+, also boost STREAM_ACCESSIBILITY if available
+            // STREAM_ALARM — Samsung devices sometimes route TTS through this
+            try {
+                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_NOTIFICATION — Huawei/Honor devices route TTS here
+            try {
+                val maxNotification = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
+                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maxNotification, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_SYSTEM — some devices use this for TTS in communication mode
+            try {
+                val maxSystem = audioManager.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
+                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSystem, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_ACCESSIBILITY — Android 8+ for accessibility TTS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
                     val maxAccessibility = audioManager.getStreamMaxVolume(AudioManager.STREAM_ACCESSIBILITY)
@@ -694,18 +731,44 @@ class SpeechManager(private val application: Application) {
                 } catch (_: Exception) {}
             }
 
-            // Boost STREAM_ALARM — some Samsung devices route TTS through this
-            try {
-                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
-            } catch (_: Exception) {}
-
-            // Ensure speaker is ON when not near ear
+            // ── STEP 3: Force speaker ON with multiple re-apply cycles ──
+            // Some OEMs reset speaker state after volume changes
             if (!isNearEar && !isBluetoothScoConnected) {
                 setSpeakerphoneOn(true)
+                // Delayed re-apply cycle 1: 100ms
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (audioSessionActive && !isNearEar) {
+                        setSpeakerphoneOn(true)
+                        // Re-verify STREAM_MUSIC is still at max (some devices auto-adjust)
+                        try {
+                            val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                            if (currentMusic < maxMusic) {
+                                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }, 100)
+                // Delayed re-apply cycle 2: 300ms (for stubborn Samsung/Pixel devices)
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (audioSessionActive && !isNearEar) {
+                        setSpeakerphoneOn(true)
+                    }
+                }, 300)
+                // Delayed re-apply cycle 3: 600ms (final safety net)
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (audioSessionActive && !isNearEar) {
+                        setSpeakerphoneOn(true)
+                        try {
+                            val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                            if (currentMusic < maxMusic) {
+                                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }, 600)
             }
 
-            android.util.Log.d("SpeechManager", "Volume boosted: MUSIC=$maxMusic, VOICE_CALL=$maxVoiceCall, speaker=${!isNearEar}")
+            android.util.Log.d("SpeechManager", "Volume boosted: MUSIC=$maxMusic, VOICE_CALL=$maxVoiceCall, RING=$maxRing, speaker=${!isNearEar}, mode=${audioManager.mode}")
         } catch (e: Exception) {
             android.util.Log.w("SpeechManager", "Volume boost failed: ${e.message}")
         }

@@ -87,7 +87,9 @@ class LocationStore(private val context: Context) {
 
     /**
      * Resolves a Location to a human-readable address using Geocoder.
-     * Uses blocking Geocoder API on a background thread (safe inside a suspend function).
+     * Handles both API 33+ async and legacy sync APIs with proper waiting.
+     * v3.9: Fixed API 33+ geocoding by using CountDownLatch instead of Thread.sleep
+     * to reliably wait for the async callback result.
      */
     private fun resolveAddress(location: Location): LocationData {
         val geocoder = Geocoder(context, Locale.getDefault())
@@ -97,7 +99,8 @@ class LocationStore(private val context: Context) {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                // Android 13+: Use async Geocoder API
+                // Android 13+: Use async Geocoder API with CountDownLatch for reliable waiting
+                val latch = java.util.concurrent.CountDownLatch(1)
                 geocoder.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
                     override fun onGeocode(addresses: MutableList<Address>) {
                         val addr = addresses.firstOrNull()
@@ -106,13 +109,15 @@ class LocationStore(private val context: Context) {
                             city = addr.locality ?: addr.subAdminArea ?: ""
                             country = addr.countryName ?: ""
                         }
+                        latch.countDown()
                     }
                     override fun onError(errorMessage: String?) {
                         android.util.Log.w("LocationStore", "Geocoder error: $errorMessage")
+                        latch.countDown()
                     }
                 })
-                // Small delay for async result
-                Thread.sleep(500)
+                // Wait up to 3 seconds for the geocoder result (much more reliable than Thread.sleep)
+                latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
             } else {
                 @Suppress("DEPRECATION")
                 val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
