@@ -22,7 +22,7 @@ class SettingsStore(private val context: Context) {
     private val KEY_THEME = stringPreferencesKey("theme_mode")
     private val KEY_LANGUAGE = stringPreferencesKey("language")
     private val KEY_VOICE = stringPreferencesKey("voice_type")
-    private val KEY_API_KEY = stringPreferencesKey("api_key")
+    private val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
 
     val themeMode: Flow<ThemeMode> = context.settingsStore.data.map { prefs ->
         try {
@@ -66,13 +66,13 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    val apiKey: Flow<String> = context.settingsStore.data.map { prefs ->
-        prefs[KEY_API_KEY] ?: ""
+    val accentColor: Flow<Long> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_ACCENT_COLOR]?.toLongOrNull() ?: 0L
     }
 
-    suspend fun setApiKey(key: String) {
+    suspend fun setAccentColor(color: Long) {
         context.settingsStore.edit { prefs ->
-            prefs[KEY_API_KEY] = key
+            prefs[KEY_ACCENT_COLOR] = color.toString()
         }
     }
 }

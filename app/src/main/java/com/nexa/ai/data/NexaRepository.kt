@@ -226,9 +226,11 @@ class NexaRepository {
         messages: List<ChatMessage>,
         baseUrl: String,
         provider: String? = null,
-        language: String? = null
+        language: String? = null,
+        systemPrompt: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val systemMessage = ChatMessage("system", BACKEND_SYSTEM_PROMPT)
+        val systemContent = systemPrompt ?: BACKEND_SYSTEM_PROMPT
+        val systemMessage = ChatMessage("system", systemContent)
         val allMessages = listOf(systemMessage) + messages
 
         val chatRequest = ChatRequest(allMessages, provider, language)

@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "3.9"
+        versionCode = 44
+        versionName = "4.4"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }

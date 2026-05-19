@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import com.nexa.ai.viewmodel.*
 
 // ═══════════════════════════════════════
@@ -72,7 +73,11 @@ fun NexaChatScreen(
     onSetSpeechRate: (Float) -> Unit = {},
     onCaptureImage: () -> Unit = {},
     onDismissPreview: () -> Unit = {},
-    onQuickAction: (String) -> Unit = {}
+    onQuickAction: (String) -> Unit = {},
+    onPreviewVoice: () -> Unit = {},
+    onSetAccentColor: (Color) -> Unit = {},
+    onExportSettings: () -> Unit = {},
+    onImportSettings: () -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -140,7 +145,12 @@ fun NexaChatScreen(
             onToggleAutoSpeak = onToggleAutoSpeak,
             onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
             onRequestLocation = onRequestLocation, onToggleNotifications = onToggleNotifications,
-            onToggleVolumeBoost = onToggleVolumeBoost, onSetSpeechRate = onSetSpeechRate
+            onToggleVolumeBoost = onToggleVolumeBoost, onSetSpeechRate = onSetSpeechRate,
+            onQuickAction = onQuickAction,
+            onPreviewVoice = onPreviewVoice,
+            onSetAccentColor = onSetAccentColor,
+            onExportSettings = onExportSettings,
+            onImportSettings = onImportSettings
         )
         Screen.TRANSLATOR -> TranslatorScreen(
             onBack = onNavigateToChat

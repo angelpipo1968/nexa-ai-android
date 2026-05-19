@@ -66,8 +66,6 @@ data class NexaUiState(
     val language: AppLanguage = AppLanguage.SPANISH,
     val voiceType: VoiceType = VoiceType.FEMALE_1,
     val themeMode: ThemeMode = ThemeMode.DARK,
-    val apiKey: String = "",
-    val apiKeyInput: String = "",
     val drawerOpen: Boolean = false,
     val drawerView: Int = 0,
     // Location
@@ -105,6 +103,8 @@ data class NexaUiState(
     val isRegistering: Boolean = false,
     // Voice commands help
     val showVoiceCommandsHelp: Boolean = false,
+    // Accent color
+    val accentColor: Long = 0L,  // ARGB color value, 0 means default
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false

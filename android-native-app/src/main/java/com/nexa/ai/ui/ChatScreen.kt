@@ -128,7 +128,8 @@ fun ChatMainScreen(
                     uiState = uiState, 
                     isDarkTheme = isDarkTheme, 
                     onToggleDrawer = onToggleDrawer,
-                    onClearChat = onClearChat
+                    onClearChat = onClearChat,
+                    onToggleSettings = onToggleSettings
                 )
             },
             containerColor = MaterialTheme.colorScheme.background
@@ -1091,7 +1092,7 @@ fun ChatSessionItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () -> Unit, onClearChat: () -> Unit) {
+fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () -> Unit, onClearChat: () -> Unit, onToggleSettings: () -> Unit = {}) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1119,6 +1120,14 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
             }
         },
         actions = {
+            IconButton(onClick = onToggleSettings) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = NexaStrings.get("settings", uiState.language),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
             IconButton(onClick = onClearChat) {
                 Icon(
                     imageVector = Icons.Default.DeleteSweep,

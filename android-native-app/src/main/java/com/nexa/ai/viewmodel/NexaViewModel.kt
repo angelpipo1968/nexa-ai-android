@@ -322,10 +322,12 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             val savedTheme = settingsStore.themeMode.first()
             val savedLanguage = settingsStore.language.first()
             val savedVoice = settingsStore.voiceType.first()
+            val savedAccent = settingsStore.accentColor.first()
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
-                voiceType = savedVoice
+                voiceType = savedVoice,
+                accentColor = savedAccent
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
@@ -760,6 +762,28 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 speak(if (lang == AppLanguage.SPANISH) "Modo claro activado" else "Light mode activated")
                 return
             }
+            // Voice command: open settings
+            if (cmd.contains("abrir ajustes") || cmd.contains("open settings") || cmd.contains("ajustes") || cmd.contains("configuración") || cmd.contains("configuracion")) {
+                _uiState.update { it.copy(currentScreen = Screen.SETTINGS, drawerOpen = false) }
+                speak(if (lang == AppLanguage.SPANISH) "Abriendo ajustes" else "Opening settings")
+                return
+            }
+            // Voice command: change theme (generic)
+            if (cmd.contains("cambiar tema") || cmd.contains("change theme") || cmd.contains("cambiar color") || cmd.contains("change color")) {
+                val nextTheme = when (_uiState.value.themeMode) {
+                    ThemeMode.DARK -> ThemeMode.LIGHT
+                    ThemeMode.LIGHT -> ThemeMode.SYSTEM
+                    ThemeMode.SYSTEM -> ThemeMode.DARK
+                }
+                setThemeMode(nextTheme)
+                val themeName = when (nextTheme) {
+                    ThemeMode.DARK -> if (lang == AppLanguage.SPANISH) "oscuro" else "dark"
+                    ThemeMode.LIGHT -> if (lang == AppLanguage.SPANISH) "claro" else "light"
+                    ThemeMode.SYSTEM -> if (lang == AppLanguage.SPANISH) "sistema" else "system"
+                }
+                speak(if (lang == AppLanguage.SPANISH) "Tema cambiado a $themeName" else "Theme changed to $themeName")
+                return
+            }
             // Voice command: create image / generate image / create logo
             if (cmd.contains("crear imagen") || cmd.contains("create image") || cmd.contains("genera imagen") ||
                 cmd.contains("generate image") || cmd.contains("crear logo") || cmd.contains("create logo") ||
@@ -1103,6 +1127,63 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     fun setThemeMode(mode: ThemeMode) {
         _uiState.value = _uiState.value.copy(themeMode = mode)
         viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    }
+
+    fun setAccentColor(color: androidx.compose.ui.graphics.Color) {
+        _uiState.update { it.copy(accentColor = color.value.toLong()) }
+        viewModelScope.launch { settingsStore.setAccentColor(color.value.toLong()) }
+    }
+
+    fun previewVoice() {
+        val lang = _uiState.value.language
+        val text = if (lang == AppLanguage.SPANISH) "Hola, esta es una vista previa de mi voz." else "Hello, this is a preview of my voice."
+        speak(text)
+    }
+
+    fun exportSettings() {
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val settings = mapOf(
+                    "theme" to _uiState.value.themeMode.name,
+                    "language" to _uiState.value.language.name,
+                    "voice" to _uiState.value.voiceType.name,
+                    "autoSpeak" to _uiState.value.autoSpeak.toString(),
+                    "volumeBoost" to _uiState.value.volumeBoostEnabled.toString(),
+                    "speechRate" to _uiState.value.speechRate.toString(),
+                    "notifications" to _uiState.value.notificationsEnabled.toString(),
+                    "accentColor" to _uiState.value.accentColor.toString()
+                )
+                val json = com.google.gson.Gson().toJson(settings)
+                val file = java.io.File(context.getExternalFilesDir(null), "nexa_settings_backup.json")
+                file.writeText(json)
+                shareText("NEXA Settings Backup:\n$json")
+            } catch (e: Exception) {
+                android.util.Log.e("NexaVM", "Export settings error", e)
+            }
+        }
+    }
+
+    fun importSettings() {
+        val context = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val file = java.io.File(context.getExternalFilesDir(null), "nexa_settings_backup.json")
+                if (file.exists()) {
+                    val json = file.readText()
+                    val settings = com.google.gson.Gson().fromJson(json, Map::class.java) as Map<String, String>
+                    settings["theme"]?.let { try { setThemeMode(ThemeMode.valueOf(it)) } catch (_: Exception) {} }
+                    settings["language"]?.let { try { setLanguage(AppLanguage.valueOf(it)) } catch (_: Exception) {} }
+                    settings["voice"]?.let { try { setVoiceType(VoiceType.valueOf(it)) } catch (_: Exception) {} }
+                    settings["autoSpeak"]?.let { if (it == "false") { if (_uiState.value.autoSpeak) toggleAutoSpeak() } else { if (!_uiState.value.autoSpeak) toggleAutoSpeak() } }
+                    settings["volumeBoost"]?.let { if (it != _uiState.value.volumeBoostEnabled.toString()) toggleVolumeBoost() }
+                    settings["speechRate"]?.let { try { setSpeechRate(it.toFloat()) } catch (_: Exception) {} }
+                    settings["accentColor"]?.let { try { _uiState.update { s -> s.copy(accentColor = it.toLong()) } } catch (_: Exception) {} }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("NexaVM", "Import settings error", e)
+            }
+        }
     }
 
     fun cycleTheme() {

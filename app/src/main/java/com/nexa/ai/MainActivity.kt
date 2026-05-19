@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.nexa.ai.ui.NexaChatScreen
 import com.nexa.ai.ui.theme.NexaTheme
 import com.nexa.ai.viewmodel.NexaViewModel
+import androidx.compose.ui.graphics.Color
 import java.io.ByteArrayOutputStream
 
 class MainActivity : ComponentActivity() {
@@ -226,9 +227,10 @@ class MainActivity : ComponentActivity() {
                             }
                             viewModel.sendMessage(prompt)
                         },
-                        onUpdateApiKeyInput = { viewModel.updateApiKeyInput(it) },
-                        onSaveApiKey = { viewModel.saveApiKey() },
-                        onClearApiKey = { viewModel.clearApiKey() }
+                        onPreviewVoice = { viewModel.previewVoice() },
+                        onSetAccentColor = { viewModel.setAccentColor(it) },
+                        onExportSettings = { viewModel.exportSettings() },
+                        onImportSettings = { viewModel.importSettings() }
                     )
                 }
             }

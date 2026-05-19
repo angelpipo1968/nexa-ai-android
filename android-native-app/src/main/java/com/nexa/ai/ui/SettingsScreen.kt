@@ -66,13 +66,18 @@ fun SettingsScreen(
     onRequestLocation: () -> Unit = {},
     onToggleNotifications: () -> Unit = {},
     onToggleVolumeBoost: () -> Unit = {},
-    onSetSpeechRate: (Float) -> Unit = {}
+    onSetSpeechRate: (Float) -> Unit = {},
+    onQuickAction: (String) -> Unit = {},
+    onPreviewVoice: () -> Unit = {},
+    onSetAccentColor: (Color) -> Unit = {},
+    onExportSettings: () -> Unit = {},
+    onImportSettings: () -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity
     val sectionSpacing = 28.dp
     val internalSpacing = 12.dp
 
-    val effectiveAccent = if (uiState.themeMode == ThemeMode.SYSTEM) dynamicPrimaryColor() else NexaAccent
+    val effectiveAccent = if (uiState.accentColor != 0L) Color(uiState.accentColor) else if (uiState.themeMode == ThemeMode.SYSTEM) dynamicPrimaryColor() else NexaAccent
 
     CompositionLocalProvider(LocalAccentColor provides effectiveAccent) {
 
@@ -105,7 +110,7 @@ fun SettingsScreen(
                         }
                     },
                     actions = {
-                        MinimalIconButton(onClick = { /* Settings context */ }) {
+                        MinimalIconButton(onClick = { /* Info */ }) {
                             Icon(Icons.Default.Settings, null, modifier = Modifier.size(16.dp))
                         }
                     },
@@ -177,6 +182,29 @@ fun SettingsScreen(
                                     VoiceCard(voice = voice, label = NexaStrings.get(voice.name.lowercase(), uiState.language), selected = selected, modifier = Modifier.weight(1f), onClick = { onSetVoiceType(voice) })
                                 }
                             }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            // Voice preview button
+                            Surface(
+                                onClick = { onPreviewVoice() },
+                                shape = RoundedCornerShape(12.dp),
+                                color = effectiveAccent.copy(alpha = 0.08f),
+                                border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp), tint = effectiveAccent)
+                                    Text(
+                                        NexaStrings.get("preview_voice", uiState.language),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = effectiveAccent
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -195,8 +223,44 @@ fun SettingsScreen(
                     }
                 }
 
-                // ── Preferences ──
+                // ── Accent Color ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 4) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("accent_color", uiState.language).uppercase())
+                        FuturisticCard {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                listOf(
+                                    Color(0xFF00F5A0) to "Emerald",
+                                    Color(0xFF00B4D8) to "Ocean",
+                                    Color(0xFF7C6AFF) to "Violet",
+                                    Color(0xFFFF6B6B) to "Coral",
+                                    Color(0xFFFFB800) to "Amber",
+                                    Color(0xFFFF00E5) to "Magenta",
+                                    Color(0xFF00E5FF) to "Cyan",
+                                    Color(0xFF8B5CF6) to "Purple"
+                                ).forEach { (color, name) ->
+                                    val selected = effectiveAccent == color
+                                    Surface(
+                                        onClick = { onSetAccentColor(color) },
+                                        shape = CircleShape,
+                                        color = color.copy(alpha = if (selected) 1f else 0.5f),
+                                        border = if (selected) BorderStroke(2.dp, Color.White.copy(alpha = 0.8f)) else null,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        if (selected) {
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp), tint = Color.Black)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Preferences ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("preferences", uiState.language).uppercase())
                         FuturisticCard {
@@ -240,7 +304,7 @@ fun SettingsScreen(
                 }
 
                 // ── Speech Rate ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("speech_rate", uiState.language).uppercase())
                         FuturisticCard {
@@ -261,7 +325,7 @@ fun SettingsScreen(
                 }
 
                 // ── Location ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 7) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("location", uiState.language).uppercase())
                         FuturisticCard {
@@ -292,7 +356,7 @@ fun SettingsScreen(
                 }
 
                 // ── AI Capabilities ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 8) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("ai_capabilities", uiState.language).uppercase())
                         FuturisticCard {
@@ -307,17 +371,43 @@ fun SettingsScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            // Capability cards
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                listOf(
-                                    Icons.Default.Image to NexaStrings.get("create_image", uiState.language),
-                                    Icons.Default.Language to NexaStrings.get("create_web", uiState.language),
-                                    Icons.Default.Brush to NexaStrings.get("create_logo", uiState.language)
-                                ).forEach { (icon, label) ->
-                                    Surface(shape = RoundedCornerShape(10.dp), color = effectiveAccent.copy(alpha = 0.06f), border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.15f)), modifier = Modifier.weight(1f)) {
-                                        Column(modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Icon(icon, null, modifier = Modifier.size(16.dp), tint = effectiveAccent.copy(alpha = 0.6f))
-                                            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = effectiveAccent.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                            // Capability cards - 2x2 grid
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    listOf(
+                                        Triple(Icons.Default.Image, NexaStrings.get("create_image", uiState.language), "image"),
+                                        Triple(Icons.Default.Language, NexaStrings.get("create_web", uiState.language), "web")
+                                    ).forEach { (icon, label, action) ->
+                                        Surface(
+                                            onClick = { onQuickAction(action) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = effectiveAccent.copy(alpha = 0.06f),
+                                            border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.15f)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Column(modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Icon(icon, null, modifier = Modifier.size(16.dp), tint = effectiveAccent.copy(alpha = 0.6f))
+                                                Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = effectiveAccent.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                                            }
+                                        }
+                                    }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                    listOf(
+                                        Triple(Icons.Default.Brush, NexaStrings.get("create_logo", uiState.language), "logo"),
+                                        Triple(Icons.Default.Code, NexaStrings.get("write_code", uiState.language), "code")
+                                    ).forEach { (icon, label, action) ->
+                                        Surface(
+                                            onClick = { onQuickAction(action) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = effectiveAccent.copy(alpha = 0.06f),
+                                            border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.15f)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Column(modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Icon(icon, null, modifier = Modifier.size(16.dp), tint = effectiveAccent.copy(alpha = 0.6f))
+                                                Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = effectiveAccent.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                                            }
                                         }
                                     }
                                 }
@@ -327,7 +417,7 @@ fun SettingsScreen(
                 }
 
                 // ── Screen Adaptation ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 7) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 9) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("screen_adaptation", uiState.language).uppercase())
                         FuturisticCard {
@@ -346,8 +436,43 @@ fun SettingsScreen(
                     }
                 }
 
+                // ── Backup ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 10) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("backup", uiState.language).uppercase())
+                        FuturisticCard {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    onClick = onExportSettings,
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = effectiveAccent.copy(alpha = 0.08f),
+                                    border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.2f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Default.FileDownload, null, modifier = Modifier.size(14.dp), tint = effectiveAccent)
+                                        Text(NexaStrings.get("export_settings", uiState.language), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = effectiveAccent)
+                                    }
+                                }
+                                Surface(
+                                    onClick = onImportSettings,
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                        Text(NexaStrings.get("import_settings", uiState.language), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Privacy ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 8) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 11) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("privacy", uiState.language).uppercase())
                         FuturisticCard {
@@ -368,7 +493,7 @@ fun SettingsScreen(
                 }
 
                 // ── Danger Zone ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 9) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 12) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("danger_zone", uiState.language).uppercase(), color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                         FuturisticCard {
@@ -391,7 +516,7 @@ fun SettingsScreen(
                 }
 
                 // ── About ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 10) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 13) {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.width(40.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), Color.Transparent))))
                         Spacer(modifier = Modifier.height(10.dp))

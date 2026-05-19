@@ -103,6 +103,8 @@ data class NexaUiState(
     val isRegistering: Boolean = false,
     // Voice commands help
     val showVoiceCommandsHelp: Boolean = false,
+    // Accent color
+    val accentColor: Long = 0L,  // ARGB color value, 0 means default
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false
