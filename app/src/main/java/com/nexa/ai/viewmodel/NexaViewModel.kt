@@ -88,34 +88,43 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             
             if (_uiState.value.voiceMode) {
                 if (isSpeaking) {
-                    // Barge-in: start listening WHILE AI is speaking
-                    // so the user can interrupt just by talking
+                    // Barge-in: start AudioRecord monitor while AI is speaking
+                    // AudioRecord works reliably even when TTS is active
                     viewModelScope.launch {
-                        kotlinx.coroutines.delay(400) // Let TTS settle before opening mic
-                        if (_uiState.value.voiceMode && _uiState.value.isSpeaking && !_uiState.value.isListening) {
-                            speechManager.startListening()
+                        kotlinx.coroutines.delay(400) // Let TTS settle
+                        if (_uiState.value.voiceMode && _uiState.value.isSpeaking) {
+                            speechManager.startBargeInMonitor()
                         }
                     }
-                }
-                // When AI finishes speaking naturally (not interrupted),
-                // the barge-in listener is already running → no need to restart
-                // But if it's not listening (e.g. error), restart
-                if (!isSpeaking && !_uiState.value.isListening && !_uiState.value.isThinking) {
-                    viewModelScope.launch {
-                        kotlinx.coroutines.delay(300)
-                        if (_uiState.value.voiceMode && !_uiState.value.isListening &&
-                            !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
-                            speechManager.startListening()
+                } else {
+                    // AI stopped speaking (finished or interrupted)
+                    speechManager.stopBargeInMonitor()
+                    // Start actual speech recognition if not already listening
+                    if (!_uiState.value.isListening && !_uiState.value.isThinking) {
+                        viewModelScope.launch {
+                            kotlinx.coroutines.delay(300)
+                            if (_uiState.value.voiceMode && !_uiState.value.isListening &&
+                                !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                                speechManager.startListening()
+                            }
                         }
                     }
                 }
             }
         }
         
-        // Barge-in: user started talking while AI was speaking → shut up and listen
+        // Barge-in: AudioRecord detected user voice while AI was speaking
         speechManager.onBargeInDetected = {
-            if (_uiState.value.voiceMode && _uiState.value.isSpeaking) {
+            if (_uiState.value.voiceMode) {
+                speechManager.stopBargeInMonitor()
                 speechManager.stopSpeaking()
+                // Start actual speech recognition now
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(200)
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening) {
+                        speechManager.startListening()
+                    }
+                }
             }
         }
         
@@ -697,6 +706,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(autoSpeak = true)
             speechManager.startListening()
         } else {
+            speechManager.stopBargeInMonitor()
             speechManager.stopListening()
             speechManager.stopSpeaking()
         }
@@ -704,11 +714,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopVoiceMode() {
         _uiState.value = _uiState.value.copy(voiceMode = false)
+        speechManager.stopBargeInMonitor()
         speechManager.stopListening()
         speechManager.stopSpeaking()
     }
 
     fun interruptVoice() {
+        speechManager.stopBargeInMonitor()
         speechManager.stopSpeaking()
         // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening
     }

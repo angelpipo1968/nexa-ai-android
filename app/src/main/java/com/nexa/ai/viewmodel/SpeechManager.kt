@@ -2,6 +2,9 @@ package com.nexa.ai.viewmodel
 
 import android.app.Application
 import android.content.Intent
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -34,6 +37,10 @@ class SpeechManager(private val application: Application) {
     @Volatile
     var isTtsActive: Boolean = false
         private set
+
+    // Barge-in audio monitor (AudioRecord) — runs while TTS is speaking
+    private var bargeInThread: Thread? = null
+    @Volatile private var bargeInActive = false
 
     // Current settings
     private var currentLanguage: AppLanguage = AppLanguage.SPANISH
@@ -361,7 +368,100 @@ class SpeechManager(private val application: Application) {
         onListeningStateChanged?.invoke(false)
     }
 
+    // ═══════════════════════════════════════
+    //  BARGE-IN MONITOR (AudioRecord)
+    //  Detects user voice while TTS is speaking
+    // ═══════════════════════════════════════
+
+    /**
+     * Starts monitoring mic audio energy while TTS is speaking.
+     * When sustained voice energy is detected above the threshold,
+     * triggers onBargeInDetected to stop TTS and switch to listening.
+     */
+    fun startBargeInMonitor() {
+        if (bargeInActive) return
+        bargeInActive = true
+
+        bargeInThread = Thread {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+
+            val sampleRate = 16000
+            val bufferSize = AudioRecord.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            ).coerceAtLeast(1024)
+
+            var recorder: AudioRecord? = null
+            try {
+                recorder = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufferSize
+                )
+
+                if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+                    android.util.Log.e("SpeechManager", "Barge-in AudioRecord init failed")
+                    bargeInActive = false
+                    return@Thread
+                }
+
+                recorder.startRecording()
+
+                val buffer = ShortArray(bufferSize)
+                var highEnergyFrames = 0
+                val requiredFrames = 12 // ~12 consecutive high-energy frames = real voice
+                val thresholdDb = 48.0  // dB threshold for voice vs silence
+
+                while (bargeInActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                    val read = recorder.read(buffer, 0, buffer.size)
+                    if (read > 0) {
+                        var sum = 0.0
+                        for (i in 0 until read) {
+                            val sample = buffer[i].toDouble()
+                            sum += sample * sample
+                        }
+                        val rms = Math.sqrt(sum / read)
+                        // Convert to dB (avoid log10(0))
+                        val db = if (rms > 1.0) 20.0 * Math.log10(rms) else 0.0
+
+                        if (db > thresholdDb) {
+                            highEnergyFrames++
+                            if (highEnergyFrames >= requiredFrames) {
+                                android.util.Log.d("SpeechManager", "Barge-in detected! dB=$db")
+                                bargeInActive = false
+                                onBargeInDetected?.invoke()
+                                break
+                            }
+                        } else {
+                            // Decay slowly — don't reset instantly for brief pauses
+                            highEnergyFrames = maxOf(0, highEnergyFrames - 2)
+                        }
+                    } else if (read < 0) {
+                        break
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SpeechManager", "Barge-in monitor error: ${e.message}", e)
+            } finally {
+                try { recorder?.stop() } catch (_: Exception) {}
+                try { recorder?.release() } catch (_: Exception) {}
+                bargeInActive = false
+            }
+        }
+        bargeInThread?.start()
+    }
+
+    fun stopBargeInMonitor() {
+        bargeInActive = false
+        bargeInThread?.interrupt()
+        bargeInThread = null
+    }
+
     fun destroy() {
+        stopBargeInMonitor()
         try {
             speechRecognizer?.destroy()
             tts?.stop()
