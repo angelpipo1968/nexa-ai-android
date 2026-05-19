@@ -265,107 +265,104 @@ class SpeechManager(private val application: Application) {
     //  SPEECH RECOGNITION
     // ═══════════════════════════════════════
 
+    // Cached recognizer intent — avoids rebuilding on every start
+    private fun buildRecognizerIntent(): Intent {
+        val langCode = when (currentLanguage) {
+            AppLanguage.SPANISH -> "es-ES"
+            AppLanguage.ENGLISH -> "en-US"
+        }
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, application.packageName)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra("android.speech.extra.DICTATION_MODE", true)
+        }
+    }
+
+    // Lazy-create recognizer once and reuse to avoid audio hardware clicks
+    private fun getOrCreateRecognizer(): SpeechRecognizer? {
+        if (speechRecognizer != null) return speechRecognizer
+
+        if (!SpeechRecognizer.isRecognitionAvailable(application)) {
+            onError?.invoke("voice_unavailable")
+            return null
+        }
+
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    onListeningStateChanged?.invoke(true)
+                }
+                override fun onBeginningOfSpeech() {
+                    if (isTtsActive) {
+                        onBargeInDetected?.invoke()
+                    }
+                }
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onError(error: Int) {
+                    isCurrentlyListening = false
+                    onListeningStateChanged?.invoke(false)
+
+                    if (error == 5) {
+                        // ERROR_CLIENT: recognizer broken, destroy and recreate next time
+                        try {
+                            speechRecognizer?.cancel()
+                            speechRecognizer?.destroy()
+                        } catch (_: Exception) {}
+                        speechRecognizer = null
+                    }
+
+                    if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                        error == SpeechRecognizer.ERROR_NO_MATCH || error == 5) {
+                        onRecognitionEnded?.invoke()
+                    } else if (error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                        onError?.invoke("voice_error: $error")
+                    }
+                }
+                override fun onResults(results: Bundle?) {
+                    isCurrentlyListening = false
+                    onListeningStateChanged?.invoke(false)
+
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull()
+
+                    if (!text.isNullOrBlank()) {
+                        onInputTextChanged?.invoke(text)
+                        onSpeechResult?.invoke(text)
+                    } else {
+                        onRecognitionEnded?.invoke()
+                    }
+                }
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull() ?: return
+                    onSpeechPartial?.invoke(text)
+                }
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+        return speechRecognizer
+    }
+
     fun startListening() {
-        if (isCurrentlyListening) return // Prevents ERROR_CLIENT (Error 5)
-        
+        if (isCurrentlyListening) return
+
         try {
-            if (!SpeechRecognizer.isRecognitionAvailable(application)) {
-                onError?.invoke("voice_unavailable")
-                return
-            }
+            val recognizer = getOrCreateRecognizer() ?: return
 
             isCurrentlyListening = true
-            // Cleanup previous recognizer if any
-            speechRecognizer?.destroy()
-            
-            // Don't stop TTS during barge-in listening
+
             if (!isTtsActive) {
                 stopSpeaking()
             }
 
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
-                setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        onListeningStateChanged?.invoke(true)
-                    }
-                    override fun onBeginningOfSpeech() {
-                        // Barge-in: user started speaking while AI was talking
-                        if (isTtsActive) {
-                            onBargeInDetected?.invoke()
-                        }
-                    }
-                    override fun onRmsChanged(rmsdB: Float) {
-                        // Monitor energy levels to prevent premature cut-offs
-                    }
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() {
-                        // DON'T change state here. Wait for results or error to avoid UI flicker.
-                    }
-                    override fun onError(error: Int) {
-                        isCurrentlyListening = false
-                        onListeningStateChanged?.invoke(false)
-                        
-                        // Error 5 (ERROR_CLIENT) recovery: destroy and nullify to force fresh start next time
-                        if (error == 5) {
-                            try {
-                                speechRecognizer?.cancel()
-                                speechRecognizer?.destroy()
-                            } catch (_: Exception) {}
-                            speechRecognizer = null
-                        }
-
-                        if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || 
-                            error == SpeechRecognizer.ERROR_NO_MATCH || error == 5) {
-                            onRecognitionEnded?.invoke()
-                        } else if (error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
-                            onError?.invoke("voice_error: $error")
-                        }
-                    }
-                    override fun onResults(results: Bundle?) {
-                        isCurrentlyListening = false
-                        onListeningStateChanged?.invoke(false)
-                        
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull()
-                        
-                        if (!text.isNullOrBlank()) {
-                            onInputTextChanged?.invoke(text)
-                            onSpeechResult?.invoke(text)
-                        } else {
-                            onRecognitionEnded?.invoke()
-                        }
-                    }
-                    override fun onPartialResults(partialResults: Bundle?) {
-                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull() ?: return
-                        onSpeechPartial?.invoke(text)
-                    }
-                    override fun onEvent(eventType: Int, params: Bundle?) {}
-                })
-            }
-
-            val langCode = when (currentLanguage) {
-                AppLanguage.SPANISH -> "es-ES"
-                AppLanguage.ENGLISH -> "en-US"
-            }
-
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, langCode)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                
-                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, application.packageName)
-                
-                // Optimized silence detection (as suggested)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
-                
-                // Ensure dictation mode for better long speech handling
-                putExtra("android.speech.extra.DICTATION_MODE", true)
-            }
-
-            speechRecognizer?.startListening(intent)
+            recognizer.startListening(buildRecognizerIntent())
         } catch (e: Exception) {
             isCurrentlyListening = false
             android.util.Log.e("SpeechManager", "Speech recognition error: ${e.message}", e)
@@ -382,6 +379,7 @@ class SpeechManager(private val application: Application) {
         }
         isCurrentlyListening = false
         onListeningStateChanged?.invoke(false)
+        // Don't destroy recognizer — reuse to avoid audio clicks
     }
 
     // ═══════════════════════════════════════
@@ -560,6 +558,7 @@ class SpeechManager(private val application: Application) {
         } catch (_: Exception) {}
         try {
             speechRecognizer?.destroy()
+            speechRecognizer = null
             tts?.stop()
             tts?.shutdown()
         } catch (e: Exception) {
