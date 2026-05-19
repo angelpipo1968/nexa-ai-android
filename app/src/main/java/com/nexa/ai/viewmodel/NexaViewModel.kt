@@ -91,7 +91,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                     // Barge-in: start AudioRecord monitor while AI is speaking
                     // AudioRecord works reliably even when TTS is active
                     viewModelScope.launch {
-                        kotlinx.coroutines.delay(400) // Let TTS settle
+                        kotlinx.coroutines.delay(150) // Quick settle, then monitor
                         if (_uiState.value.voiceMode && _uiState.value.isSpeaking) {
                             speechManager.startBargeInMonitor()
                         }
@@ -120,7 +120,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 speechManager.stopSpeaking()
                 // Start actual speech recognition now
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(200)
+                    kotlinx.coroutines.delay(80)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening) {
                         speechManager.startListening()
                     }
@@ -704,11 +704,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
+            speechManager.startVoiceAudioSession()
             speechManager.startListening()
         } else {
             speechManager.stopBargeInMonitor()
             speechManager.stopListening()
             speechManager.stopSpeaking()
+            speechManager.stopVoiceAudioSession()
         }
     }
 
@@ -717,6 +719,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.stopBargeInMonitor()
         speechManager.stopListening()
         speechManager.stopSpeaking()
+        speechManager.stopVoiceAudioSession()
     }
 
     fun interruptVoice() {

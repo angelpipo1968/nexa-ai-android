@@ -1,8 +1,12 @@
 package com.nexa.ai.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Bundle
@@ -38,9 +42,14 @@ class SpeechManager(private val application: Application) {
     var isTtsActive: Boolean = false
         private set
 
-    // Barge-in audio monitor (AudioRecord) — runs while TTS is speaking
+    // Continuous audio session — keeps mic open during entire voice mode
+    // to eliminate start/stop clicks and enable seamless barge-in
+    private var continuousAudioRecord: AudioRecord? = null
     private var bargeInThread: Thread? = null
     @Volatile private var bargeInActive = false
+    private var audioSessionActive = false
+    private val audioManager: AudioManager
+        get() = application.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     // Current settings
     private var currentLanguage: AppLanguage = AppLanguage.SPANISH
@@ -369,14 +378,45 @@ class SpeechManager(private val application: Application) {
     }
 
     // ═══════════════════════════════════════
-    //  BARGE-IN MONITOR (AudioRecord)
-    //  Detects user voice while TTS is speaking
+    //  CONTINUOUS VOICE AUDIO SESSION
+    //  Keeps mic open during entire voice mode
+    //  to eliminate clicks and enable instant barge-in
     // ═══════════════════════════════════════
 
     /**
-     * Starts monitoring mic audio energy while TTS is speaking.
-     * When sustained voice energy is detected above the threshold,
-     * triggers onBargeInDetected to stop TTS and switch to listening.
+     * Opens a continuous audio session for the entire voice mode.
+     * Sets MODE_IN_COMMUNICATION to prevent audio clicks on transitions.
+     * AudioRecord is created once and reused — never released until voice mode ends.
+     */
+    fun startVoiceAudioSession() {
+        if (audioSessionActive) return
+        audioSessionActive = true
+
+        try {
+            // Set communication mode — eliminates clicks between TTS/recording transitions
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isSpeakerphoneOn = false // Route to earpiece/headset, reduce feedback
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "AudioManager mode error: ${e.message}", e)
+        }
+    }
+
+    fun stopVoiceAudioSession() {
+        audioSessionActive = false
+        stopBargeInMonitor()
+        releaseContinuousAudioRecord()
+
+        try {
+            audioManager.mode = AudioManager.MODE_NORMAL
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "AudioManager restore error: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Starts monitoring mic energy using the persistent AudioRecord.
+     * Only monitors — does NOT do speech recognition.
+     * When sustained voice energy is detected, triggers onBargeInDetected.
      */
     fun startBargeInMonitor() {
         if (bargeInActive) return
@@ -385,35 +425,49 @@ class SpeechManager(private val application: Application) {
         bargeInThread = Thread {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
 
-            val sampleRate = 16000
-            val bufferSize = AudioRecord.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            ).coerceAtLeast(1024)
-
-            var recorder: AudioRecord? = null
-            try {
-                recorder = AudioRecord(
-                    MediaRecorder.AudioSource.MIC,
+            // Create persistent AudioRecord once
+            if (continuousAudioRecord == null || continuousAudioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                releaseContinuousAudioRecord()
+                val sampleRate = 16000
+                val bufferSize = AudioRecord.getMinBufferSize(
                     sampleRate,
                     AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    bufferSize
-                )
+                    AudioFormat.ENCODING_PCM_16BIT
+                ).coerceAtLeast(2048)
 
-                if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-                    android.util.Log.e("SpeechManager", "Barge-in AudioRecord init failed")
+                try {
+                    continuousAudioRecord = AudioRecord(
+                        MediaRecorder.AudioSource.MIC,
+                        sampleRate,
+                        AudioFormat.CHANNEL_IN_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        bufferSize * 2
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("SpeechManager", "AudioRecord create error: ${e.message}", e)
                     bargeInActive = false
                     return@Thread
                 }
+            }
 
-                recorder.startRecording()
+            val recorder = continuousAudioRecord ?: run { bargeInActive = false; return@Thread }
 
-                val buffer = ShortArray(bufferSize)
+            if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+                android.util.Log.e("SpeechManager", "AudioRecord not initialized")
+                bargeInActive = false
+                return@Thread
+            }
+
+            try {
+                if (recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                    recorder.startRecording()
+                }
+
+                val bufferSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                val buffer = ShortArray(bufferSize.coerceAtLeast(1024))
                 var highEnergyFrames = 0
-                val requiredFrames = 12 // ~12 consecutive high-energy frames = real voice
-                val thresholdDb = 48.0  // dB threshold for voice vs silence
+                val requiredFrames = 6     // Faster detection: 6 frames ≈ 200ms
+                val thresholdDb = 40.0     // Lower threshold for better sensitivity
 
                 while (bargeInActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                     val read = recorder.read(buffer, 0, buffer.size)
@@ -424,20 +478,18 @@ class SpeechManager(private val application: Application) {
                             sum += sample * sample
                         }
                         val rms = Math.sqrt(sum / read)
-                        // Convert to dB (avoid log10(0))
                         val db = if (rms > 1.0) 20.0 * Math.log10(rms) else 0.0
 
                         if (db > thresholdDb) {
                             highEnergyFrames++
                             if (highEnergyFrames >= requiredFrames) {
-                                android.util.Log.d("SpeechManager", "Barge-in detected! dB=$db")
+                                android.util.Log.d("SpeechManager", "Barge-in! dB=$db frames=$highEnergyFrames")
                                 bargeInActive = false
                                 onBargeInDetected?.invoke()
                                 break
                             }
                         } else {
-                            // Decay slowly — don't reset instantly for brief pauses
-                            highEnergyFrames = maxOf(0, highEnergyFrames - 2)
+                            highEnergyFrames = maxOf(0, highEnergyFrames - 1)
                         }
                     } else if (read < 0) {
                         break
@@ -446,8 +498,9 @@ class SpeechManager(private val application: Application) {
             } catch (e: Exception) {
                 android.util.Log.e("SpeechManager", "Barge-in monitor error: ${e.message}", e)
             } finally {
-                try { recorder?.stop() } catch (_: Exception) {}
-                try { recorder?.release() } catch (_: Exception) {}
+                // Pause recording but KEEP the AudioRecord instance (don't release)
+                // This prevents the click sound from mic hardware open/close
+                try { recorder.stop() } catch (_: Exception) {}
                 bargeInActive = false
             }
         }
@@ -458,10 +511,26 @@ class SpeechManager(private val application: Application) {
         bargeInActive = false
         bargeInThread?.interrupt()
         bargeInThread = null
+        // Note: don't stop recorder here, let the thread's finally block handle it
+        // and don't release — keep it for next use
+    }
+
+    private fun releaseContinuousAudioRecord() {
+        try {
+            continuousAudioRecord?.stop()
+        } catch (_: Exception) {}
+        try {
+            continuousAudioRecord?.release()
+        } catch (_: Exception) {}
+        continuousAudioRecord = null
     }
 
     fun destroy() {
         stopBargeInMonitor()
+        releaseContinuousAudioRecord()
+        try {
+            audioManager.mode = AudioManager.MODE_NORMAL
+        } catch (_: Exception) {}
         try {
             speechRecognizer?.destroy()
             tts?.stop()
