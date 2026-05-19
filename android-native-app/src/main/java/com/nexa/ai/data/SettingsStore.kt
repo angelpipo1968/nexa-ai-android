@@ -1,0 +1,95 @@
+package com.nexa.ai.data
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.nexa.ai.viewmodel.AiMode
+import com.nexa.ai.viewmodel.AppLanguage
+import com.nexa.ai.viewmodel.ThemeMode
+import com.nexa.ai.viewmodel.VoiceType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+private val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "nexa_settings")
+
+/**
+ * Persists user preferences (theme, language, voice, AI mode, location) across app restarts.
+ */
+class SettingsStore(private val context: Context) {
+
+    private val KEY_THEME = stringPreferencesKey("theme_mode")
+    private val KEY_LANGUAGE = stringPreferencesKey("language")
+    private val KEY_VOICE = stringPreferencesKey("voice_type")
+    private val KEY_AI_MODE = stringPreferencesKey("ai_mode")
+    private val KEY_LOCATION_ENABLED = booleanPreferencesKey("location_enabled")
+
+    val themeMode: Flow<ThemeMode> = context.settingsStore.data.map { prefs ->
+        try {
+            ThemeMode.valueOf(prefs[KEY_THEME] ?: ThemeMode.DARK.name)
+        } catch (_: Exception) {
+            ThemeMode.DARK
+        }
+    }
+
+    val language: Flow<AppLanguage> = context.settingsStore.data.map { prefs ->
+        try {
+            AppLanguage.valueOf(prefs[KEY_LANGUAGE] ?: AppLanguage.SPANISH.name)
+        } catch (_: Exception) {
+            AppLanguage.SPANISH
+        }
+    }
+
+    val voiceType: Flow<VoiceType> = context.settingsStore.data.map { prefs ->
+        try {
+            VoiceType.valueOf(prefs[KEY_VOICE] ?: VoiceType.FEMALE_1.name)
+        } catch (_: Exception) {
+            VoiceType.FEMALE_1
+        }
+    }
+
+    val aiMode: Flow<AiMode> = context.settingsStore.data.map { prefs ->
+        try {
+            AiMode.valueOf(prefs[KEY_AI_MODE] ?: AiMode.GENERAL.name)
+        } catch (_: Exception) {
+            AiMode.GENERAL
+        }
+    }
+
+    val locationEnabled: Flow<Boolean> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_LOCATION_ENABLED] ?: false
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_THEME] = mode.name
+        }
+    }
+
+    suspend fun setLanguage(lang: AppLanguage) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_LANGUAGE] = lang.name
+        }
+    }
+
+    suspend fun setVoiceType(type: VoiceType) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_VOICE] = type.name
+        }
+    }
+
+    suspend fun setAiMode(mode: AiMode) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_AI_MODE] = mode.name
+        }
+    }
+
+    suspend fun setLocationEnabled(enabled: Boolean) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_LOCATION_ENABLED] = enabled
+        }
+    }
+}
