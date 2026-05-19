@@ -86,21 +86,47 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
             _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
             
-            // Voice mode: restart listening AFTER AI finishes speaking (INSTANT RESTART)
-            if (!isSpeaking && _uiState.value.voiceMode) {
-                viewModelScope.launch {
-                    // Minimal delay (300ms) to ensure audio hardware is ready
-                    kotlinx.coroutines.delay(300) 
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && 
-                        !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
-                        speechManager.startListening()
+            if (_uiState.value.voiceMode) {
+                if (isSpeaking) {
+                    // Barge-in: start listening WHILE AI is speaking
+                    // so the user can interrupt just by talking
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(400) // Let TTS settle before opening mic
+                        if (_uiState.value.voiceMode && _uiState.value.isSpeaking && !_uiState.value.isListening) {
+                            speechManager.startListening()
+                        }
+                    }
+                }
+                // When AI finishes speaking naturally (not interrupted),
+                // the barge-in listener is already running → no need to restart
+                // But if it's not listening (e.g. error), restart
+                if (!isSpeaking && !_uiState.value.isListening && !_uiState.value.isThinking) {
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(300)
+                        if (_uiState.value.voiceMode && !_uiState.value.isListening &&
+                            !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                            speechManager.startListening()
+                        }
                     }
                 }
             }
         }
         
+        // Barge-in: user started talking while AI was speaking → shut up and listen
+        speechManager.onBargeInDetected = {
+            if (_uiState.value.voiceMode && _uiState.value.isSpeaking) {
+                speechManager.stopSpeaking()
+            }
+        }
+        
         speechManager.onSpeechResult = { text ->
             if (_uiState.value.voiceMode) {
+                // Barge-in: if AI was speaking, it's already stopped by onBargeInDetected
+                // but double-check in case onBeginningOfSpeech didn't fire
+                if (_uiState.value.isSpeaking) {
+                    speechManager.stopSpeaking()
+                }
+                
                 // Apply "Debounce" logic to avoid rapid/accidental triggers
                 speechDebounceJob?.cancel()
                 speechDebounceJob = viewModelScope.launch {
@@ -683,10 +709,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun interruptVoice() {
-        if (_uiState.value.isSpeaking) {
-            speechManager.stopSpeaking()
-            // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening
-        }
+        speechManager.stopSpeaking()
+        // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening
     }
 
     fun clearChat() {

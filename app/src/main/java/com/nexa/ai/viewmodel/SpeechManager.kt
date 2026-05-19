@@ -28,6 +28,12 @@ class SpeechManager(private val application: Application) {
     var onError: ((String) -> Unit)? = null
     var onInputTextChanged: ((String) -> Unit)? = null
     var onRecognitionEnded: (() -> Unit)? = null
+    var onBargeInDetected: (() -> Unit)? = null
+
+    // Barge-in: track whether TTS is actively playing
+    @Volatile
+    var isTtsActive: Boolean = false
+        private set
 
     // Current settings
     private var currentLanguage: AppLanguage = AppLanguage.SPANISH
@@ -60,10 +66,12 @@ class SpeechManager(private val application: Application) {
                             onSpeakingStateChanged?.invoke(true, utteranceId)
                         }
                         override fun onDone(utteranceId: String?) {
+                            isTtsActive = false
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                         @Deprecated("Deprecated")
                         override fun onError(utteranceId: String?) {
+                            isTtsActive = false
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                     })
@@ -179,6 +187,7 @@ class SpeechManager(private val application: Application) {
 
         try {
             // Use simple speak without params to avoid device-specific crashes
+            isTtsActive = true
             val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, null, messageId ?: "msg")
             if (result == TextToSpeech.ERROR) {
                 android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
@@ -191,6 +200,7 @@ class SpeechManager(private val application: Application) {
     }
 
     fun stopSpeaking() {
+        isTtsActive = false
         tts?.stop()
         onSpeakingStateChanged?.invoke(false, null)
     }
@@ -245,14 +255,22 @@ class SpeechManager(private val application: Application) {
             // Cleanup previous recognizer if any
             speechRecognizer?.destroy()
             
-            stopSpeaking()
+            // Don't stop TTS during barge-in listening
+            if (!isTtsActive) {
+                stopSpeaking()
+            }
 
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
                         onListeningStateChanged?.invoke(true)
                     }
-                    override fun onBeginningOfSpeech() {}
+                    override fun onBeginningOfSpeech() {
+                        // Barge-in: user started speaking while AI was talking
+                        if (isTtsActive) {
+                            onBargeInDetected?.invoke()
+                        }
+                    }
                     override fun onRmsChanged(rmsdB: Float) {
                         // Monitor energy levels to prevent premature cut-offs
                     }
