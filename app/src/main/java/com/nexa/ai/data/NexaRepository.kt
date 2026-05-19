@@ -24,7 +24,8 @@ data class ChatMessage(
 data class ChatRequest(
     val messages: List<ChatMessage>,
     val provider: String? = null,
-    val language: String? = null
+    val language: String? = null,
+    val systemPrompt: String? = null
 )
 
 class NexaRepository {
@@ -46,10 +47,27 @@ class NexaRepository {
         messages: List<ChatMessage>,
         baseUrl: String,
         provider: String? = null,
-        language: String? = null
+        language: String? = null,
+        systemPrompt: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val chatRequest = ChatRequest(messages, provider, language)
+        val chatRequest = ChatRequest(messages, provider, language, systemPrompt)
         val body = gson.toJsonTree(chatRequest).asJsonObject
+
+        // Remove systemPrompt from body and inject as first message instead
+        if (body.has("systemPrompt")) body.remove("systemPrompt")
+        if (!systemPrompt.isNullOrBlank()) {
+            val msgArray = body.getAsJsonArray("messages")
+            val systemMsg = com.google.gson.JsonObject().apply {
+                addProperty("role", "system")
+                addProperty("content", systemPrompt)
+            }
+            msgArray?.let { it ->
+                val newArray = com.google.gson.JsonArray()
+                newArray.add(systemMsg)
+                it.forEach { elem -> newArray.add(elem) }
+                body.add("messages", newArray)
+            }
+        }
 
         val httpRequest = Request.Builder()
             .url("$baseUrl/api/chat")

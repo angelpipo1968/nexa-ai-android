@@ -146,7 +146,25 @@ class MainActivity : ComponentActivity() {
                                 requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                             }
                         },
-                        onToggleNotifications = { viewModel.toggleNotifications() }
+                        onToggleNotifications = { viewModel.toggleNotifications() },
+                        onShareMessage = { viewModel.shareText(it) },
+                        onQuickAction = { action ->
+                            val lang = uiState.language
+                            val prompt = when (action) {
+                                "image" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Genera una imagen creativa e impresionante" else "Generate a creative and impressive image"
+                                "web" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Crea una página web profesional y moderna con diseño responsive. Incluye HTML, CSS y JavaScript completos." else "Create a professional and modern responsive web page with complete HTML, CSS, and JavaScript."
+                                "logo" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Genera un logo moderno y profesional. Describe el diseño y crea la imagen del logo." else "Generate a modern and professional logo. Describe the design and create the logo image."
+                                "code" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Escribe código profesional. ¿Qué proyecto te gustaría que programe?" else "Write professional code. What project would you like me to program?"
+                                "vision" -> if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Puedo analizar imágenes que subas como adjunto. Sube una foto y la describiré en detalle." else "I can analyze images you upload as attachments. Upload a photo and I'll describe it in detail."
+                                else -> return@NexaChatScreen
+                            }
+                            viewModel.sendMessage(prompt)
+                        }
                     )
                 }
             }

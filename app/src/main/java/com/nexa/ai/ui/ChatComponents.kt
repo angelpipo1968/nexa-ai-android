@@ -67,7 +67,9 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     onRegenerate: () -> Unit = {}, isDarkTheme: Boolean = true,
     themeMode: ThemeMode = ThemeMode.DARK, modifier: Modifier = Modifier,
     onClearChat: () -> Unit = {}, onStopSpeaking: () -> Unit = {},
-    isSpeaking: Boolean = false, onActivateVoiceMode: () -> Unit = {}) {
+    isSpeaking: Boolean = false, onActivateVoiceMode: () -> Unit = {},
+    onShareMessage: (String) -> Unit = {},
+    onQuickAction: (String) -> Unit = {}) {
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -75,7 +77,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     LazyColumn(modifier = modifier.fillMaxWidth(), state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode) }
+        if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode, onQuickAction) }
         items(messages, key = { it.id }) { msg ->
             val isLast = msg == messages.lastOrNull()
             val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
@@ -84,7 +86,8 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
                 onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
                 onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null,
                 isLastAssistant = isLastAssistant, onClearChat = onClearChat,
-                onStopSpeaking = onStopSpeaking, isGloballySpeaking = isSpeaking)
+                onStopSpeaking = onStopSpeaking, isGloballySpeaking = isSpeaking,
+                onShare = { onShareMessage(msg.content) })
         }
         if (isThinking && messages.isEmpty()) item { ShimmerLoading(isDarkTheme = isDarkTheme) }
         if (isThinking && messages.isNotEmpty()) item { ThinkingIndicator(language) }
@@ -92,7 +95,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
 }
 
 @Composable
-fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
+fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickAction: (String) -> Unit = {}) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 120.dp, bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -221,6 +224,77 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}) {
                 fontWeight = FontWeight.Bold
             )
         }
+
+        // ── Quick Actions ──
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text(
+                NexaStrings.get("quick_actions", lang),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                letterSpacing = 2.sp
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
+                QuickActionChip(
+                    emoji = "🎨",
+                    label = NexaStrings.get("create_image", lang),
+                    onClick = { onQuickAction("image") }
+                )
+                QuickActionChip(
+                    emoji = "🌐",
+                    label = NexaStrings.get("create_web", lang),
+                    onClick = { onQuickAction("web") }
+                )
+                QuickActionChip(
+                    emoji = "⭐",
+                    label = NexaStrings.get("create_logo", lang),
+                    onClick = { onQuickAction("logo") }
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
+                QuickActionChip(
+                    emoji = "💻",
+                    label = NexaStrings.get("write_code", lang),
+                    onClick = { onQuickAction("code") }
+                )
+                QuickActionChip(
+                    emoji = "📷",
+                    label = NexaStrings.get("vision_camera", lang),
+                    onClick = { onQuickAction("vision") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionChip(emoji: String, label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.15f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(emoji, fontSize = 14.sp)
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                letterSpacing = 0.3.sp)
+        }
     }
 }
 
@@ -272,7 +346,8 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     isDarkTheme: Boolean = true, themeMode: ThemeMode = ThemeMode.DARK,
     onSpeak: () -> Unit, onCopy: () -> Unit, onExport: () -> Unit, onRegenerate: (() -> Unit)? = null,
     isLastAssistant: Boolean = false, onClearChat: () -> Unit = {},
-    onStopSpeaking: () -> Unit = {}, isGloballySpeaking: Boolean = false) {
+    onStopSpeaking: () -> Unit = {}, isGloballySpeaking: Boolean = false,
+    onShare: () -> Unit = {}) {
     val isUser = message.role == "user"
 
     // Dynamic color for user bubble: SYSTEM mode uses Material You, others use custom colors
@@ -420,6 +495,13 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                     }
                 }
+                // Share button
+                Surface(onClick = onShare, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(32.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    }
+                }
                 // More menu
                 var showMsgMenu by remember { mutableStateOf(false) }
                 Box {
@@ -433,6 +515,10 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                         DropdownMenuItem(
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("copy", language)) } },
                             onClick = { showMsgMenu = false; onCopy() }
+                        )
+                        DropdownMenuItem(
+                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("share", language)) } },
+                            onClick = { showMsgMenu = false; onShare() }
                         )
                         DropdownMenuItem(
                             text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("read_aloud", language)) } },

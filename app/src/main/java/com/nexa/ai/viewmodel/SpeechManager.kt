@@ -162,7 +162,7 @@ class SpeechManager(private val application: Application) {
     private var currentVoiceType: VoiceType = VoiceType.FEMALE_1
 
     // TTS stream fallback tracking
-    private var useVoiceCallStream = true
+    private var useVoiceCallStream = false  // Changed: default to STREAM_MUSIC for louder hands-free volume
 
     fun initialize() {
         initTTS()
@@ -811,6 +811,18 @@ class SpeechManager(private val application: Application) {
             // Set communication mode — eliminates clicks between TTS/recording transitions
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
 
+            // ── VOLUME BOOST for hands-free mode ──
+            // Raise STREAM_MUSIC volume to max for louder TTS in hands-free
+            try {
+                val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                if (currentMusic < maxMusic) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SpeechManager", "Volume boost failed: ${e.message}")
+            }
+
             // Bluetooth SCO: route audio to BT headset if available
             detectBluetoothSco()
             if (isBluetoothScoConnected) {
@@ -819,7 +831,7 @@ class SpeechManager(private val application: Application) {
             } else {
                 // Enable proximity sensor for auto earpiece/speaker switching
                 enableProximitySensor()
-                // Initial state: use speaker for hands-free
+                // Initial state: use speaker for hands-free (louder)
                 setSpeakerphoneOn(!isNearEar)
             }
         } catch (e: Exception) {

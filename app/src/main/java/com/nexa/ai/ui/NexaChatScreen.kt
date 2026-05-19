@@ -66,7 +66,9 @@ fun NexaChatScreen(
     onDownloadSession: (String) -> Unit = {},
     onRegenerate: () -> Unit = {},
     onRequestLocation: () -> Unit = {},
-    onToggleNotifications: () -> Unit = {}
+    onToggleNotifications: () -> Unit = {},
+    onShareMessage: (String) -> Unit = {},
+    onQuickAction: (String) -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -116,7 +118,9 @@ fun NexaChatScreen(
             onRegenerate = onRegenerate,
             onInterruptVoice = onInterruptVoice,
             onToggleVoiceMode = onToggleVoiceMode, onStopVoiceMode = onStopVoiceMode,
-            onDismissVoiceHelp = onDismissVoiceHelp)
+            onDismissVoiceHelp = onDismissVoiceHelp,
+            onShareMessage = onShareMessage,
+            onQuickAction = onQuickAction)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,
             isDarkTheme = isDark,

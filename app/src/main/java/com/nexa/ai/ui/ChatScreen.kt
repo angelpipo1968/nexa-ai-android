@@ -87,7 +87,9 @@ fun ChatMainScreen(
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
     onDownloadSession: (String) -> Unit = {},
-    onRegenerate: () -> Unit = {}
+    onRegenerate: () -> Unit = {},
+    onShareMessage: (String) -> Unit = {},
+    onQuickAction: (String) -> Unit = {}
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -218,7 +220,9 @@ fun ChatMainScreen(
                             onClearChat = onClearChat,
                             onStopSpeaking = onStopSpeaking,
                             isSpeaking = uiState.isSpeaking,
-                            onActivateVoiceMode = onToggleVoiceMode
+                            onActivateVoiceMode = onToggleVoiceMode,
+                            onShareMessage = onShareMessage,
+                            onQuickAction = onQuickAction
                         )
                     }
 

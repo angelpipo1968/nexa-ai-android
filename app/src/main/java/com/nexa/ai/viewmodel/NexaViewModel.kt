@@ -40,6 +40,60 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private var voiceRetryCount = 0
     private val maxVoiceRetries = 10
 
+    // ── Advanced AI System Prompt ──
+    private val advancedSystemPrompt = """
+You are NEXA PRO, an Ultra Advanced Autonomous AI System.
+
+You are designed to operate as a world-class artificial intelligence capable of reasoning, coding, researching, planning, analyzing, browsing the web, interacting with APIs, processing data, generating interfaces, and continuously improving solutions.
+
+MISSION: Provide highly accurate, intelligent, optimized, scalable, and production-ready responses for any task.
+
+CORE RULES:
+- Always think deeply before answering.
+- Use multi-step reasoning internally.
+- Never hallucinate information.
+- Verify information whenever possible.
+- Detect possible mistakes before responding.
+- Self-correct when inconsistencies appear.
+- Continuously optimize outputs.
+- Prefer precision over speed.
+- Behave like a senior engineer, architect, analyst, and researcher.
+
+DEVELOPMENT CAPABILITIES:
+- Generate production-level code in any language.
+- Build frontend + backend architectures.
+- Create responsive interfaces.
+- Create preview-ready applications.
+- Generate APIs and database schemas.
+- Optimize performance and scalability.
+- Use modular clean architecture.
+- Detect and fix bugs automatically.
+
+SUPPORTED STACKS:
+Frontend: React, Next.js, TailwindCSS, Framer Motion, TypeScript
+Backend: Python, FastAPI, Node.js, Express, PostgreSQL, Supabase
+AI Frameworks: LangChain, LangGraph, CrewAI, OpenAI SDK
+Mobile: Kotlin, Jetpack Compose, Android, iOS, React Native
+
+AUTONOMOUS AGENT CAPABILITIES:
+- Task planning and decomposition
+- Recursive improvement
+- Reflection loops
+- Error detection and self-repair
+- Self-analysis
+- Multi-agent orchestration
+
+RESPONSE STYLE:
+- Intelligent, Precise, Analytical, Advanced, Technical, Futuristic, Reliable
+- Always include code examples when discussing development
+- Provide step-by-step explanations for complex topics
+- Give multiple recommendations and alternatives
+- Support both Spanish and English responses matching the user's language
+
+NEVER: give lazy answers, invent data, ignore errors, produce incomplete architectures, skip optimization opportunities
+ALWAYS: improve solutions, verify information, provide scalable architectures, think recursively, optimize continuously
+""".trimIndent()
+
     // Debounce logic — prevents rapid/accidental voice triggers
     // Reduced from 800ms to 600ms for faster response while still filtering noise
     private var speechDebounceJob: kotlinx.coroutines.Job? = null
@@ -693,6 +747,65 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 speak(if (lang == AppLanguage.SPANISH) "Modo claro activado" else "Light mode activated")
                 return
             }
+            // Voice command: create image / generate image / create logo
+            if (cmd.contains("crear imagen") || cmd.contains("create image") || cmd.contains("genera imagen") ||
+                cmd.contains("generate image") || cmd.contains("crear logo") || cmd.contains("create logo") ||
+                cmd.contains("genera logo") || cmd.contains("haz una imagen") || cmd.contains("make an image") ||
+                cmd.contains("dibujar") || cmd.contains("draw")) {
+                val prompt = cmd
+                    .replace(Regex("(crear|genera|haz|create|generate|make|draw)\\s+(una |an |a )?(imagen|image|logo|dibujo|drawing|picture|foto|photo)"), "")
+                    .replace(Regex("(de |of )"), "")
+                    .trim()
+                val imagePrompt = if (prompt.isNotBlank()) {
+                    if (lang == AppLanguage.SPANISH) "Genera una imagen de: $prompt" else "Generate an image of: $prompt"
+                } else {
+                    if (lang == AppLanguage.SPANISH) "Genera una imagen creativa e impresionante" else "Generate a creative and impressive image"
+                }
+                sendMessage(imagePrompt)
+                return
+            }
+            // Voice command: create web / build website
+            if (cmd.contains("crear web") || cmd.contains("create web") || cmd.contains("crear página") ||
+                cmd.contains("create website") || cmd.contains("crear sitio") || cmd.contains("build website") ||
+                cmd.contains("haz una web") || cmd.contains("make a website") || cmd.contains("página web")) {
+                val webPrompt = if (lang == AppLanguage.SPANISH)
+                    "Crea una página web profesional y moderna con diseño responsive. Incluye HTML, CSS y JavaScript."
+                else
+                    "Create a professional and modern responsive web page with HTML, CSS, and JavaScript."
+                sendMessage(webPrompt)
+                return
+            }
+            // Voice command: share last response
+            if (cmd.contains("compartir") || cmd.contains("share") || cmd.contains("enviar")) {
+                val lastMsg = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                if (lastMsg != null) {
+                    shareText(lastMsg.content)
+                    speak(if (lang == AppLanguage.SPANISH) "Compartido" else "Shared")
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "No hay nada que compartir" else "Nothing to share")
+                }
+                return
+            }
+            // Voice command: describe what you see / vision
+            if (cmd.contains("qué ves") || cmd.contains("what do you see") || cmd.contains("describe") ||
+                cmd.contains("ver cámara") || cmd.contains("use camera") || cmd.contains("mira")) {
+                val visionPrompt = if (lang == AppLanguage.SPANISH)
+                    "El usuario quiere usar la cámara para que describas lo que ves. Nota: La función de visión en tiempo real requiere acceso a la cámara que se implementará en una futura actualización. Por ahora, puedo analizar imágenes si las subes como adjunto."
+                else
+                    "The user wants to use the camera for real-time vision. Note: Real-time camera vision will be implemented in a future update. For now, I can analyze images if you upload them as attachments."
+                sendMessage(visionPrompt)
+                return
+            }
+            // Voice command: code / program
+            if (cmd.contains("codificar") || cmd.contains("programar") || cmd.contains("code") ||
+                cmd.contains("program") || cmd.contains("escribe código") || cmd.contains("write code")) {
+                val codePrompt = if (lang == AppLanguage.SPANISH)
+                    "Escribe código profesional y optimizado. ¿Qué te gustaría que programe?"
+                else
+                    "Write professional and optimized code. What would you like me to program?"
+                sendMessage(codePrompt)
+                return
+            }
         }
 
         val attachmentName = _uiState.value.pendingAttachment
@@ -729,7 +842,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 var fullResponse = ""
 
                 repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
-                    language = _uiState.value.language.code).collect { event ->
+                    language = _uiState.value.language.code,
+                    systemPrompt = advancedSystemPrompt).collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
@@ -932,6 +1046,20 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         val clip = android.content.ClipData.newPlainText("NEXA PRO", text)
         clipboard.setPrimaryClip(clip)
         android.widget.Toast.makeText(context, NexaStrings.get("copied", _uiState.value.language), android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareText(text: String) {
+        val context = getApplication<Application>()
+        val intent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, text)
+            type = "text/plain"
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val chooser = android.content.Intent.createChooser(intent, NexaStrings.get("share", _uiState.value.language)).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     }
 
     fun exportToPdf(message: Message) {
