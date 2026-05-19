@@ -291,8 +291,63 @@ fun SettingsScreen(
                     }
                 }
 
-                // ── Privacy ──
+                // ── AI Capabilities ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 6) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("ai_capabilities", uiState.language).uppercase())
+                        FuturisticCard {
+                            // Quick actions info
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(effectiveAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(16.dp), tint = effectiveAccent)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("ai_capabilities", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(NexaStrings.get("ai_capabilities_desc", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            // Capability cards
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                listOf(
+                                    Icons.Default.Image to NexaStrings.get("create_image", uiState.language),
+                                    Icons.Default.Language to NexaStrings.get("create_web", uiState.language),
+                                    Icons.Default.Brush to NexaStrings.get("create_logo", uiState.language)
+                                ).forEach { (icon, label) ->
+                                    Surface(shape = RoundedCornerShape(10.dp), color = effectiveAccent.copy(alpha = 0.06f), border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.15f)), modifier = Modifier.weight(1f)) {
+                                        Column(modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Icon(icon, null, modifier = Modifier.size(16.dp), tint = effectiveAccent.copy(alpha = 0.6f))
+                                            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = effectiveAccent.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Screen Adaptation ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 7) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("screen_adaptation", uiState.language).uppercase())
+                        FuturisticCard {
+                            // Auto-scroll
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.ArrowDownward, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("auto_scroll", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(NexaStrings.get("auto_scroll_desc", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
+                                }
+                                FuturisticSwitch(checked = uiState.autoScrollEnabled, onCheckedChange = { /* Handled by ViewModel */ })
+                            }
+                        }
+                    }
+                }
+
+                // ── Privacy ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 8) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("privacy", uiState.language).uppercase())
                         FuturisticCard {
@@ -313,7 +368,7 @@ fun SettingsScreen(
                 }
 
                 // ── Danger Zone ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 7) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 9) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("danger_zone", uiState.language).uppercase(), color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                         FuturisticCard {
@@ -336,13 +391,11 @@ fun SettingsScreen(
                 }
 
                 // ── About ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 10) {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.width(40.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), Color.Transparent))))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("NEXA PRO v${BuildConfig.VERSION_NAME}", fontSize = 9.sp, fontWeight = FontWeight.Medium, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(NexaStrings.get("about_desc", uiState.language), fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f), letterSpacing = 1.sp)
+                        Text(NexaStrings.get("about_version", uiState.language), fontSize = 9.sp, fontWeight = FontWeight.Medium, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))

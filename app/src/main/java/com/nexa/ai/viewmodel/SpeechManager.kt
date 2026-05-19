@@ -582,11 +582,15 @@ class SpeechManager(private val application: Application) {
             requestAudioFocus()
 
             // ── VOLUME BOOST: Maximize volume before speaking ──
-            if (volumeBoostEnabled && audioSessionActive) {
+            if (volumeBoostEnabled) {
                 boostVolumeForHandsFree()
             }
 
             isTtsActive = true
+            // Ensure speaker is on for hands-free mode
+            if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                setSpeakerphoneOn(true)
+            }
             ttsStartedAt = System.currentTimeMillis()
             val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
             val params = Bundle().apply {
@@ -689,6 +693,12 @@ class SpeechManager(private val application: Application) {
                     audioManager.setStreamVolume(AudioManager.STREAM_ACCESSIBILITY, maxAccessibility, 0)
                 } catch (_: Exception) {}
             }
+
+            // Boost STREAM_ALARM — some Samsung devices route TTS through this
+            try {
+                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
+            } catch (_: Exception) {}
 
             // Ensure speaker is ON when not near ear
             if (!isNearEar && !isBluetoothScoConnected) {
@@ -901,27 +911,39 @@ class SpeechManager(private val application: Application) {
                 enableProximitySensor()
                 // Initial state: use speaker for hands-free (louder)
                 setSpeakerphoneOn(!isNearEar)
-                // ── EXTRA: Force speaker ON for maximum volume when not near ear ──
                 if (!isNearEar) {
-                    // On some devices, MODE_IN_COMMUNICATION routes to earpiece
-                    // We need to explicitly force speaker for hands-free
+                    // KEY FIX: Use MODE_NORMAL for speaker mode on most devices
+                    // MODE_IN_COMMUNICATION forces earpiece routing on many OEMs
+                    // We use MODE_NORMAL + speaker ON for maximum hands-free volume
                     try {
-                        // Temporarily set MODE_NORMAL so speaker works at full volume
-                        // Then switch back to IN_COMMUNICATION for echo cancellation
                         audioManager.mode = AudioManager.MODE_NORMAL
                         setSpeakerphoneOn(true)
-                        // Small delay to let audio routing settle
+                        // Boost volume after routing change
+                        if (volumeBoostEnabled) {
+                            boostVolumeForHandsFree()
+                        }
+                        // Delayed re-apply: some devices need speaker forced after mode change
                         Handler(Looper.getMainLooper()).postDelayed({
-                            if (audioSessionActive) {
-                                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                            if (audioSessionActive && !isNearEar) {
                                 setSpeakerphoneOn(true)
-                                // Re-boost volume after mode change
-                                boostVolumeForHandsFree()
+                                if (volumeBoostEnabled) {
+                                    boostVolumeForHandsFree()
+                                }
                             }
-                        }, 100)
+                        }, 200)
+                        // Second delayed re-apply for stubborn devices (Samsung, Xiaomi, etc.)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (audioSessionActive && !isNearEar) {
+                                setSpeakerphoneOn(true)
+                            }
+                        }, 500)
                     } catch (e: Exception) {
                         android.util.Log.w("SpeechManager", "Speaker force error: ${e.message}")
                     }
+                } else {
+                    // Near ear: use MODE_IN_COMMUNICATION for earpiece + echo cancellation
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    setSpeakerphoneOn(false)
                 }
             }
         } catch (e: Exception) {
