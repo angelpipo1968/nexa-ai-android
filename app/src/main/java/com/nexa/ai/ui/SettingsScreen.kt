@@ -8,6 +8,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -71,7 +75,9 @@ fun SettingsScreen(
     onPreviewVoice: () -> Unit = {},
     onSetAccentColor: (Color) -> Unit = {},
     onExportSettings: () -> Unit = {},
-    onImportSettings: () -> Unit = {}
+    onImportSettings: () -> Unit = {},
+    onSetGroqApiKey: (String) -> Unit = {},
+    onDeleteGroqApiKey: () -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity
     val sectionSpacing = 28.dp
@@ -155,6 +161,109 @@ fun SettingsScreen(
                                     FuturisticPill(label = label, selected = selected, accent = effectiveAccent, modifier = Modifier.weight(1f), onClick = { onSetLanguage(lang) })
                                 }
                             }
+                        }
+                    }
+                }
+
+                // ── Groq API Key ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 2) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("api_key_section", uiState.language).uppercase())
+                        FuturisticCard {
+                            // PRO / FREE status badge
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(if (uiState.isGroqProMode) effectiveAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.VpnKey, null, modifier = Modifier.size(16.dp), tint = if (uiState.isGroqProMode) effectiveAccent else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("groq_api_key", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    if (uiState.isGroqProMode) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(effectiveAccent))
+                                            Text(NexaStrings.get("pro_mode", uiState.language), fontSize = 10.sp, color = effectiveAccent, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                        }
+                                    } else {
+                                        Text(NexaStrings.get("free_mode", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (uiState.isGroqProMode) effectiveAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        if (uiState.isGroqProMode) "PRO" else "FREE",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
+                                        color = if (uiState.isGroqProMode) effectiveAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // API Key input field
+                            var apiKeyInput by remember { mutableStateOf(uiState.groqApiKey) }
+                            var showKey by remember { mutableStateOf(false) }
+
+                            OutlinedTextField(
+                                value = apiKeyInput,
+                                onValueChange = { apiKeyInput = it },
+                                label = { Text(NexaStrings.get("groq_key_placeholder", uiState.language), fontSize = 11.sp) },
+                                visualTransformation = if (showKey) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        MinimalIconButton(onClick = { showKey = !showKey }) {
+                                            Icon(if (showKey) Icons.Default.Visibility else Icons.Default.VisibilityOff, null, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = effectiveAccent.copy(alpha = 0.5f),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                    focusedLabelColor = effectiveAccent.copy(alpha = 0.7f),
+                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    cursorColor = effectiveAccent
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Save / Delete buttons
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    onClick = { if (apiKeyInput.isNotBlank()) onSetGroqApiKey(apiKeyInput) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = effectiveAccent.copy(alpha = 0.10f),
+                                    border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.25f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(12.dp), tint = effectiveAccent)
+                                        Text(NexaStrings.get("save_key", uiState.language), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = effectiveAccent)
+                                    }
+                                }
+                                if (uiState.isGroqProMode) {
+                                    Surface(
+                                        onClick = { apiKeyInput = ""; onDeleteGroqApiKey() },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.05f),
+                                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                                            Text(NexaStrings.get("delete_key", uiState.language), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(NexaStrings.get("groq_key_info", uiState.language), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), lineHeight = 12.sp)
                         }
                     }
                 }
@@ -521,6 +630,16 @@ fun SettingsScreen(
                         Box(modifier = Modifier.width(40.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), Color.Transparent))))
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(NexaStrings.get("about_version", uiState.language), fontSize = 9.sp, fontWeight = FontWeight.Medium, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(if (uiState.isGroqProMode) effectiveAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)))
+                            Text(
+                                if (uiState.isGroqProMode) "🟢 Groq API • PRO" else "🔵 Pollinations • FREE",
+                                fontSize = 8.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.sp,
+                                color = if (uiState.isGroqProMode) effectiveAccent.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                        Text("com.nexa.ai • Sdk 35", fontSize = 8.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))

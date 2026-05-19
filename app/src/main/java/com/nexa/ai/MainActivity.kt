@@ -230,7 +230,9 @@ class MainActivity : ComponentActivity() {
                         onPreviewVoice = { viewModel.previewVoice() },
                         onSetAccentColor = { viewModel.setAccentColor(it) },
                         onExportSettings = { viewModel.exportSettings() },
-                        onImportSettings = { viewModel.importSettings() }
+                        onImportSettings = { viewModel.importSettings() },
+                        onSetGroqApiKey = { viewModel.setGroqApiKey(it) },
+                        onDeleteGroqApiKey = { viewModel.deleteGroqApiKey() }
                     )
                 }
             }

@@ -105,6 +105,8 @@ data class NexaUiState(
     val showVoiceCommandsHelp: Boolean = false,
     // Accent color
     val accentColor: Long = 0L,  // ARGB color value, 0 means default
+    // Groq API Key
+    val groqApiKey: String = "",  // Empty = FREE mode (Pollinations), non-empty = PRO mode (Groq)
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false
@@ -114,6 +116,10 @@ data class NexaUiState(
 
     val messages: List<Message>
         get() = activeSession?.messages ?: emptyList()
+
+    /** Whether Groq PRO mode is active (API key is set). */
+    val isGroqProMode: Boolean
+        get() = groqApiKey.isNotBlank()
 
     /** Whether the app should currently use dark colors. */
     fun isDark(isSystemDark: Boolean): Boolean = when (themeMode) {

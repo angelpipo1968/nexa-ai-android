@@ -75,4 +75,23 @@ class SettingsStore(private val context: Context) {
             prefs[KEY_ACCENT_COLOR] = color.toString()
         }
     }
+
+    // Groq API Key
+    private val KEY_GROQ_API_KEY = stringPreferencesKey("groq_api_key")
+
+    val groqApiKey: Flow<String> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_GROQ_API_KEY] ?: ""
+    }
+
+    suspend fun setGroqApiKey(key: String) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_GROQ_API_KEY] = key
+        }
+    }
+
+    suspend fun deleteGroqApiKey() {
+        context.settingsStore.edit { prefs ->
+            prefs.remove(KEY_GROQ_API_KEY)
+        }
+    }
 }

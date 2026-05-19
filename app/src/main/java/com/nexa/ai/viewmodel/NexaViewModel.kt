@@ -323,11 +323,13 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             val savedLanguage = settingsStore.language.first()
             val savedVoice = settingsStore.voiceType.first()
             val savedAccent = settingsStore.accentColor.first()
+            val savedGroqKey = settingsStore.groqApiKey.first()
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
                 voiceType = savedVoice,
-                accentColor = savedAccent
+                accentColor = savedAccent,
+                groqApiKey = savedGroqKey
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
@@ -876,9 +878,17 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
 
-                repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
-                    language = _uiState.value.language.code,
-                    systemPrompt = buildSystemPrompt()).collect { event ->
+                // Use Groq PRO mode if API key is set, otherwise use backend
+                val groqKey = _uiState.value.groqApiKey
+                val messageFlow = if (groqKey.isNotBlank()) {
+                    repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code)
+                } else {
+                    repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
+                        language = _uiState.value.language.code,
+                        systemPrompt = buildSystemPrompt())
+                }
+
+                messageFlow.collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
@@ -1132,6 +1142,16 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     fun setAccentColor(color: androidx.compose.ui.graphics.Color) {
         _uiState.update { it.copy(accentColor = color.value.toLong()) }
         viewModelScope.launch { settingsStore.setAccentColor(color.value.toLong()) }
+    }
+
+    fun setGroqApiKey(key: String) {
+        _uiState.update { it.copy(groqApiKey = key.trim()) }
+        viewModelScope.launch { settingsStore.setGroqApiKey(key.trim()) }
+    }
+
+    fun deleteGroqApiKey() {
+        _uiState.update { it.copy(groqApiKey = "") }
+        viewModelScope.launch { settingsStore.deleteGroqApiKey() }
     }
 
     fun previewVoice() {
