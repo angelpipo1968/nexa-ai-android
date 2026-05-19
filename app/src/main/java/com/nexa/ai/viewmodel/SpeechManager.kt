@@ -42,6 +42,11 @@ class SpeechManager(private val application: Application) {
     var isTtsActive: Boolean = false
         private set
 
+    // Cooldown: don't allow barge-in until TTS has been playing for this long
+    // Prevents TTS audio from triggering false barge-in via mic bleed
+    private var ttsStartedAt: Long = 0L
+    private val bargeInCooldownMs = 1500L // 1.5 seconds
+
     // Continuous audio session — keeps mic open during entire voice mode
     // to eliminate start/stop clicks and enable seamless barge-in
     private var continuousAudioRecord: AudioRecord? = null
@@ -204,6 +209,7 @@ class SpeechManager(private val application: Application) {
         try {
             // Use simple speak without params to avoid device-specific crashes
             isTtsActive = true
+            ttsStartedAt = System.currentTimeMillis()
             val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, null, messageId ?: "msg")
             if (result == TextToSpeech.ERROR) {
                 android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
@@ -437,7 +443,7 @@ class SpeechManager(private val application: Application) {
 
                 try {
                     continuousAudioRecord = AudioRecord(
-                        MediaRecorder.AudioSource.MIC,
+                        MediaRecorder.AudioSource.VOICE_COMMUNICATION, // Hardware echo cancellation
                         sampleRate,
                         AudioFormat.CHANNEL_IN_MONO,
                         AudioFormat.ENCODING_PCM_16BIT,
@@ -466,12 +472,24 @@ class SpeechManager(private val application: Application) {
                 val bufferSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 val buffer = ShortArray(bufferSize.coerceAtLeast(1024))
                 var highEnergyFrames = 0
-                val requiredFrames = 6     // Faster detection: 6 frames ≈ 200ms
-                val thresholdDb = 40.0     // Lower threshold for better sensitivity
+                val requiredFrames = 10    // Need sustained voice, not a quick spike
+                val thresholdDb = 55.0     // Higher threshold to reject TTS bleed-through
+                var framesSinceCooldown = 0
 
                 while (bargeInActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                     val read = recorder.read(buffer, 0, buffer.size)
                     if (read > 0) {
+                        // Enforce cooldown: don't allow barge-in until TTS has played long enough
+                        val elapsed = System.currentTimeMillis() - ttsStartedAt
+                        if (elapsed < bargeInCooldownMs) {
+                            // Skip detection during cooldown, but keep monitoring
+                            framesSinceCooldown++
+                            if (framesSinceCooldown % 10 == 0) {
+                                highEnergyFrames = 0 // Reset counter periodically during cooldown
+                            }
+                            continue
+                        }
+
                         var sum = 0.0
                         for (i in 0 until read) {
                             val sample = buffer[i].toDouble()
@@ -483,7 +501,7 @@ class SpeechManager(private val application: Application) {
                         if (db > thresholdDb) {
                             highEnergyFrames++
                             if (highEnergyFrames >= requiredFrames) {
-                                android.util.Log.d("SpeechManager", "Barge-in! dB=$db frames=$highEnergyFrames")
+                                android.util.Log.d("SpeechManager", "Barge-in! dB=$db frames=$highEnergyFrames elapsed=${elapsed}ms")
                                 bargeInActive = false
                                 onBargeInDetected?.invoke()
                                 break
