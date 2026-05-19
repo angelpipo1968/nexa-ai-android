@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.ChatMessage
+import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.NexaRepository
 import com.nexa.ai.data.PersistedMessage
 import com.nexa.ai.data.PersistedSession
@@ -28,6 +29,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     // Managers
     private val speechManager = SpeechManager(application)
     private val authManager = AuthManager(application)
+    private val locationStore = LocationStore(application)
     private val repository = NexaRepository()
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
@@ -76,6 +78,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     init {
         setupSpeechCallbacks()
         speechManager.initialize()
+        locationStore.initialize()
         restoreState()
     }
 
@@ -838,6 +841,27 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissVoiceCommandsHelp() {
         _uiState.update { it.copy(showVoiceCommandsHelp = false) }
+    }
+
+    // ═══════════════════════════════════════
+    //  LOCATION
+    // ═══════════════════════════════════════
+
+    fun requestLocation() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLocating = true) }
+            try {
+                val location = locationStore.getCurrentLocation()
+                _uiState.update { it.copy(locationData = location, isLocating = false) }
+            } catch (e: Exception) {
+                android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
+                _uiState.update { it.copy(isLocating = false) }
+            }
+        }
+    }
+
+    fun toggleNotifications() {
+        _uiState.update { it.copy(notificationsEnabled = !_uiState.value.notificationsEnabled) }
     }
 
     fun clearChat() {

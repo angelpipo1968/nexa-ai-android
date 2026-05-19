@@ -1,5 +1,6 @@
 package com.nexa.ai.viewmodel
 
+import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.UpdateInfo
 import java.util.UUID
 
@@ -67,6 +68,11 @@ data class NexaUiState(
     val themeMode: ThemeMode = ThemeMode.DARK,
     val drawerOpen: Boolean = false,
     val drawerView: Int = 0,
+    // Location
+    val locationData: LocationStore.LocationData = LocationStore.LocationData(),
+    val isLocating: Boolean = false,
+    // Notifications
+    val notificationsEnabled: Boolean = true,
     // Auth
     val currentScreen: Screen = Screen.CHAT,
     val user: UserData = UserData(),

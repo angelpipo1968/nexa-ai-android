@@ -35,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.BuildConfig
@@ -61,7 +62,9 @@ fun SettingsScreen(
     onToggleAutoSpeak: () -> Unit,
     onClearChat: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onRequestLocation: () -> Unit = {},
+    onToggleNotifications: () -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity
     val sectionSpacing = 28.dp
@@ -195,6 +198,7 @@ fun SettingsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("preferences", uiState.language).uppercase())
                         FuturisticCard {
+                            // Auto-speak
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
                                     Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -205,12 +209,76 @@ fun SettingsScreen(
                                 }
                                 FuturisticSwitch(checked = uiState.autoSpeak, onCheckedChange = { onToggleAutoSpeak() })
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            // Notifications
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Notifications, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("notifications", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(NexaStrings.get("notifications_desc", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
+                                }
+                                FuturisticSwitch(checked = uiState.notificationsEnabled, onCheckedChange = { onToggleNotifications() })
+                            }
+                        }
+                    }
+                }
+
+                // ── Location ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("location", uiState.language).uppercase())
+                        FuturisticCard {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(effectiveAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.MyLocation, null, modifier = Modifier.size(16.dp), tint = effectiveAccent)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("location", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    if (uiState.isLocating) {
+                                        Text(NexaStrings.get("location_loading", uiState.language), fontSize = 11.sp, color = effectiveAccent.copy(alpha = 0.7f), lineHeight = 14.sp)
+                                    } else if (uiState.locationData.isAvailable) {
+                                        Text(uiState.locationData.city + ", " + uiState.locationData.country, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("%.4f, %.4f".format(uiState.locationData.latitude, uiState.locationData.longitude), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                                    } else {
+                                        Text(NexaStrings.get("location_not_available", uiState.language), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), lineHeight = 14.sp)
+                                    }
+                                }
+                                Surface(onClick = onRequestLocation, shape = RoundedCornerShape(10.dp), color = effectiveAccent.copy(alpha = 0.10f), border = BorderStroke(1.dp, effectiveAccent.copy(alpha = 0.25f))) {
+                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.GpsFixed, null, modifier = Modifier.size(12.dp), tint = effectiveAccent)
+                                        Text(NexaStrings.get("location_request", uiState.language), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = effectiveAccent)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Privacy ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("privacy", uiState.language).uppercase())
+                        FuturisticCard {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Shield, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(NexaStrings.get("privacy_cleartext", uiState.language), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(NexaStrings.get("privacy_cleartext_on", uiState.language), fontSize = 11.sp, color = Color(0xFF00C896), lineHeight = 14.sp)
+                                }
+                                Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF00C896).copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp), tint = Color(0xFF00C896))
+                                }
+                            }
                         }
                     }
                 }
 
                 // ── Danger Zone ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 5) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 7) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("danger_zone", uiState.language).uppercase(), color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                         FuturisticCard {
@@ -232,12 +300,14 @@ fun SettingsScreen(
                     }
                 }
 
-                // ── Version ──
+                // ── About ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 6) {
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.width(40.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), Color.Transparent))))
                         Spacer(modifier = Modifier.height(10.dp))
                         Text("NEXA PRO v${BuildConfig.VERSION_NAME}", fontSize = 9.sp, fontWeight = FontWeight.Medium, letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(NexaStrings.get("about_desc", uiState.language), fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f), letterSpacing = 1.sp)
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))

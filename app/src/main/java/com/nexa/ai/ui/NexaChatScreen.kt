@@ -64,7 +64,9 @@ fun NexaChatScreen(
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
     onDownloadSession: (String) -> Unit = {},
-    onRegenerate: () -> Unit = {}
+    onRegenerate: () -> Unit = {},
+    onRequestLocation: () -> Unit = {},
+    onToggleNotifications: () -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -126,7 +128,8 @@ fun NexaChatScreen(
             onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
             onSetThemeMode = onSetThemeMode,
             onToggleAutoSpeak = onToggleAutoSpeak,
-            onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout
+            onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
+            onRequestLocation = onRequestLocation, onToggleNotifications = onToggleNotifications
         )
         Screen.TRANSLATOR -> TranslatorScreen(
             onBack = onNavigateToChat

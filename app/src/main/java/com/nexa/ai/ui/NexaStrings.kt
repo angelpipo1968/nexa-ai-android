@@ -72,7 +72,8 @@ object NexaStrings {
         "voice_help_dark" to "Modo oscuro",
         "voice_help_light" to "Modo claro",
         "voice_help_help" to "Ayuda / Comandos",
-        "voice_help_close" to "Cerrar"
+        "voice_help_close" to "Cerrar",
+        "location" to "Ubicación", "location_desc" to "Mostrar tu ubicación actual", "location_loading" to "Obteniendo ubicación...", "location_not_available" to "No disponible", "location_disabled" to "Ubicación desactivada", "location_request" to "Activar ubicación", "notifications" to "Notificaciones", "notifications_desc" to "Recibir alertas y mensajes", "about" to "Acerca de", "about_desc" to "NEXA PRO v3.7 • Asistente de IA", "privacy" to "Privacidad", "privacy_desc" to "Configuración de privacidad y datos", "privacy_cleartext" to "Tráfico cifrado", "privacy_cleartext_on" to "Conexión segura activada", "privacy_cleartext_off" to "Conexión no cifrada", "chat_settings" to "Chat", "chat_settings_desc" to "Configuración de chat y mensajes", "font_size" to "Tamaño de texto", "font_small" to "Pequeño", "font_medium" to "Mediano", "font_large" to "Grande", "coordinates" to "Coordenadas", "city_country" to "Ciudad / País"
     )
 
     private val english = mapOf(
@@ -137,6 +138,7 @@ object NexaStrings {
         "voice_help_dark" to "Dark mode",
         "voice_help_light" to "Light mode",
         "voice_help_help" to "Help / Commands",
-        "voice_help_close" to "Close"
+        "voice_help_close" to "Close",
+        "location" to "Location", "location_desc" to "Show your current location", "location_loading" to "Getting location...", "location_not_available" to "Not available", "location_disabled" to "Location disabled", "location_request" to "Enable location", "notifications" to "Notifications", "notifications_desc" to "Receive alerts and messages", "about" to "About", "about_desc" to "NEXA PRO v3.7 • AI Assistant", "privacy" to "Privacy", "privacy_desc" to "Privacy and data settings", "privacy_cleartext" to "Encrypted traffic", "privacy_cleartext_on" to "Secure connection enabled", "privacy_cleartext_off" to "Unencrypted connection", "chat_settings" to "Chat", "chat_settings_desc" to "Chat and message settings", "font_size" to "Font size", "font_small" to "Small", "font_medium" to "Medium", "font_large" to "Large", "coordinates" to "Coordinates", "city_country" to "City / Country"
     )
 }

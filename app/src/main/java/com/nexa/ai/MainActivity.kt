@@ -35,6 +35,14 @@ class MainActivity : ComponentActivity() {
         // Permission result handled — notifications will work if granted
     }
 
+    private val requestLocationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.requestLocation()
+        }
+    }
+
     private val pickFile = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -126,7 +134,19 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onStopVoiceMode = { viewModel.stopVoiceMode() },
-                        onDismissVoiceHelp = { viewModel.dismissVoiceCommandsHelp() }
+                        onDismissVoiceHelp = { viewModel.dismissVoiceCommandsHelp() },
+                        onRequestLocation = {
+                            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                                == PackageManager.PERMISSION_GRANTED ||
+                                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                                == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                viewModel.requestLocation()
+                            } else {
+                                requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
+                        },
+                        onToggleNotifications = { viewModel.toggleNotifications() }
                     )
                 }
             }
