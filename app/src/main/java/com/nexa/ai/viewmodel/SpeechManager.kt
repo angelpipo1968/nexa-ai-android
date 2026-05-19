@@ -45,7 +45,8 @@ class SpeechManager(private val application: Application) {
     // Cooldown: don't allow barge-in until TTS has been playing for this long
     // Prevents TTS audio from triggering false barge-in via mic bleed
     private var ttsStartedAt: Long = 0L
-    private val bargeInCooldownMs = 1500L // 1.5 seconds
+    private val bargeInCooldownMs = 3000L // 3 seconds — gives TTS time to stabilize
+    private var lastBargeInAt: Long = 0L  // Prevents rapid re-triggers
 
     // Continuous audio session — keeps mic open during entire voice mode
     // to eliminate start/stop clicks and enable seamless barge-in
@@ -472,20 +473,27 @@ class SpeechManager(private val application: Application) {
                 val bufferSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 val buffer = ShortArray(bufferSize.coerceAtLeast(1024))
                 var highEnergyFrames = 0
-                val requiredFrames = 10    // Need sustained voice, not a quick spike
-                val thresholdDb = 55.0     // Higher threshold to reject TTS bleed-through
+                val requiredFrames = 12    // Need sustained voice
+                val thresholdDb = 62.0     // High threshold — only real voice triggers
                 var framesSinceCooldown = 0
 
                 while (bargeInActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                     val read = recorder.read(buffer, 0, buffer.size)
                     if (read > 0) {
+                        // Re-arm delay: don't allow barge-in immediately after a previous one
+                        val sinceLastBargeIn = System.currentTimeMillis() - lastBargeInAt
+                        if (sinceLastBargeIn < 2000L) {
+                            highEnergyFrames = 0
+                            continue
+                        }
+
                         // Enforce cooldown: don't allow barge-in until TTS has played long enough
                         val elapsed = System.currentTimeMillis() - ttsStartedAt
                         if (elapsed < bargeInCooldownMs) {
-                            // Skip detection during cooldown, but keep monitoring
-                            framesSinceCooldown++
-                            if (framesSinceCooldown % 10 == 0) {
-                                highEnergyFrames = 0 // Reset counter periodically during cooldown
+                            // Reset counter during cooldown to avoid accumulated noise
+                            if (framesSinceCooldown++ > 20) {
+                                highEnergyFrames = 0
+                                framesSinceCooldown = 0
                             }
                             continue
                         }
@@ -502,6 +510,7 @@ class SpeechManager(private val application: Application) {
                             highEnergyFrames++
                             if (highEnergyFrames >= requiredFrames) {
                                 android.util.Log.d("SpeechManager", "Barge-in! dB=$db frames=$highEnergyFrames elapsed=${elapsed}ms")
+                                lastBargeInAt = System.currentTimeMillis()
                                 bargeInActive = false
                                 onBargeInDetected?.invoke()
                                 break
