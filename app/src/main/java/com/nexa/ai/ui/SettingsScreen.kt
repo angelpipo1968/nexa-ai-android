@@ -43,6 +43,8 @@ import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.ui.theme.dynamicPrimaryColor
 import com.nexa.ai.viewmodel.*
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
 
 /** CompositionLocal providing the effective accent color for the current theme. */
 val LocalAccentColor = compositionLocalOf { NexaAccent }
@@ -109,8 +111,47 @@ fun SettingsScreen(
                         }
                     },
                     actions = {
-                        MinimalIconButton(onClick = { /* Settings context */ }) {
-                            Icon(Icons.Default.Settings, null, modifier = Modifier.size(16.dp))
+                        var showInfoDialog by remember { mutableStateOf(false) }
+                        MinimalIconButton(onClick = { showInfoDialog = true }) {
+                            Icon(Icons.Default.Info, null, modifier = Modifier.size(16.dp))
+                        }
+                        if (showInfoDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showInfoDialog = false },
+                                title = {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(effectiveAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.FlashOn, null, modifier = Modifier.size(14.dp), tint = effectiveAccent)
+                                        }
+                                        Text("NEXA PRO", fontSize = 16.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = effectiveAccent)
+                                    }
+                                },
+                                text = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("v${BuildConfig.VERSION_NAME} • Build ${BuildConfig.VERSION_CODE}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(NexaStrings.get("app_info_desc", uiState.language), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 18.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF00C896)))
+                                            Text(if (uiState.apiKey.isNotEmpty()) "Groq API • Modo PRO" else "Pollinations.ai • Modo Gratuito", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(effectiveAccent))
+                                            Text("com.nexa.ai • targetSdk 35", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    Surface(onClick = { showInfoDialog = false }, shape = RoundedCornerShape(10.dp), color = effectiveAccent.copy(alpha = 0.10f), border = BorderStroke(1.dp, effectiveAccent.copy(alpha = 0.3f))) {
+                                        Text(NexaStrings.get("close", uiState.language), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = effectiveAccent)
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(20.dp)
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
