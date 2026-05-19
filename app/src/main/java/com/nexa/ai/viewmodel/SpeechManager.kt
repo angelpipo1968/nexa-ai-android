@@ -12,6 +12,7 @@ import android.hardware.SensorManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioFormat
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -121,7 +122,7 @@ class SpeechManager(private val application: Application) {
                         isStartingSco = false
                         android.util.Log.d("SpeechManager", "Bluetooth SCO disconnected")
                     }
-                    AudioManager.SCO_AUDIO_STATE_CONNECTING -> {
+                    2 -> {  // SCO_AUDIO_STATE_CONNECTING (not a public SDK constant)
                         isStartingSco = true
                         android.util.Log.d("SpeechManager", "Bluetooth SCO connecting...")
                     }
@@ -200,16 +201,46 @@ class SpeechManager(private val application: Application) {
         }
     }
 
+    /** Set speaker on/off using modern API (API 31+) or fallback to deprecated API. */
+    private fun setSpeakerphoneOn(on: Boolean) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (on) {
+                    // Find and set speaker as communication device
+                    val speakerDevice = audioManager.availableCommunicationDevices.find {
+                        it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                    }
+                    if (speakerDevice != null) {
+                        audioManager.setCommunicationDevice(speakerDevice)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        audioManager.isSpeakerphoneOn = true
+                    }
+                } else {
+                    // Clear communication device to fall back to earpiece
+                    audioManager.clearCommunicationDevice()
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.isSpeakerphoneOn = on
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "setSpeakerphoneOn error: ${e.message}", e)
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = on
+        }
+    }
+
     private fun updateAudioRoutingForProximity() {
         try {
             if (isBluetoothScoConnected && scoConnected) return  // BT takes priority
             if (isNearEar) {
                 // Near ear: use earpiece, turn off speaker
-                audioManager.isSpeakerphoneOn = false
+                setSpeakerphoneOn(false)
                 android.util.Log.d("SpeechManager", "Proximity: near ear → earpiece")
             } else {
                 // Far from ear: use speaker for hands-free
-                audioManager.isSpeakerphoneOn = true
+                setSpeakerphoneOn(true)
                 android.util.Log.d("SpeechManager", "Proximity: far from ear → speaker")
             }
         } catch (e: Exception) {
@@ -323,33 +354,75 @@ class SpeechManager(private val application: Application) {
         if (!isBluetoothScoConnected || isStartingSco || scoConnected) return
         isStartingSco = true
         try {
-            audioManager.startBluetoothSco()
-            // Don't set isBluetoothScoOn until we get the connected callback
-            // Wait up to 3 seconds for connection
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (isStartingSco && !scoConnected) {
-                    // SCO didn't connect in time, try setting it manually as fallback
-                    try {
-                        audioManager.isBluetoothScoOn = true
-                    } catch (e: Exception) {
-                        android.util.Log.e("SpeechManager", "Bluetooth SCO fallback error: ${e.message}", e)
-                    }
-                    isStartingSco = false
+            // API 31+: Use setCommunicationDevice with Bluetooth SCO device
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val btDevice = audioManager.availableCommunicationDevices.find {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
                 }
-            }, 3000)
+                if (btDevice != null) {
+                    val result = audioManager.setCommunicationDevice(btDevice)
+                    if (result) {
+                        scoConnected = true
+                        isStartingSco = false
+                        android.util.Log.d("SpeechManager", "Bluetooth SCO connected via setCommunicationDevice")
+                    } else {
+                        // Fallback to legacy API if setCommunicationDevice fails
+                        @Suppress("DEPRECATION")
+                        audioManager.startBluetoothSco()
+                        startBluetoothScoLegacyFallback()
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.startBluetoothSco()
+                    startBluetoothScoLegacyFallback()
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.startBluetoothSco()
+                startBluetoothScoLegacyFallback()
+            }
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Bluetooth SCO start error: ${e.message}", e)
             isStartingSco = false
         }
     }
 
+    /** Legacy fallback for Bluetooth SCO connection with timeout. */
+    private fun startBluetoothScoLegacyFallback() {
+        // Wait up to 3 seconds for connection
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (isStartingSco && !scoConnected) {
+                try {
+                    @Suppress("DEPRECATION")
+                    audioManager.isBluetoothScoOn = true
+                } catch (e: Exception) {
+                    android.util.Log.e("SpeechManager", "Bluetooth SCO fallback error: ${e.message}", e)
+                }
+                isStartingSco = false
+            }
+        }, 3000)
+    }
+
     private fun stopBluetoothSco() {
         if (!isBluetoothScoConnected && !scoConnected) return
         try {
-            audioManager.stopBluetoothSco()
-            audioManager.isBluetoothScoOn = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                audioManager.clearCommunicationDevice()
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.stopBluetoothSco()
+                @Suppress("DEPRECATION")
+                audioManager.isBluetoothScoOn = false
+            }
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Bluetooth SCO stop error: ${e.message}", e)
+            // Try legacy as fallback
+            try {
+                @Suppress("DEPRECATION")
+                audioManager.stopBluetoothSco()
+                @Suppress("DEPRECATION")
+                audioManager.isBluetoothScoOn = false
+            } catch (_: Exception) {}
         }
         scoConnected = false
         isStartingSco = false
@@ -742,12 +815,12 @@ class SpeechManager(private val application: Application) {
             detectBluetoothSco()
             if (isBluetoothScoConnected) {
                 startBluetoothSco()
-                audioManager.isSpeakerphoneOn = false
+                setSpeakerphoneOn(false)
             } else {
                 // Enable proximity sensor for auto earpiece/speaker switching
                 enableProximitySensor()
                 // Initial state: use speaker for hands-free
-                audioManager.isSpeakerphoneOn = !isNearEar
+                setSpeakerphoneOn(!isNearEar)
             }
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "AudioManager mode error: ${e.message}", e)
@@ -762,7 +835,7 @@ class SpeechManager(private val application: Application) {
 
         try {
             audioManager.mode = AudioManager.MODE_NORMAL
-            audioManager.isSpeakerphoneOn = false
+            setSpeakerphoneOn(false)
             stopBluetoothSco()
             abandonAudioFocus()
         } catch (e: Exception) {
@@ -971,7 +1044,7 @@ class SpeechManager(private val application: Application) {
         unregisterScoStateReceiver()
         try {
             audioManager.mode = AudioManager.MODE_NORMAL
-            audioManager.isSpeakerphoneOn = false
+            setSpeakerphoneOn(false)
             stopBluetoothSco()
             abandonAudioFocus()
         } catch (_: Exception) {}

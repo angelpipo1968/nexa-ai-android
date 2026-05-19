@@ -187,8 +187,14 @@ fun NexaTheme(
                 val context = view.context
                 val activity = context as? Activity ?: return@SideEffect
                 val window = activity.window
-                window.statusBarColor = animatedColorScheme.background.toArgb()
-                window.navigationBarColor = animatedColorScheme.background.toArgb()
+                // Use WindowCompat for edge-to-edge — statusBarColor/navigationBarColor
+                // are deprecated since API 35. The system handles bar colors automatically
+                // when using transparent bars with WindowCompat.
+                @Suppress("DEPRECATION")
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                    window.statusBarColor = animatedColorScheme.background.toArgb()
+                    window.navigationBarColor = animatedColorScheme.background.toArgb()
+                }
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
             } catch (e: Exception) {
                 android.util.Log.e("NexaTheme", "Theme error: ${e.message}")

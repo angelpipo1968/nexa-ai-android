@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class NexaViewModel(application: Application) : AndroidViewModel(application) {
@@ -141,31 +142,31 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 val now = System.currentTimeMillis()
                 if (now - lastVoiceResultAt < voiceResultCooldownMs) {
                     android.util.Log.d("NexaVM", "Dropping duplicate voice result: $text")
-                    return@setOnSpeechResult
-                }
-                lastVoiceResultAt = now
+                } else {
+                    lastVoiceResultAt = now
 
-                // Barge-in: if AI was speaking, it's already stopped by onBargeInDetected
-                // but double-check in case onBeginningOfSpeech didn't fire
-                if (_uiState.value.isSpeaking) {
-                    speechManager.stopSpeaking()
-                }
+                    // Barge-in: if AI was speaking, it's already stopped by onBargeInDetected
+                    // but double-check in case onBeginningOfSpeech didn't fire
+                    if (_uiState.value.isSpeaking) {
+                        speechManager.stopSpeaking()
+                    }
 
-                // Apply debounce logic to avoid rapid/accidental triggers
-                speechDebounceJob?.cancel()
-                speechDebounceJob = viewModelScope.launch {
-                    kotlinx.coroutines.delay(speechDebounceTimeMs)
+                    // Apply debounce logic to avoid rapid/accidental triggers
+                    speechDebounceJob?.cancel()
+                    speechDebounceJob = viewModelScope.launch {
+                        kotlinx.coroutines.delay(speechDebounceTimeMs)
 
-                    speechManager.stopListening() // Force stop before processing
+                        speechManager.stopListening() // Force stop before processing
 
-                    if (text.trim().length >= 2) {
-                        kotlinx.coroutines.delay(200)
-                        sendMessage(text)
-                    } else {
-                        // Accidental noise, restart listening with delay
-                        kotlinx.coroutines.delay(800)
-                        if (_uiState.value.voiceMode && !_uiState.value.isListening) {
-                            speechManager.startListening()
+                        if (text.trim().length >= 2) {
+                            kotlinx.coroutines.delay(200)
+                            sendMessage(text)
+                        } else {
+                            // Accidental noise, restart listening with delay
+                            kotlinx.coroutines.delay(800)
+                            if (_uiState.value.voiceMode && !_uiState.value.isListening) {
+                                speechManager.startListening()
+                            }
                         }
                     }
                 }
