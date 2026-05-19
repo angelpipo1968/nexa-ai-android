@@ -225,7 +225,10 @@ class MainActivity : ComponentActivity() {
                                 else -> return@NexaChatScreen
                             }
                             viewModel.sendMessage(prompt)
-                        }
+                        },
+                        onUpdateApiKeyInput = { viewModel.updateApiKeyInput(it) },
+                        onSaveApiKey = { viewModel.saveApiKey() },
+                        onClearApiKey = { viewModel.clearApiKey() }
                     )
                 }
             }

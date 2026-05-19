@@ -318,14 +318,17 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 _uiState.value = _uiState.value.copy(user = user)
             }
 
-            // Restore persisted preferences (theme, language, voice)
+            // Restore persisted preferences (theme, language, voice, API key)
             val savedTheme = settingsStore.themeMode.first()
             val savedLanguage = settingsStore.language.first()
             val savedVoice = settingsStore.voiceType.first()
+            val savedApiKey = settingsStore.apiKey.first()
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
-                voiceType = savedVoice
+                voiceType = savedVoice,
+                apiKey = savedApiKey,
+                apiKeyInput = savedApiKey
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
@@ -1111,6 +1114,21 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     fun setThemeMode(mode: ThemeMode) {
         _uiState.value = _uiState.value.copy(themeMode = mode)
         viewModelScope.launch { settingsStore.setThemeMode(mode) }
+    }
+
+    fun updateApiKeyInput(input: String) {
+        _uiState.value = _uiState.value.copy(apiKeyInput = input)
+    }
+
+    fun saveApiKey() {
+        val key = _uiState.value.apiKeyInput.trim()
+        _uiState.value = _uiState.value.copy(apiKey = key)
+        viewModelScope.launch { settingsStore.setApiKey(key) }
+    }
+
+    fun clearApiKey() {
+        _uiState.value = _uiState.value.copy(apiKey = "", apiKeyInput = "")
+        viewModelScope.launch { settingsStore.setApiKey("") }
     }
 
     fun cycleTheme() {

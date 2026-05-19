@@ -13,16 +13,26 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 42
-        versionName = "4.2"
+        versionCode = 43
+        versionName = "4.3"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../nexa-release.keystore")
+            storePassword = "nexa123"
+            keyAlias = "nexa"
+            keyPassword = "nexa123"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

@@ -72,7 +72,10 @@ fun NexaChatScreen(
     onSetSpeechRate: (Float) -> Unit = {},
     onCaptureImage: () -> Unit = {},
     onDismissPreview: () -> Unit = {},
-    onQuickAction: (String) -> Unit = {}
+    onQuickAction: (String) -> Unit = {},
+    onUpdateApiKeyInput: (String) -> Unit = {},
+    onSaveApiKey: () -> Unit = {},
+    onClearApiKey: () -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -140,7 +143,8 @@ fun NexaChatScreen(
             onToggleAutoSpeak = onToggleAutoSpeak,
             onClearChat = onClearChat, onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
             onRequestLocation = onRequestLocation, onToggleNotifications = onToggleNotifications,
-            onToggleVolumeBoost = onToggleVolumeBoost, onSetSpeechRate = onSetSpeechRate
+            onToggleVolumeBoost = onToggleVolumeBoost, onSetSpeechRate = onSetSpeechRate,
+            onUpdateApiKeyInput = onUpdateApiKeyInput, onSaveApiKey = onSaveApiKey, onClearApiKey = onClearApiKey
         )
         Screen.TRANSLATOR -> TranslatorScreen(
             onBack = onNavigateToChat

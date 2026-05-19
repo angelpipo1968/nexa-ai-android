@@ -42,6 +42,7 @@ import com.nexa.ai.BuildConfig
 import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.ui.theme.dynamicPrimaryColor
 import com.nexa.ai.viewmodel.*
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 /** CompositionLocal providing the effective accent color for the current theme. */
 val LocalAccentColor = compositionLocalOf { NexaAccent }
@@ -66,7 +67,10 @@ fun SettingsScreen(
     onRequestLocation: () -> Unit = {},
     onToggleNotifications: () -> Unit = {},
     onToggleVolumeBoost: () -> Unit = {},
-    onSetSpeechRate: (Float) -> Unit = {}
+    onSetSpeechRate: (Float) -> Unit = {},
+    onUpdateApiKeyInput: (String) -> Unit = {},
+    onSaveApiKey: () -> Unit = {},
+    onClearApiKey: () -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity
     val sectionSpacing = 28.dp
@@ -135,6 +139,107 @@ fun SettingsScreen(
                         Text("NEXA", fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp, color = effectiveAccent)
                         Surface(shape = RoundedCornerShape(6.dp), color = effectiveAccent.copy(alpha = 0.12f)) {
                             Text("PRO", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = effectiveAccent)
+                        }
+                    }
+                }
+
+                // ── API Key (Groq) ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 1) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel(NexaStrings.get("api_key_section", uiState.language).uppercase())
+                        FuturisticCard {
+                            val hasApiKey = uiState.apiKey.isNotEmpty()
+                            val isFreeMode = !hasApiKey
+
+                            // Status indicator
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(if (hasApiKey) effectiveAccent.copy(alpha = 0.12f) else Color(0xFF00C896).copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                    Icon(if (hasApiKey) Icons.Default.VpnKey else Icons.Default.AutoAwesome, null, modifier = Modifier.size(16.dp), tint = if (hasApiKey) effectiveAccent else Color(0xFF00C896))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(if (hasApiKey) "Groq API" else "Modo Gratuito", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(if (hasApiKey) "Conexión directa - Máxima velocidad" else "Pollinations.ai - Sin clave necesaria", fontSize = 11.sp, color = if (hasApiKey) effectiveAccent.copy(alpha = 0.6f) else Color(0xFF00C896).copy(alpha = 0.7f), lineHeight = 14.sp)
+                                }
+                                // Status badge
+                                Surface(shape = RoundedCornerShape(8.dp), color = if (hasApiKey) effectiveAccent.copy(alpha = 0.10f) else Color(0xFF00C896).copy(alpha = 0.10f), border = BorderStroke(0.5.dp, if (hasApiKey) effectiveAccent.copy(alpha = 0.3f) else Color(0xFF00C896).copy(alpha = 0.3f))) {
+                                    Text(if (hasApiKey) "PRO" else "FREE", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = if (hasApiKey) effectiveAccent else Color(0xFF00C896))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // API Key input field
+                            OutlinedTextField(
+                                value = uiState.apiKeyInput,
+                                onValueChange = onUpdateApiKeyInput,
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text("gsk_...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = effectiveAccent.copy(alpha = 0.5f),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.15f),
+                                    cursorColor = effectiveAccent,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                ),
+                                visualTransformation = PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    if (uiState.apiKeyInput.isNotEmpty()) {
+                                        MinimalIconButton(onClick = { onUpdateApiKeyInput("") }) {
+                                            Icon(Icons.Default.Clear, "Clear", modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Save / Clear buttons
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                // Save button
+                                Surface(
+                                    onClick = onSaveApiKey,
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = effectiveAccent.copy(alpha = 0.10f),
+                                    border = BorderStroke(1.dp, effectiveAccent.copy(alpha = 0.3f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp), tint = effectiveAccent)
+                                        Text(NexaStrings.get("save", uiState.language), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = effectiveAccent)
+                                    }
+                                }
+                                // Clear button (only if key exists)
+                                if (hasApiKey) {
+                                    Surface(
+                                        onClick = onClearApiKey,
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.2f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                                            Text(NexaStrings.get("delete", uiState.language), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Help text
+                            Text(
+                                "Obtén tu clave gratuita en console.groq.com",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                lineHeight = 13.sp
+                            )
                         }
                     }
                 }
