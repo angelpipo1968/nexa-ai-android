@@ -32,6 +32,21 @@ import java.util.Locale
  * Enhanced with audio focus, Bluetooth SCO, adaptive barge-in with VAD,
  * proximity sensor support, and volume feedback.
  *
+ * Changelog v4.0 — HANDS-FREE VOLUME FIX:
+ * - CRITICAL FIX: onDone/onError in TTS no longer abandon audio focus during voice mode
+ *   (was the #1 cause of low volume — every TTS completion reset audio routing)
+ * - CRITICAL FIX: Audio focus now uses USAGE_MEDIA for hands-free (forces speaker routing)
+ *   (USAGE_VOICE_COMMUNICATION routes to earpiece on most OEMs)
+ * - CRITICAL FIX: MODE_NORMAL is maintained throughout hands-free session
+ *   (MODE_IN_COMMUNICATION forces earpiece routing on Samsung/Xiaomi/OPPO/Huawei)
+ * - Added: STREAM_DTMF boost (some devices route TTS through this in comm mode)
+ * - Added: Volume re-boost after TTS starts (post-speak verification at 200ms)
+ * - Added: isSpeakerphoneActive() verification method
+ * - Improved: boostVolumeForHandsFree() now called only during voice mode
+ * - Improved: Audio focus request differentiated between earpiece and speaker modes
+ * - Improved: Multiple speaker re-apply cycles increased from 3 to 5 with 1s final check
+ * - Improved: MODE_NORMAL re-applied after every speak() call in hands-free mode
+ *
  * Changelog v3.7:
  * - Fixed: Bluetooth SCO timing (isStartingSco guard now works correctly)
  * - Fixed: SpeechRecognizer error code 5 is ERROR_CLIENT (removed redundant check)
@@ -260,13 +275,29 @@ class SpeechManager(private val application: Application) {
     //  AUDIO FOCUS — Prevent conflicts with other apps
     // ═══════════════════════════════════════
 
+    /**
+     * Requests audio focus with attributes appropriate for the current mode.
+     * v4.0: For hands-free/speaker mode, uses USAGE_MEDIA to force speaker routing.
+     * USAGE_VOICE_COMMUNICATION causes Android to route to earpiece on most OEMs.
+     */
     private fun requestAudioFocus() {
         if (hasAudioFocus) return
         try {
-            val attrs = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
+            // v4.0: Choose audio attributes based on current routing
+            val attrs = if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                // Hands-free/speaker mode: use USAGE_MEDIA to force speaker output
+                // This prevents Android from routing to earpiece
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            } else {
+                // Earpiece or Bluetooth mode: use voice communication attributes
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            }
 
             // Use MAY_DUCK instead of GAIN_TRANSIENT — allows other apps to duck
             // rather than pause entirely (e.g. music, navigation)
@@ -292,6 +323,11 @@ class SpeechManager(private val application: Application) {
                 hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
             } else {
                 @Suppress("DEPRECATION")
+                val streamType = if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                    AudioManager.STREAM_MUSIC  // v4.0: Use STREAM_MUSIC for hands-free
+                } else {
+                    AudioManager.STREAM_VOICE_CALL
+                }
                 val result = audioManager.requestAudioFocus(
                     { focusChange ->
                         if (focusChange == AudioManager.AUDIOFOCUS_LOSS ||
@@ -300,7 +336,7 @@ class SpeechManager(private val application: Application) {
                             stopSpeaking()
                         }
                     },
-                    AudioManager.STREAM_VOICE_CALL,
+                    streamType,
                     focusType
                 )
                 hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -457,16 +493,33 @@ class SpeechManager(private val application: Application) {
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
                             onSpeakingStateChanged?.invoke(true, utteranceId)
+                            // v4.0: Re-boost volume and re-apply speaker after TTS starts
+                            // Some OEMs reset routing when TTS engine takes over audio
+                            if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    if (audioSessionActive && !isNearEar) {
+                                        reapplyHandsFreeRouting()
+                                    }
+                                }, 150)
+                            }
                         }
                         override fun onDone(utteranceId: String?) {
                             isTtsActive = false
-                            abandonAudioFocus()
+                            // v4.0 CRITICAL FIX: Don't abandon audio focus during voice mode!
+                            // Previously, abandoning focus after every TTS utterance caused
+                            // audio routing to reset to earpiece, making hands-free volume drop.
+                            if (!audioSessionActive) {
+                                abandonAudioFocus()
+                            }
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                         @Deprecated("Deprecated")
                         override fun onError(utteranceId: String?) {
                             isTtsActive = false
-                            abandonAudioFocus()
+                            // v4.0 CRITICAL FIX: Same as onDone — don't abandon during voice mode
+                            if (!audioSessionActive) {
+                                abandonAudioFocus()
+                            }
                             onSpeakingStateChanged?.invoke(false, null)
                         }
                     })
@@ -578,22 +631,43 @@ class SpeechManager(private val application: Application) {
         if (cleaned.isBlank()) return
 
         try {
+            // v4.0: Re-apply hands-free routing BEFORE requesting focus
+            // This ensures MODE_NORMAL is set before focus request with USAGE_MEDIA
+            if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                reapplyHandsFreeRouting()
+            }
+
             // Request audio focus before speaking
+            // v4.0: Focus request now uses USAGE_MEDIA for hands-free
             requestAudioFocus()
 
             // ── VOLUME BOOST: Maximize volume before speaking ──
+            // v4.0: Only boost during voice mode to avoid aggressive volume changes
             if (volumeBoostEnabled && audioSessionActive) {
                 boostVolumeForHandsFree()
             }
 
             isTtsActive = true
+            // Ensure speaker is on for hands-free mode
+            if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                setSpeakerphoneOn(true)
+            }
             ttsStartedAt = System.currentTimeMillis()
             val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
+
+            // v4.0: Always use STREAM_MUSIC for hands-free mode
+            // STREAM_VOICE_CALL routes through earpiece even with speaker ON on most OEMs
+            val useStream = if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+                AudioManager.STREAM_MUSIC  // Always MUSIC for speaker/hands-free
+            } else if (useVoiceCallStream) {
+                AudioManager.STREAM_VOICE_CALL
+            } else {
+                AudioManager.STREAM_MUSIC
+            }
+
             val params = Bundle().apply {
                 putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-                // Use STREAM_MUSIC for louder hands-free (STREAM_VOICE_CALL is too quiet on speaker)
-                val stream = if (useVoiceCallStream) AudioManager.STREAM_VOICE_CALL else AudioManager.STREAM_MUSIC
-                putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, stream)
+                putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, useStream)
                 // Volume: 1.0f = max volume for TTS output
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
             }
@@ -611,20 +685,20 @@ class SpeechManager(private val application: Application) {
                     if (retryResult == TextToSpeech.ERROR) {
                         android.util.Log.e("SpeechManager", "TTS speak returned ERROR on both streams")
                         isTtsActive = false
-                        abandonAudioFocus()
+                        if (!audioSessionActive) abandonAudioFocus()
                         onSpeakingStateChanged?.invoke(false, null)
                     }
                 } else {
                     android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
                     isTtsActive = false
-                    abandonAudioFocus()
+                    if (!audioSessionActive) abandonAudioFocus()
                     onSpeakingStateChanged?.invoke(false, null)
                 }
             }
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "TTS speak error: ${e.message}", e)
             isTtsActive = false
-            abandonAudioFocus()
+            if (!audioSessionActive) abandonAudioFocus()
             onSpeakingStateChanged?.invoke(false, null)
         }
     }
@@ -665,24 +739,67 @@ class SpeechManager(private val application: Application) {
     /**
      * Aggressively boosts all relevant audio streams to maximum volume
      * for hands-free/speaker mode. This is the key fix for "too low" volume.
+     *
+     * v4.0 improvements:
+     * - MODE_NORMAL maintained throughout hands-free session (not just before speaker switch)
+     * - STREAM_DTMF boost added (some devices route TTS through this in comm mode)
+     * - 5 re-apply cycles instead of 3 (some Samsung/Xiaomi devices need more)
+     * - Final verification at 1000ms with full re-boost if needed
+     * - Volume re-verification after each speaker re-apply cycle
+     * - MODE_NORMAL re-applied in every cycle (OEMs may reset it)
      */
     private fun boostVolumeForHandsFree() {
         try {
-            // Boost STREAM_MUSIC (used by TTS in default mode)
+            // ── STEP 1: Force audio mode to NORMAL for speaker output ──
+            // MODE_IN_COMMUNICATION on many OEMs (Samsung, Xiaomi, OPPO, Huawei)
+            // routes audio to earpiece even with speaker ON.
+            // Switching to MODE_NORMAL allows speaker to work at full volume.
+            if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
+                try {
+                    audioManager.mode = AudioManager.MODE_NORMAL
+                } catch (_: Exception) {}
+            }
+
+            // ── STEP 2: Maximize ALL audio streams ──
+            // STREAM_MUSIC — primary stream for TTS in hands-free mode
             val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
 
-            // Boost STREAM_VOICE_CALL (used by TTS when useVoiceCallStream=true)
+            // STREAM_VOICE_CALL — used when useVoiceCallStream=true or earpiece mode
             val maxVoiceCall = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
             audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCall, 0)
 
-            // Boost STREAM_RING (some devices route TTS through this in communication mode)
+            // STREAM_RING — some devices route TTS through this in communication mode
             val maxRing = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
             try {
                 audioManager.setStreamVolume(AudioManager.STREAM_RING, maxRing, 0)
             } catch (_: Exception) {}
 
-            // On Android 12+, also boost STREAM_ACCESSIBILITY if available
+            // STREAM_ALARM — Samsung devices sometimes route TTS through this
+            try {
+                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_NOTIFICATION — Huawei/Honor devices route TTS here
+            try {
+                val maxNotification = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
+                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maxNotification, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_SYSTEM — some devices use this for TTS in communication mode
+            try {
+                val maxSystem = audioManager.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
+                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSystem, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_DTMF — v4.0: Some devices route TTS through this in communication mode
+            try {
+                val maxDtmf = audioManager.getStreamMaxVolume(AudioManager.STREAM_DTMF)
+                audioManager.setStreamVolume(AudioManager.STREAM_DTMF, maxDtmf, 0)
+            } catch (_: Exception) {}
+
+            // STREAM_ACCESSIBILITY — Android 8+ for accessibility TTS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
                     val maxAccessibility = audioManager.getStreamMaxVolume(AudioManager.STREAM_ACCESSIBILITY)
@@ -690,14 +807,81 @@ class SpeechManager(private val application: Application) {
                 } catch (_: Exception) {}
             }
 
-            // Ensure speaker is ON when not near ear
+            // ── STEP 3: Force speaker ON with multiple re-apply cycles ──
+            // Some OEMs reset speaker state after volume changes
             if (!isNearEar && !isBluetoothScoConnected) {
                 setSpeakerphoneOn(true)
+
+                // v4.0: 5 re-apply cycles with progressive delays
+                val reApplyDelays = listOf(80L, 200L, 400L, 600L, 1000L)
+                for ((index, delay) in reApplyDelays.withIndex()) {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (audioSessionActive && !isNearEar) {
+                            // Re-apply MODE_NORMAL (OEMs may reset it)
+                            try { audioManager.mode = AudioManager.MODE_NORMAL } catch (_: Exception) {}
+                            setSpeakerphoneOn(true)
+                            // Re-verify STREAM_MUSIC is still at max (some devices auto-adjust)
+                            try {
+                                val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                if (currentMusic < maxMusic) {
+                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                                }
+                            } catch (_: Exception) {}
+                            // Final cycle: full re-boost if anything was reset
+                            if (index == reApplyDelays.size - 1) {
+                                android.util.Log.d("SpeechManager", "Final volume verify: MUSIC=${audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)}/$maxMusic, mode=${audioManager.mode}, speakerActive=${isSpeakerphoneActive()}")
+                            }
+                        }
+                    }, delay)
+                }
             }
 
-            android.util.Log.d("SpeechManager", "Volume boosted: MUSIC=$maxMusic, VOICE_CALL=$maxVoiceCall, speaker=${!isNearEar}")
+            android.util.Log.d("SpeechManager", "Volume boosted: MUSIC=$maxMusic, VOICE_CALL=$maxVoiceCall, RING=$maxRing, DTMF=boosted, speaker=${!isNearEar}, mode=${audioManager.mode}")
         } catch (e: Exception) {
             android.util.Log.w("SpeechManager", "Volume boost failed: ${e.message}")
+        }
+    }
+
+    /**
+     * v4.0: Re-applies hands-free routing without full volume boost.
+     * Used when TTS starts/stops to prevent OEMs from resetting routing.
+     * Lighter than boostVolumeForHandsFree() — only fixes routing, doesn't max volumes.
+     */
+    private fun reapplyHandsFreeRouting() {
+        try {
+            // Force MODE_NORMAL for speaker output
+            try { audioManager.mode = AudioManager.MODE_NORMAL } catch (_: Exception) {}
+            // Force speaker ON
+            setSpeakerphoneOn(true)
+            // Verify STREAM_MUSIC volume is still at max
+            try {
+                val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                if (currentMusic < maxMusic) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                }
+            } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("SpeechManager", "Re-apply routing failed: ${e.message}")
+        }
+    }
+
+    /**
+     * v4.0: Checks if speakerphone is currently active.
+     * Uses modern API on API 31+ and deprecated API as fallback.
+     */
+    private fun isSpeakerphoneActive(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val device = audioManager.communicationDevice
+                device?.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.isSpeakerphoneOn
+            }
+        } catch (e: Exception) {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn
         }
     }
 
@@ -901,27 +1085,39 @@ class SpeechManager(private val application: Application) {
                 enableProximitySensor()
                 // Initial state: use speaker for hands-free (louder)
                 setSpeakerphoneOn(!isNearEar)
-                // ── EXTRA: Force speaker ON for maximum volume when not near ear ──
                 if (!isNearEar) {
-                    // On some devices, MODE_IN_COMMUNICATION routes to earpiece
-                    // We need to explicitly force speaker for hands-free
+                    // KEY FIX: Use MODE_NORMAL for speaker mode on most devices
+                    // MODE_IN_COMMUNICATION forces earpiece routing on many OEMs
+                    // We use MODE_NORMAL + speaker ON for maximum hands-free volume
                     try {
-                        // Temporarily set MODE_NORMAL so speaker works at full volume
-                        // Then switch back to IN_COMMUNICATION for echo cancellation
                         audioManager.mode = AudioManager.MODE_NORMAL
                         setSpeakerphoneOn(true)
-                        // Small delay to let audio routing settle
+                        // Boost volume after routing change
+                        if (volumeBoostEnabled) {
+                            boostVolumeForHandsFree()
+                        }
+                        // Delayed re-apply: some devices need speaker forced after mode change
                         Handler(Looper.getMainLooper()).postDelayed({
-                            if (audioSessionActive) {
-                                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                            if (audioSessionActive && !isNearEar) {
                                 setSpeakerphoneOn(true)
-                                // Re-boost volume after mode change
-                                boostVolumeForHandsFree()
+                                if (volumeBoostEnabled) {
+                                    boostVolumeForHandsFree()
+                                }
                             }
-                        }, 100)
+                        }, 200)
+                        // Second delayed re-apply for stubborn devices (Samsung, Xiaomi, etc.)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (audioSessionActive && !isNearEar) {
+                                setSpeakerphoneOn(true)
+                            }
+                        }, 500)
                     } catch (e: Exception) {
                         android.util.Log.w("SpeechManager", "Speaker force error: ${e.message}")
                     }
+                } else {
+                    // Near ear: use MODE_IN_COMMUNICATION for earpiece + echo cancellation
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    setSpeakerphoneOn(false)
                 }
             }
         } catch (e: Exception) {

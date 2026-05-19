@@ -82,6 +82,12 @@ data class NexaUiState(
     // Preview
     val previewContent: String? = null,  // HTML/code content for preview
     val showPreview: Boolean = false,  // Whether to show preview overlay
+    // AI Capabilities
+    val showCapabilitiesMenu: Boolean = false,  // Quick actions menu
+    // Auto-scroll
+    val autoScrollEnabled: Boolean = true,  // Auto-scroll to latest message
+    // Font size
+    val chatFontSize: Float = 14f,  // Chat font size in sp
     // Auth
     val currentScreen: Screen = Screen.CHAT,
     val user: UserData = UserData(),

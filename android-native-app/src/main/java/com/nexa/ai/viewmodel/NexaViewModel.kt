@@ -973,17 +973,32 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     // ═══════════════════════════════════════
 
     fun requestLocation() {
+        // v4.0: Check if location permissions are granted before requesting
+        if (!locationStore.hasLocationPermission()) {
+            android.util.Log.w("NexaVM", "Location permission not granted, skipping request")
+            _uiState.update { it.copy(isLocating = false) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLocating = true) }
             try {
                 val location = locationStore.getCurrentLocation()
                 _uiState.update { it.copy(locationData = location, isLocating = false) }
+                if (location.isAvailable) {
+                    android.util.Log.d("NexaVM", "Location obtained: ${location.city}, ${location.country} (${location.latitude}, ${location.longitude})")
+                }
             } catch (e: Exception) {
                 android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
                 _uiState.update { it.copy(isLocating = false) }
             }
         }
     }
+
+    /** v4.0: Check if location services are enabled on the device. */
+    fun isLocationEnabled(): Boolean = locationStore.isLocationEnabled()
+
+    /** v4.0: Check if location permissions are granted. */
+    fun hasLocationPermission(): Boolean = locationStore.hasLocationPermission()
 
     fun toggleNotifications() {
         _uiState.update { it.copy(notificationsEnabled = !_uiState.value.notificationsEnabled) }

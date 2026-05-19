@@ -39,3 +39,4 @@ __pycache__/
 *.pyc
 app-debug.zip
 app-debug.apk
+android-native-app/build/

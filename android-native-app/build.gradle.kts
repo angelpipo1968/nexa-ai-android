@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 38
-        versionName = "3.8"
+        versionCode = 39
+        versionName = "3.9"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
@@ -71,13 +71,14 @@ dependencies {
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
-
-    // Location
-    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
