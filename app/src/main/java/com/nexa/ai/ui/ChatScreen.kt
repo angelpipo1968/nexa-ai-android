@@ -59,6 +59,7 @@ fun ChatMainScreen(
     onSpeakMessage: (String, String) -> Unit,
     onToggleVoiceMode: () -> Unit = {},
     onStopVoiceMode: () -> Unit = {},
+    onDismissVoiceHelp: () -> Unit = {},
     onInterruptVoice: () -> Unit = {},
     onClearChat: () -> Unit,
     onDismissError: () -> Unit,
@@ -233,7 +234,16 @@ fun ChatMainScreen(
                     VoiceModeOverlay(
                         uiState = uiState,
                         onStopVoiceMode = onStopVoiceMode,
-                        onInterrupt = onInterruptVoice
+                        onInterrupt = onInterruptVoice,
+                        onDismissHelp = onDismissVoiceHelp
+                    )
+                }
+
+                // Voice commands help overlay
+                if (uiState.showVoiceCommandsHelp) {
+                    VoiceCommandsHelpOverlay(
+                        language = uiState.language,
+                        onDismiss = onDismissVoiceHelp
                     )
                 }
             }
@@ -249,7 +259,8 @@ fun ChatMainScreen(
 fun VoiceModeOverlay(
     uiState: NexaUiState,
     onStopVoiceMode: () -> Unit,
-    onInterrupt: () -> Unit = {}
+    onInterrupt: () -> Unit = {},
+    onDismissHelp: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
     val haptic = LocalHapticFeedback.current
@@ -521,6 +532,26 @@ fun VoiceModeOverlay(
                 )
             }
 
+            // Real-time transcription display while listening
+            if (isListening && uiState.inputText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White.copy(alpha = 0.04f),
+                    border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.12f)),
+                    modifier = Modifier.fillMaxWidth(0.8f)
+                ) {
+                    Text(
+                        uiState.inputText,
+                        fontSize = 13.sp,
+                        color = accentColor.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        maxLines = 3,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
             val msgCount = uiState.messages.size
             if (msgCount > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
@@ -533,7 +564,50 @@ fun VoiceModeOverlay(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Real-time volume level indicator — visual feedback for mic input
+            if (isListening || isSpeaking) {
+                val volumeLevel = uiState.voiceVolumeLevel
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(24.dp)
+                ) {
+                    val barWidth = size.width
+                    val barHeight = size.height
+                    val barY = barHeight / 2f
+
+                    // Background bar
+                    drawRoundRect(
+                        color = accentColor.copy(alpha = 0.08f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                    )
+
+                    // Volume fill bar
+                    val fillWidth = barWidth * volumeLevel.coerceIn(0f, 1f)
+                    if (fillWidth > 0) {
+                        drawRoundRect(
+                            color = accentColor.copy(alpha = 0.4f + volumeLevel * 0.4f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(fillWidth, barHeight)
+                        )
+                    }
+
+                    // Segments markers
+                    for (i in 1..4) {
+                        val markerX = barWidth * i / 5f
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.06f),
+                            start = Offset(markerX, 2.dp.toPx()),
+                            end = Offset(markerX, barHeight - 2.dp.toPx()),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (recentMessages.isNotEmpty()) {
                 Column(
@@ -625,6 +699,111 @@ fun VoiceModeOverlay(
                     }
                 }
             }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  VOICE COMMANDS HELP OVERLAY
+// ═══════════════════════════════════════
+
+@Composable
+fun VoiceCommandsHelpOverlay(
+    language: AppLanguage,
+    onDismiss: () -> Unit
+) {
+    // Auto-dismiss after 8 seconds
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(8000)
+        onDismiss()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xE60A0A0F))
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
+        ) {
+            // Title
+            Text(
+                NexaStrings.get("voice_help_title", language),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = NexaAccent,
+                letterSpacing = 2.sp
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Commands list
+            val commands = listOf(
+                "voice_help_repeat" to "🔄",
+                "voice_help_stop" to "🔇",
+                "voice_help_read" to "📖",
+                "voice_help_clear" to "🗑️",
+                "voice_help_new" to "➕",
+                "voice_help_pdf" to "📄",
+                "voice_help_male" to "🗣️",
+                "voice_help_female" to "🗣️",
+                "voice_help_english" to "🇺🇸",
+                "voice_help_spanish" to "🇪🇸",
+                "voice_help_dark" to "🌙",
+                "voice_help_light" to "☀️",
+                "voice_help_exit" to "✋",
+                "voice_help_help" to "❓"
+            )
+
+            commands.chunked(2).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    row.forEach { (key, emoji) ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.04f),
+                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(emoji, fontSize = 14.sp)
+                                Text(
+                                    NexaStrings.get(key, language),
+                                    fontSize = 11.sp,
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    // If odd number, add spacer
+                    if (row.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Close hint
+            Text(
+                NexaStrings.get("voice_help_close", language),
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.25f),
+                letterSpacing = 1.5.sp
+            )
         }
     }
 }

@@ -60,6 +60,7 @@ data class NexaUiState(
     val speakingMessageId: String? = null,
     val autoSpeak: Boolean = true,
     val voiceMode: Boolean = false,
+    val voiceVolumeLevel: Float = 0f,  // 0f..1f real-time mic volume for visual feedback
     // Settings
     val language: AppLanguage = AppLanguage.SPANISH,
     val voiceType: VoiceType = VoiceType.FEMALE_1,
@@ -79,6 +80,8 @@ data class NexaUiState(
     val registerConfirmPassword: String = "",
     val registerError: String? = null,
     val isRegistering: Boolean = false,
+    // Voice commands help
+    val showVoiceCommandsHelp: Boolean = false,
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false

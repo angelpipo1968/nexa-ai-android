@@ -39,3 +39,8 @@
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
 -dontwarn androidx.room.paging.**
+
+# Audio focus & Bluetooth
+-dontwarn android.media.AudioFocusRequest
+-keep class android.media.AudioFocusRequest { *; }
+-keep class android.media.AudioAttributes$Builder { *; }

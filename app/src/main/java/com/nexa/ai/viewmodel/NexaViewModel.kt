@@ -34,12 +34,17 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
-    private var voiceRetryCount = 0 
-    private val maxVoiceRetries = 10 
-    
-    // --- CHAT GPT RECOMMENDATION: DEBOUNCE LOGIC ---
+    private var voiceRetryCount = 0
+    private val maxVoiceRetries = 10
+
+    // Debounce logic — prevents rapid/accidental voice triggers
+    // Reduced from 800ms to 600ms for faster response while still filtering noise
     private var speechDebounceJob: kotlinx.coroutines.Job? = null
-    private val speechDebounceTimeMs = 800L // Time to wait for "real" silence before processing
+    private val speechDebounceTimeMs = 600L
+
+    // Track last successful voice result time to prevent duplicate sends
+    private var lastVoiceResultAt = 0L
+    private val voiceResultCooldownMs = 1000L
 
     private val surprisePromptsEs = listOf(
         "Cuéntame algo fascinante sobre el universo",
@@ -79,13 +84,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun setupSpeechCallbacks() {
         speechManager.onListeningStateChanged = { isListening ->
-            _uiState.value = _uiState.value.copy(isListening = isListening)
+            _uiState.update { it.copy(isListening = isListening) }
             if (isListening) voiceRetryCount = 0 // ¡Reiniciamos el contador si empieza a escuchar bien!
         }
         
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
-            _uiState.value = _uiState.value.copy(isSpeaking = isSpeaking, speakingMessageId = messageId)
-            
+            _uiState.update { it.copy(isSpeaking = isSpeaking, speakingMessageId = messageId) }
+
             if (_uiState.value.voiceMode) {
                 if (isSpeaking) {
                     // Barge-in: start AudioRecord monitor while AI is speaking
@@ -118,6 +123,8 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
             if (_uiState.value.voiceMode) {
                 speechManager.stopBargeInMonitor()
                 speechManager.stopSpeaking()
+                // Update UI to show barge-in state
+                _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
                 // Start actual speech recognition now
                 viewModelScope.launch {
                     kotlinx.coroutines.delay(80)
@@ -130,25 +137,33 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         
         speechManager.onSpeechResult = { text ->
             if (_uiState.value.voiceMode) {
+                // Prevent duplicate sends from rapid recognition results
+                val now = System.currentTimeMillis()
+                if (now - lastVoiceResultAt < voiceResultCooldownMs) {
+                    android.util.Log.d("NexaVM", "Dropping duplicate voice result: $text")
+                    return@setOnSpeechResult
+                }
+                lastVoiceResultAt = now
+
                 // Barge-in: if AI was speaking, it's already stopped by onBargeInDetected
                 // but double-check in case onBeginningOfSpeech didn't fire
                 if (_uiState.value.isSpeaking) {
                     speechManager.stopSpeaking()
                 }
-                
-                // Apply "Debounce" logic to avoid rapid/accidental triggers
+
+                // Apply debounce logic to avoid rapid/accidental triggers
                 speechDebounceJob?.cancel()
                 speechDebounceJob = viewModelScope.launch {
                     kotlinx.coroutines.delay(speechDebounceTimeMs)
-                    
+
                     speechManager.stopListening() // Force stop before processing
-                    
+
                     if (text.trim().length >= 2) {
-                        kotlinx.coroutines.delay(300) 
+                        kotlinx.coroutines.delay(200)
                         sendMessage(text)
                     } else {
                         // Accidental noise, restart listening with delay
-                        kotlinx.coroutines.delay(1000)
+                        kotlinx.coroutines.delay(800)
                         if (_uiState.value.voiceMode && !_uiState.value.isListening) {
                             speechManager.startListening()
                         }
@@ -160,21 +175,23 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         speechManager.onSpeechPartial = { text ->
-            _uiState.value = _uiState.value.copy(inputText = text)
+            _uiState.update { it.copy(inputText = text) }
         }
         
         speechManager.onError = { errorKey ->
             if (_uiState.value.voiceMode) {
-                voiceRetryCount++ // ¡Sumamos un error!
-                
+                voiceRetryCount++
+
                 if (voiceRetryCount >= maxVoiceRetries) {
                     // Si falla muchas veces, apagamos modo voz para no volver loco al usuario
-                    _uiState.value = _uiState.value.copy(voiceMode = false)
+                    _uiState.update { it.copy(voiceMode = false) }
                     speechManager.stopListening()
+                    stopVoiceMode()
                 } else {
-                    // Reintento normal
+                    // Reintento normal con backoff exponencial
+                    val delayMs = (2000L * (1 + voiceRetryCount / 3)).coerceAtMost(5000L)
                     viewModelScope.launch {
-                        kotlinx.coroutines.delay(2000) 
+                        kotlinx.coroutines.delay(delayMs)
                         if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                             speechManager.startListening()
                         }
@@ -182,25 +199,39 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } else {
                 val lang = _uiState.value.language
-                _uiState.value = _uiState.value.copy(error = NexaStrings.get(errorKey, lang))
+                _uiState.update { it.copy(error = NexaStrings.get(errorKey, lang)) }
             }
         }
         
         speechManager.onInputTextChanged = { text ->
-            _uiState.value = _uiState.value.copy(inputText = text)
+            _uiState.update { it.copy(inputText = text) }
         }
         
         // Voice mode: retry on recognition ended without match
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(2000)
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening && 
+                    kotlinx.coroutines.delay(1500) // Reduced from 2s for faster retry
+                    if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
                     }
                 }
             }
+        }
+        
+        // Real-time volume level for visual feedback in voice mode
+        speechManager.onVolumeLevelChanged = { level ->
+            if (_uiState.value.voiceMode) {
+                _uiState.update { it.copy(voiceVolumeLevel = level) }
+            }
+        }
+
+        // Proximity sensor: auto-switch earpiece/speaker
+        speechManager.onProximityChanged = { isNearEar ->
+            // Proximity is handled internally by SpeechManager for audio routing
+            // This callback is for future UI updates if needed
+            android.util.Log.d("NexaVM", "Proximity changed: nearEar=$isNearEar")
         }
     }
 
@@ -577,9 +608,85 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 return
             }
-            if (cmd.contains("detener manos libres") || cmd.contains("stop hands free")) {
+            if (cmd.contains("detener manos libres") || cmd.contains("stop hands free") || cmd.contains("salir modo voz") || cmd.contains("exit voice mode")) {
                 stopVoiceMode()
                 speak(if (lang == AppLanguage.SPANISH) "Modo manos libres desactivado" else "Hands free mode off")
+                return
+            }
+            // New voice commands: change language
+            if (cmd.contains("cambiar a inglés") || cmd.contains("switch to english") || cmd.contains("habla inglés") || cmd.contains("speak english")) {
+                setLanguage(AppLanguage.ENGLISH)
+                speak("Language switched to English")
+                return
+            }
+            if (cmd.contains("cambiar a español") || cmd.contains("switch to spanish") || cmd.contains("habla español") || cmd.contains("speak spanish")) {
+                setLanguage(AppLanguage.SPANISH)
+                speak("Idioma cambiado a español")
+                return
+            }
+            // New voice command: change voice
+            if (cmd.contains("voz masculina") || cmd.contains("male voice") || cmd.contains("voz de hombre")) {
+                setVoiceType(VoiceType.MALE_1)
+                speak(if (lang == AppLanguage.SPANISH) "Cambiado a voz masculina" else "Switched to male voice")
+                return
+            }
+            if (cmd.contains("voz femenina") || cmd.contains("female voice") || cmd.contains("voz de mujer")) {
+                setVoiceType(VoiceType.FEMALE_1)
+                speak(if (lang == AppLanguage.SPANISH) "Cambiado a voz femenina" else "Switched to female voice")
+                return
+            }
+            // New voice command: new chat
+            if (cmd.contains("nuevo chat") || cmd.contains("new chat") || cmd.contains("nueva conversación") || cmd.contains("new conversation")) {
+                createNewSession()
+                speak(if (lang == AppLanguage.SPANISH) "Nuevo chat creado" else "New chat created")
+                return
+            }
+            // Voice command: repeat last response
+            if (cmd.contains("repite") || cmd.contains("repito") || cmd.contains("repeat") || cmd.contains("say again") || cmd.contains("otra vez")) {
+                val lastMsg = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                if (lastMsg != null) {
+                    speak(lastMsg.content, lastMsg.id)
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "No hay nada que repetir" else "Nothing to repeat")
+                }
+                return
+            }
+            // Voice command: stop / silence
+            if (cmd.contains("cállate") || cmd.contains("callate") || cmd.contains("silencio") || cmd.contains("shut up") || cmd.contains("be quiet") || cmd.contains("silence")) {
+                speechManager.stopSpeaking()
+                speak(if (lang == AppLanguage.SPANISH) "De acuerdo" else "Alright")
+                return
+            }
+            // Voice command: help / what commands
+            if (cmd.contains("ayuda") || cmd.contains("comandos") || cmd.contains("help") || cmd.contains("commands") || cmd.contains("qué puedes hacer") || cmd.contains("what can you do")) {
+                _uiState.update { it.copy(showVoiceCommandsHelp = true) }
+                val helpText = if (lang == AppLanguage.SPANISH) {
+                    "Puedes decir: limpiar chat, nuevo chat, exportar PDF, repetir, voz masculina, voz femenina, habla inglés, habla español, detener manos libres, o cállate."
+                } else {
+                    "You can say: clear chat, new chat, export PDF, repeat, male voice, female voice, speak English, speak Spanish, stop hands free, or shut up."
+                }
+                speak(helpText)
+                return
+            }
+            // Voice command: read last message
+            if (cmd.contains("lee") || cmd.contains("leer") || cmd.contains("read") || cmd.contains("read it")) {
+                val lastMsg = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                if (lastMsg != null) {
+                    speak(lastMsg.content, lastMsg.id)
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "No hay mensajes para leer" else "No messages to read")
+                }
+                return
+            }
+            // Voice command: switch theme
+            if (cmd.contains("modo oscuro") || cmd.contains("dark mode") || cmd.contains("tema oscuro")) {
+                setThemeMode(ThemeMode.DARK)
+                speak(if (lang == AppLanguage.SPANISH) "Modo oscuro activado" else "Dark mode activated")
+                return
+            }
+            if (cmd.contains("modo claro") || cmd.contains("light mode") || cmd.contains("tema claro")) {
+                setThemeMode(ThemeMode.LIGHT)
+                speak(if (lang == AppLanguage.SPANISH) "Modo claro activado" else "Light mode activated")
                 return
             }
         }
@@ -700,7 +807,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleVoiceMode() {
         val activating = !_uiState.value.voiceMode
-        _uiState.value = _uiState.value.copy(voiceMode = activating)
+        _uiState.value = _uiState.value.copy(voiceMode = activating, voiceVolumeLevel = 0f)
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
@@ -726,6 +833,10 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
         speechManager.stopBargeInMonitor()
         speechManager.stopSpeaking()
         // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening
+    }
+
+    fun dismissVoiceCommandsHelp() {
+        _uiState.update { it.copy(showVoiceCommandsHelp = false) }
     }
 
     fun clearChat() {

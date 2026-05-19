@@ -125,7 +125,8 @@ class MainActivity : ComponentActivity() {
                                 requestPermission.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         },
-                        onStopVoiceMode = { viewModel.stopVoiceMode() }
+                        onStopVoiceMode = { viewModel.stopVoiceMode() },
+                        onDismissVoiceHelp = { viewModel.dismissVoiceCommandsHelp() }
                     )
                 }
             }
