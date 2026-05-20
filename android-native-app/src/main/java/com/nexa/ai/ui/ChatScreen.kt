@@ -95,46 +95,178 @@ fun ChatMainScreen(
     onCaptureImage: () -> Unit = {},
     onDismissPreview: () -> Unit = {}
 ) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val coroutineScope = rememberCoroutineScope()
+    val adaptiveInfo = LocalWindowAdaptiveInfo.current
+    val usePermanentDrawer = adaptiveInfo.shouldShowPermanentDrawer
 
-    LaunchedEffect(uiState.drawerOpen) {
-        if (uiState.drawerOpen && drawerState.isClosed) drawerState.open()
-        else if (!uiState.drawerOpen && drawerState.isOpen) drawerState.close()
-    }
-
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            DrawerContent(
-                uiState = uiState, onNewChat = onCreateSession,
-                onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
-                onClose = { coroutineScope.launch { drawerState.close() } },
-                onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
-                onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
-                onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
-                onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
-                onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
-                onPinSession = onPinSession, onRenameSession = onRenameSession,
-                onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
-                onShareSession = onShareSession, onDownloadSession = onDownloadSession
+    if (usePermanentDrawer) {
+        // ── TABLET: Permanent drawer as side panel ──
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Permanent side panel — session list
+            PermanentDrawerPanel(
+                uiState = uiState,
+                onNewChat = onCreateSession,
+                onSwitchSession = onSwitchSession,
+                onDeleteSession = onDeleteSession,
+                onNavigateToLogin = onNavigateToLogin,
+                onLogout = onLogout,
+                onSetLanguage = onSetLanguage,
+                onSetVoiceType = onSetVoiceType,
+                onToggleTheme = onCycleTheme,
+                onToggleSettings = onToggleSettings,
+                onToggleAutoSpeak = onToggleAutoSpeak,
+                onSetDrawerView = onSetDrawerView,
+                onNavigateToLottery = onNavigateToLottery,
+                onNavigateToTranslator = onNavigateToTranslator,
+                onPinSession = onPinSession,
+                onRenameSession = onRenameSession,
+                onCloneSession = onCloneSession,
+                onArchiveSession = onArchiveSession,
+                onShareSession = onShareSession,
+                onDownloadSession = onDownloadSession
             )
-        },
-        gesturesEnabled = true
-    ) {
-        Scaffold(
-            topBar = {
-                ChatTopBar(
-                    uiState = uiState, 
-                    isDarkTheme = isDarkTheme, 
-                    onToggleDrawer = onToggleDrawer,
-                    onClearChat = onClearChat,
-                    onToggleSettings = onToggleSettings
+            // Chat content
+            ChatContent(
+                uiState = uiState,
+                isDarkTheme = isDarkTheme,
+                onSend = onSend,
+                onInputChange = onInputChange,
+                onStartListening = onStartListening,
+                onStopListening = onStopListening,
+                onToggleAutoSpeak = onToggleAutoSpeak,
+                onStopSpeaking = onStopSpeaking,
+                onSpeakMessage = onSpeakMessage,
+                onToggleVoiceMode = onToggleVoiceMode,
+                onStopVoiceMode = onStopVoiceMode,
+                onDismissVoiceHelp = onDismissVoiceHelp,
+                onInterruptVoice = onInterruptVoice,
+                onClearChat = onClearChat,
+                onDismissError = onDismissError,
+                onToggleDrawer = onToggleDrawer,
+                onToggleSettings = onToggleSettings,
+                onCopyMessage = onCopyMessage,
+                onExportMessage = onExportMessage,
+                onRegenerate = onRegenerate,
+                onAttachFile = onAttachFile,
+                onClearAttachment = onClearAttachment,
+                onShareMessage = onShareMessage,
+                onQuickAction = onQuickAction,
+                onDismissPreview = onDismissPreview,
+                showMenuButton = false // No need for menu button on tablet — drawer is always visible
+            )
+        }
+    } else {
+        // ── PHONE / FOLDABLE: Modal drawer ──
+        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        val coroutineScope = rememberCoroutineScope()
+
+        LaunchedEffect(uiState.drawerOpen) {
+            if (uiState.drawerOpen && drawerState.isClosed) drawerState.open()
+            else if (!uiState.drawerOpen && drawerState.isOpen) drawerState.close()
+        }
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                DrawerContent(
+                    uiState = uiState, onNewChat = onCreateSession,
+                    onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
+                    onClose = { coroutineScope.launch { drawerState.close() } },
+                    onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
+                    onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
+                    onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
+                    onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
+                    onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
+                    onPinSession = onPinSession, onRenameSession = onRenameSession,
+                    onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
+                    onShareSession = onShareSession, onDownloadSession = onDownloadSession
                 )
             },
-            containerColor = MaterialTheme.colorScheme.background
-        ) { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            gesturesEnabled = true
+        ) {
+            ChatContent(
+                uiState = uiState,
+                isDarkTheme = isDarkTheme,
+                onSend = onSend,
+                onInputChange = onInputChange,
+                onStartListening = onStartListening,
+                onStopListening = onStopListening,
+                onToggleAutoSpeak = onToggleAutoSpeak,
+                onStopSpeaking = onStopSpeaking,
+                onSpeakMessage = onSpeakMessage,
+                onToggleVoiceMode = onToggleVoiceMode,
+                onStopVoiceMode = onStopVoiceMode,
+                onDismissVoiceHelp = onDismissVoiceHelp,
+                onInterruptVoice = onInterruptVoice,
+                onClearChat = onClearChat,
+                onDismissError = onDismissError,
+                onToggleDrawer = onToggleDrawer,
+                onToggleSettings = onToggleSettings,
+                onCopyMessage = onCopyMessage,
+                onExportMessage = onExportMessage,
+                onRegenerate = onRegenerate,
+                onAttachFile = onAttachFile,
+                onClearAttachment = onClearAttachment,
+                onShareMessage = onShareMessage,
+                onQuickAction = onQuickAction,
+                onDismissPreview = onDismissPreview,
+                showMenuButton = true
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  CHAT CONTENT (shared between modal and permanent drawer)
+// ═══════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatContent(
+    uiState: NexaUiState,
+    isDarkTheme: Boolean,
+    onSend: () -> Unit,
+    onInputChange: (String) -> Unit,
+    onStartListening: () -> Unit,
+    onStopListening: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onStopSpeaking: () -> Unit,
+    onSpeakMessage: (String, String) -> Unit,
+    onToggleVoiceMode: () -> Unit,
+    onStopVoiceMode: () -> Unit,
+    onDismissVoiceHelp: () -> Unit,
+    onInterruptVoice: () -> Unit,
+    onClearChat: () -> Unit,
+    onDismissError: () -> Unit,
+    onToggleDrawer: () -> Unit,
+    onToggleSettings: () -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onExportMessage: (Message) -> Unit,
+    onRegenerate: () -> Unit,
+    onAttachFile: () -> Unit,
+    onClearAttachment: () -> Unit,
+    onShareMessage: (String) -> Unit,
+    onQuickAction: (String) -> Unit,
+    onDismissPreview: () -> Unit,
+    showMenuButton: Boolean
+) {
+    val hPad = AdaptiveDimens.horizontalPadding()
+
+    Scaffold(
+        topBar = {
+            ChatTopBar(
+                uiState = uiState,
+                isDarkTheme = isDarkTheme,
+                onToggleDrawer = onToggleDrawer,
+                onClearChat = onClearChat,
+                onToggleSettings = onToggleSettings,
+                showMenuButton = showMenuButton
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // Center content on wide screens
+            CenteredContent(maxWidth = AdaptiveDimens.maxContentWidth()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     AnimatedVisibility(visible = uiState.error != null) {
                         ErrorBanner(uiState.error ?: "", onDismissError)
@@ -193,13 +325,13 @@ fun ChatMainScreen(
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = null,
-                                        modifier = Modifier.size((16 + 8 * progress).dp),
+                                        modifier = Modifier.size(adaptiveDimension(compact = (16 + 8 * progress).dp, expanded = (20 + 10 * progress).dp)),
                                         tint = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * progress)
                                     )
                                     if (progress > 0.7f) {
                                         Text(
                                             NexaStrings.get("pull_to_clear", uiState.language),
-                                            fontSize = 10.sp,
+                                            fontSize = AdaptiveTypography.labelSmall(),
                                             color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
                                             letterSpacing = 0.5.sp
                                         )
@@ -263,6 +395,192 @@ fun ChatMainScreen(
                         language = uiState.language,
                         onDismiss = onDismissPreview
                     )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  PERMANENT DRAWER PANEL (Tablet)
+// ═══════════════════════════════════════
+
+@Composable
+private fun PermanentDrawerPanel(
+    uiState: NexaUiState,
+    onNewChat: () -> Unit,
+    onSwitchSession: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onLogout: () -> Unit,
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetVoiceType: (VoiceType) -> Unit,
+    onToggleTheme: () -> Unit,
+    onToggleSettings: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onSetDrawerView: (Int) -> Unit,
+    onNavigateToLottery: () -> Unit = {},
+    onNavigateToTranslator: () -> Unit = {},
+    onPinSession: (String) -> Unit = {},
+    onRenameSession: (String) -> Unit = {},
+    onCloneSession: (String) -> Unit = {},
+    onArchiveSession: (String) -> Unit = {},
+    onShareSession: (String) -> Unit = {},
+    onDownloadSession: (String) -> Unit = {}
+) {
+    val drawerWidth = AdaptiveDimens.permanentDrawerWidth()
+    val lang = uiState.language
+    val user = uiState.user
+    val sessions = uiState.sessions
+    val activeSessionId = uiState.activeSessionId
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredSessions = if (searchQuery.isBlank()) sessions else
+        sessions.filter { it.title.contains(searchQuery, ignoreCase = true) || it.messages.any { m -> m.content.contains(searchQuery, ignoreCase = true) } }
+
+    Surface(
+        modifier = Modifier.width(drawerWidth).fillMaxHeight(),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(NexaAccent.copy(alpha = 0.04f), Color.Transparent)
+                        )
+                    )
+                    .padding(horizontal = 20.dp, vertical = 24.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "permDrawerGlow")
+                    val glowAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.10f, targetValue = 0.22f,
+                        animationSpec = infiniteRepeatable(tween(3500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                        label = "permDrawerGlowAlpha"
+                    )
+                    Box(modifier = Modifier.size(AdaptiveDimens.avatarSmall()).clip(RoundedCornerShape(12.dp))
+                        .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.03f)))),
+                        contentAlignment = Alignment.Center) { Text("⚡", fontSize = AdaptiveTypography.headlineSmall()) }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = AdaptiveTypography.headlineSmall(), letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
+                        if (user.isLoggedIn) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent))
+                                Text(user.displayName, fontSize = AdaptiveTypography.caption(), color = NexaAccent.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // New Chat button
+            Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable { onNewChat() },
+                shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()), color = NexaAccent.copy(alpha = 0.06f),
+                border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.12f))) {
+                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                    Text(NexaStrings.get("new_chat", lang), color = NexaAccent.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.SemiBold, fontSize = AdaptiveTypography.labelMedium(), letterSpacing = 0.3.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Search
+            Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))) {
+                Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Search, null, modifier = Modifier.size(AdaptiveDimens.iconSmall()),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = searchQuery, onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        textStyle = LocalTextStyle.current.copy(fontSize = AdaptiveTypography.bodySmall(), color = MaterialTheme.colorScheme.onSurface),
+                        singleLine = true,
+                        decorationBox = { innerTextField ->
+                            if (searchQuery.isEmpty()) {
+                                Text(NexaStrings.get("search_chats", lang), fontSize = AdaptiveTypography.bodySmall(),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                            }
+                            innerTextField()
+                        }
+                    )
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(18.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(AdaptiveDimens.iconSmall()),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Session list
+            if (filteredSessions.isEmpty()) {
+                Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(AdaptiveDimens.iconLarge()),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+                    Text(NexaStrings.get(if (searchQuery.isEmpty()) "no_chats" else "no_results", lang),
+                        fontSize = AdaptiveTypography.bodySmall(), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                        fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
+                }
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
+                    items(filteredSessions, key = { it.id }) { session ->
+                        ChatSessionItem(session = session, language = lang, isActive = session.id == activeSessionId,
+                            onClick = { onSwitchSession(session.id) }, onDelete = { onDeleteSession(session.id) },
+                            onPin = { onPinSession(session.id) }, onRename = { onRenameSession(session.id) },
+                            onClone = { onCloneSession(session.id) }, onArchive = { onArchiveSession(session.id) },
+                            onShare = { onShareSession(session.id) }, onDownload = { onDownloadSession(session.id) })
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+            // Translator button
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+                .clip(RoundedCornerShape(8.dp)).clickable { onNavigateToTranslator() }
+                .padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Language, contentDescription = "Traductor",
+                    tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                Text("🌍 Traductor en Vivo", fontSize = AdaptiveTypography.labelMedium(), fontWeight = FontWeight.Medium,
+                    color = NexaAccent.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+            // Bottom actions
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onToggleSettings() }
+                    .padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Settings, contentDescription = NexaStrings.get("settings", lang),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                    Text(NexaStrings.get("settings", lang), fontSize = AdaptiveTypography.labelMedium(), fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), letterSpacing = 0.3.sp)
+                }
+                Row(modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                    if (user.isLoggedIn) onLogout() else onNavigateToLogin()
+                }.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(if (user.isLoggedIn) Icons.AutoMirrored.Filled.ExitToApp else Icons.Default.Person, contentDescription = null,
+                        tint = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.6f) else NexaAccent.copy(alpha = 0.5f),
+                        modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                    Text(if (user.isLoggedIn) NexaStrings.get("logout", lang) else NexaStrings.get("login", lang),
+                        fontSize = AdaptiveTypography.labelMedium(), fontWeight = FontWeight.Medium,
+                        color = if (user.isLoggedIn) MaterialTheme.colorScheme.error.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        letterSpacing = 0.3.sp)
                 }
             }
         }
@@ -849,7 +1167,7 @@ fun DrawerContent(
     val filteredSessions = if (searchQuery.isBlank()) sessions else
         sessions.filter { it.title.contains(searchQuery, ignoreCase = true) || it.messages.any { m -> m.content.contains(searchQuery, ignoreCase = true) } }
 
-    ModalDrawerSheet(modifier = Modifier.width(300.dp), drawerContainerColor = MaterialTheme.colorScheme.surface) {
+    ModalDrawerSheet(modifier = Modifier.width(AdaptiveDimens.drawerWidth()), drawerContainerColor = MaterialTheme.colorScheme.surface) {
         val drawerListState = rememberLazyListState()
         val headerParallaxOffset by remember {
             derivedStateOf { (drawerListState.firstVisibleItemScrollOffset * 0.4f) }
@@ -1092,7 +1410,7 @@ fun ChatSessionItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () -> Unit, onClearChat: () -> Unit, onToggleSettings: () -> Unit = {}) {
+fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () -> Unit, onClearChat: () -> Unit, onToggleSettings: () -> Unit = {}, showMenuButton: Boolean = true) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1114,9 +1432,11 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
             }
         },
         navigationIcon = {
-            IconButton(onClick = onToggleDrawer) {
-                Icon(Icons.Default.Menu, contentDescription = NexaStrings.get("menu", uiState.language),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+            if (showMenuButton) {
+                IconButton(onClick = onToggleDrawer) {
+                    Icon(Icons.Default.Menu, contentDescription = NexaStrings.get("menu", uiState.language),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+                }
             }
         },
         actions = {

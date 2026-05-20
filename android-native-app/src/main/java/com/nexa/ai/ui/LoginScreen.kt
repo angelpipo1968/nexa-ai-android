@@ -54,81 +54,84 @@ fun LoginScreen(
         modifier = Modifier.fillMaxSize(),
         color = if (isDarkTheme) Color(0xFF050508) else Color(0xFFF8F9FC)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Back button
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.Start
+        // Center content on wide screens
+        CenteredContent(maxWidth = AdaptiveDimens.maxAuthContentWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = AdaptiveDimens.horizontalPadding()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = NexaStrings.get("back", language),
-                        tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f))
+                // Back button
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = NexaStrings.get("back", language),
+                            tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f))
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingXl()))
+
+                // Logo
+                AuthLogo()
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+                Text("NEXA PRO", fontSize = AdaptiveTypography.displayLarge(), fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+                Text(NexaStrings.get("login_title", language), fontSize = AdaptiveTypography.bodySmall(),
+                    color = if (isDarkTheme) Color(0xFF6B6B80) else Color(0xFF5A5A70),
+                    modifier = Modifier.padding(top = 6.dp), letterSpacing = 0.5.sp)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingXl()))
+
+                // Email field
+                AuthTextField(value = email, onValueChange = onEmailChange,
+                    label = NexaStrings.get("email", language), placeholder = NexaStrings.get("email_placeholder", language),
+                    leadingIcon = Icons.Default.Email, isDarkTheme = isDarkTheme,
+                    keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingMd()))
+
+                // Password field
+                AuthPasswordField(value = password, onValueChange = onPasswordChange,
+                    label = NexaStrings.get("password", language), showPassword = showPassword,
+                    onTogglePassword = { showPassword = !showPassword }, isDarkTheme = isDarkTheme,
+                    imeAction = ImeAction.Done,
+                    onDone = { onLogin(); keyboardController?.hide() })
+
+                // Error
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(AdaptiveDimens.spacingSm()))
+                    AuthErrorBanner(error)
+                }
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+
+                // Login button
+                AuthButton(text = NexaStrings.get("login", language), isLoading = isLoading,
+                    onClick = { onLogin(); keyboardController?.hide() })
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+
+                // Divider
+                AuthDivider(isDarkTheme = isDarkTheme)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+
+                // Register link
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Text(NexaStrings.get("no_account", language) + " ", fontSize = AdaptiveTypography.bodyMedium(),
+                        color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666))
+                    Text(NexaStrings.get("register", language), fontSize = AdaptiveTypography.bodyMedium(), fontWeight = FontWeight.Bold,
+                        color = NexaAccent, modifier = Modifier.clickable { onGoToRegister() })
+                }
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingXxl()))
             }
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Logo
-            AuthLogo()
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
-            Text(NexaStrings.get("login_title", language), fontSize = 13.sp,
-                color = if (isDarkTheme) Color(0xFF6B6B80) else Color(0xFF5A5A70),
-                modifier = Modifier.padding(top = 6.dp), letterSpacing = 0.5.sp)
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Email field
-            AuthTextField(value = email, onValueChange = onEmailChange,
-                label = NexaStrings.get("email", language), placeholder = NexaStrings.get("email_placeholder", language),
-                leadingIcon = Icons.Default.Email, isDarkTheme = isDarkTheme,
-                keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Password field
-            AuthPasswordField(value = password, onValueChange = onPasswordChange,
-                label = NexaStrings.get("password", language), showPassword = showPassword,
-                onTogglePassword = { showPassword = !showPassword }, isDarkTheme = isDarkTheme,
-                imeAction = ImeAction.Done,
-                onDone = { onLogin(); keyboardController?.hide() })
-
-            // Error
-            if (error != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                AuthErrorBanner(error)
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // Login button
-            AuthButton(text = NexaStrings.get("login", language), isLoading = isLoading,
-                onClick = { onLogin(); keyboardController?.hide() })
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Divider
-            AuthDivider(isDarkTheme = isDarkTheme)
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Register link
-            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Text(NexaStrings.get("no_account", language) + " ", fontSize = 14.sp,
-                    color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666))
-                Text(NexaStrings.get("register", language), fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    color = NexaAccent, modifier = Modifier.clickable { onGoToRegister() })
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
@@ -154,74 +157,76 @@ fun RegisterScreen(
         modifier = Modifier.fillMaxSize(),
         color = if (isDarkTheme) Color(0xFF050508) else Color(0xFFF8F9FC)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.Start) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = NexaStrings.get("back", language),
-                        tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f))
+        CenteredContent(maxWidth = AdaptiveDimens.maxAuthContentWidth()) {
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = AdaptiveDimens.horizontalPadding()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.Start) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = NexaStrings.get("back", language),
+                            tint = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f))
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+                AuthLogo()
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+                Text("NEXA PRO", fontSize = AdaptiveTypography.displayLarge(), fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+                Text(NexaStrings.get("create_account", language), fontSize = AdaptiveTypography.bodySmall(),
+                    color = if (isDarkTheme) Color(0xFF6B6B80) else Color(0xFF5A5A70),
+                    modifier = Modifier.padding(top = 6.dp), letterSpacing = 0.5.sp)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingXl()))
+
+                AuthTextField(value = name, onValueChange = onNameChange,
+                    label = NexaStrings.get("name", language), placeholder = NexaStrings.get("your_name", language),
+                    leadingIcon = Icons.Default.Person, isDarkTheme = isDarkTheme, imeAction = ImeAction.Next)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingSm()))
+
+                AuthTextField(value = email, onValueChange = onEmailChange,
+                    label = NexaStrings.get("email", language), placeholder = NexaStrings.get("email_placeholder", language),
+                    leadingIcon = Icons.Default.Email, isDarkTheme = isDarkTheme,
+                    keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingSm()))
+
+                AuthPasswordField(value = password, onValueChange = onPasswordChange,
+                    label = NexaStrings.get("password", language), showPassword = showPassword,
+                    onTogglePassword = { showPassword = !showPassword }, isDarkTheme = isDarkTheme,
+                    placeholder = NexaStrings.get("min_6", language), imeAction = ImeAction.Next)
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingSm()))
+
+                AuthPasswordField(value = confirmPassword, onValueChange = onConfirmPasswordChange,
+                    label = NexaStrings.get("confirm_password", language), showPassword = showConfirm,
+                    onTogglePassword = { showConfirm = !showConfirm }, isDarkTheme = isDarkTheme,
+                    placeholder = NexaStrings.get("repeat_password", language), imeAction = ImeAction.Done,
+                    onDone = { onRegister(); keyboardController?.hide() })
+
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(AdaptiveDimens.spacingSm()))
+                    AuthErrorBanner(error)
+                }
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+
+                AuthButton(text = NexaStrings.get("create_account_btn", language), isLoading = isLoading,
+                    onClick = { onRegister(); keyboardController?.hide() })
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
+
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Text(NexaStrings.get("has_account", language) + " ", fontSize = AdaptiveTypography.bodyMedium(),
+                        color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666))
+                    Text(NexaStrings.get("login", language), fontSize = AdaptiveTypography.bodyMedium(), fontWeight = FontWeight.Bold,
+                        color = NexaAccent, modifier = Modifier.clickable { onGoToLogin() })
+                }
+
+                Spacer(modifier = Modifier.height(AdaptiveDimens.spacingXxl()))
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            AuthLogo()
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("NEXA PRO", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
-            Text(NexaStrings.get("create_account", language), fontSize = 13.sp,
-                color = if (isDarkTheme) Color(0xFF6B6B80) else Color(0xFF5A5A70),
-                modifier = Modifier.padding(top = 6.dp), letterSpacing = 0.5.sp)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            AuthTextField(value = name, onValueChange = onNameChange,
-                label = NexaStrings.get("name", language), placeholder = NexaStrings.get("your_name", language),
-                leadingIcon = Icons.Default.Person, isDarkTheme = isDarkTheme, imeAction = ImeAction.Next)
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            AuthTextField(value = email, onValueChange = onEmailChange,
-                label = NexaStrings.get("email", language), placeholder = NexaStrings.get("email_placeholder", language),
-                leadingIcon = Icons.Default.Email, isDarkTheme = isDarkTheme,
-                keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            AuthPasswordField(value = password, onValueChange = onPasswordChange,
-                label = NexaStrings.get("password", language), showPassword = showPassword,
-                onTogglePassword = { showPassword = !showPassword }, isDarkTheme = isDarkTheme,
-                placeholder = NexaStrings.get("min_6", language), imeAction = ImeAction.Next)
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            AuthPasswordField(value = confirmPassword, onValueChange = onConfirmPasswordChange,
-                label = NexaStrings.get("confirm_password", language), showPassword = showConfirm,
-                onTogglePassword = { showConfirm = !showConfirm }, isDarkTheme = isDarkTheme,
-                placeholder = NexaStrings.get("repeat_password", language), imeAction = ImeAction.Done,
-                onDone = { onRegister(); keyboardController?.hide() })
-
-            if (error != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                AuthErrorBanner(error)
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            AuthButton(text = NexaStrings.get("create_account_btn", language), isLoading = isLoading,
-                onClick = { onRegister(); keyboardController?.hide() })
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Text(NexaStrings.get("has_account", language) + " ", fontSize = 14.sp,
-                    color = if (isDarkTheme) Color(0xFF888888) else Color(0xFF666666))
-                Text(NexaStrings.get("login", language), fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                    color = NexaAccent, modifier = Modifier.clickable { onGoToLogin() })
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
@@ -232,11 +237,12 @@ fun RegisterScreen(
 
 @Composable
 private fun AuthLogo() {
+    val logoSize = AdaptiveDimens.logoSize()
     Box(
-        modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp))
+        modifier = Modifier.size(logoSize).clip(RoundedCornerShape(AdaptiveDimens.cornerLarge()))
             .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = 0.12f), NexaAccent.copy(alpha = 0.02f)))),
         contentAlignment = Alignment.Center
-    ) { Text("⚡", fontSize = 34.sp) }
+    ) { Text("⚡", fontSize = AdaptiveTypography.displayLarge()) }
 }
 
 @Composable
@@ -249,7 +255,7 @@ private fun AuthTextField(
         value = value, onValueChange = onValueChange, label = { Text(label) },
         placeholder = { Text(placeholder) }, leadingIcon = { Icon(leadingIcon, contentDescription = null) },
         singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = NexaAccent, focusedLabelColor = NexaAccent, cursorColor = NexaAccent))
 }
@@ -271,32 +277,32 @@ private fun AuthPasswordField(
         visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction),
         keyboardActions = if (onDone != null) KeyboardActions(onDone = { onDone() }) else KeyboardActions.Default,
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = NexaAccent, focusedLabelColor = NexaAccent, cursorColor = NexaAccent))
 }
 
 @Composable
 private fun AuthErrorBanner(error: String) {
-    Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+    Surface(shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()), color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
         modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Row(modifier = Modifier.padding(AdaptiveDimens.spacingMd()), horizontalArrangement = Arrangement.spacedBy(AdaptiveDimens.spacingSm()),
             verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.ErrorOutline, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-            Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            Icon(Icons.Default.ErrorOutline, null, modifier = Modifier.size(AdaptiveDimens.iconMedium()), tint = MaterialTheme.colorScheme.error)
+            Text(error, color = MaterialTheme.colorScheme.error, fontSize = AdaptiveTypography.bodySmall())
         }
     }
 }
 
 @Composable
 private fun AuthButton(text: String, isLoading: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = NexaAccent),
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(AdaptiveDimens.buttonHeight()),
+        shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()), colors = ButtonDefaults.buttonColors(containerColor = NexaAccent),
         enabled = !isLoading) {
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.Black, strokeWidth = 2.dp)
         } else {
-            Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text(text, fontSize = AdaptiveTypography.labelLarge(), fontWeight = FontWeight.Bold, color = Color.Black)
         }
     }
 }
@@ -305,7 +311,7 @@ private fun AuthButton(text: String, isLoading: Boolean, onClick: () -> Unit) {
 private fun AuthDivider(isDarkTheme: Boolean) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         HorizontalDivider(modifier = Modifier.weight(1f), color = if (isDarkTheme) Color(0xFF2A2A2A) else Color(0xFFDDDDDD))
-        Text("  o  ", fontSize = 12.sp, color = if (isDarkTheme) Color(0xFF666666) else Color(0xFF999999))
+        Text("  o  ", fontSize = AdaptiveTypography.bodySmall(), color = if (isDarkTheme) Color(0xFF666666) else Color(0xFF999999))
         HorizontalDivider(modifier = Modifier.weight(1f), color = if (isDarkTheme) Color(0xFF2A2A2A) else Color(0xFFDDDDDD))
     }
 }

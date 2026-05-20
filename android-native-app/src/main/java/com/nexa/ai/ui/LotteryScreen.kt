@@ -117,15 +117,15 @@ fun LotteryScreen(
             // Top bar
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AdaptiveDimens.spacingSm())) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(AdaptiveDimens.avatarSmall())
+                                .clip(RoundedCornerShape(AdaptiveDimens.cornerSmall()))
                                 .background(NexaAccent.copy(alpha = 0.1f)),
                             contentAlignment = Alignment.Center
-                        ) { Text("🎰", fontSize = 16.sp) }
-                        Text(NexaStrings.get("lottery", language), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        ) { Text("🎰", fontSize = AdaptiveTypography.bodyMedium()) }
+                        Text(NexaStrings.get("lottery", language), fontWeight = FontWeight.Bold, fontSize = AdaptiveTypography.headlineMedium())
                     }
                 },
                 navigationIcon = {
@@ -137,10 +137,12 @@ fun LotteryScreen(
             )
 
             // Game selector
+            val adaptiveInfo = LocalWindowAdaptiveInfo.current
+            val contentH = AdaptiveDimens.horizontalPadding()
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = contentH),
+                horizontalArrangement = Arrangement.spacedBy(AdaptiveDimens.spacingSm())
             ) {
                 items(games) { (key, label) ->
                     val selected = selectedGame == key
@@ -152,7 +154,7 @@ fun LotteryScreen(
                             generatedTickets = emptyList(); recommendedNumbers = emptyList()
                             lastDrawDate = null; nextDrawDate = null; nextJackpot = null
                         },
-                        label = { Text(label, fontSize = 12.sp) },
+                        label = { Text(label, fontSize = AdaptiveTypography.labelMedium()) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
                             selectedLabelColor = NexaAccent
@@ -163,22 +165,22 @@ fun LotteryScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AdaptiveDimens.spacingSm()))
 
             // Tabs
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = contentH),
+                horizontalArrangement = Arrangement.spacedBy(AdaptiveDimens.spacingSm())) {
                 TabButton(text = NexaStrings.get("lottery_results", language), selected = activeTab == 0, onClick = { activeTab = 0 }, modifier = Modifier.weight(1f))
                 TabButton(text = NexaStrings.get("lottery_generate", language), selected = activeTab == 1, onClick = { activeTab = 1 }, modifier = Modifier.weight(1f))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(AdaptiveDimens.spacingLg()))
 
             // Content
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(horizontal = contentH, vertical = AdaptiveDimens.spacingSm()),
+                verticalArrangement = Arrangement.spacedBy(AdaptiveDimens.spacingMd())
             ) {
                 if (activeTab == 0) {
                     // Results tab

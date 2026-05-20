@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.nexa.ai.ui.NexaChatScreen
+import com.nexa.ai.ui.ProvideWindowAdaptiveInfo
 import com.nexa.ai.ui.theme.NexaTheme
 import com.nexa.ai.viewmodel.NexaViewModel
 import androidx.compose.ui.graphics.Color
@@ -112,8 +113,9 @@ class MainActivity : ComponentActivity() {
             }
 
             NexaTheme(themeMode = uiState.themeMode) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    NexaChatScreen(
+                ProvideWindowAdaptiveInfo {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        NexaChatScreen(
                         uiState = uiState,
                         onSend = { viewModel.sendMessage() },
                         onInputChange = { viewModel.updateInput(it) },
@@ -232,6 +234,7 @@ class MainActivity : ComponentActivity() {
                         onExportSettings = { viewModel.exportSettings() },
                         onImportSettings = { viewModel.importSettings() }
                     )
+                    }
                 }
             }
         }

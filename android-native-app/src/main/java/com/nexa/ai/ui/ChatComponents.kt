@@ -74,9 +74,11 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
+    val chatPadding = AdaptiveDimens.chatListPadding()
+    val msgSpacing = AdaptiveDimens.messageSpacing()
     LazyColumn(modifier = modifier.fillMaxWidth(), state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        contentPadding = PaddingValues(horizontal = chatPadding, vertical = AdaptiveDimens.verticalPadding()),
+        verticalArrangement = Arrangement.spacedBy(msgSpacing)) {
         if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode, onQuickAction) }
         items(messages, key = { it.id }) { msg ->
             val isLast = msg == messages.lastOrNull()
@@ -97,9 +99,9 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
 @Composable
 fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickAction: (String) -> Unit = {}) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 120.dp, bottom = 40.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = adaptiveDimension(compact = 120.dp, medium = 80.dp, expanded = 60.dp), bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(AdaptiveDimens.spacingLg())
     ) {
         // Premium pulsating glow with layered effects
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
@@ -376,9 +378,11 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     val swipeThreshold = 120f
     var swipeTriggered by remember { mutableStateOf(false) }
 
+    val bubbleMaxWidth = AdaptiveDimens.messageBubbleMaxWidth()
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
         Box(
             modifier = Modifier
+                .widthIn(max = bubbleMaxWidth)
                 .pointerInput(onCopy, onSpeak) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -411,10 +415,12 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 )
             }
 
-        Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
+        val cornerLg = AdaptiveDimens.cornerExtraLarge()
+        Surface(shape = RoundedCornerShape(topStart = cornerLg, topEnd = cornerLg, bottomStart = if (isUser) cornerLg else 6.dp, bottomEnd = if (isUser) 6.dp else cornerLg),
             color = if (isUser) userBubbleColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)) else null) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            val innerH = AdaptiveDimens.cardInnerPadding()
+            Column(modifier = Modifier.padding(horizontal = innerH, vertical = AdaptiveDimens.verticalPadding())) {
                 if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
                     Row(modifier = Modifier.padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(NexaAccent.copy(alpha = 0.12f)),
@@ -431,7 +437,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                     }
                     if (message.content.length > message.attachmentName.length + 3) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(message.content.removePrefix("📎 ${message.attachmentName}\n"), fontSize = 15.sp, lineHeight = 22.sp, color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
+                        Text(message.content.removePrefix("📎 ${message.attachmentName}\n"), fontSize = AdaptiveTypography.chatMessage(), lineHeight = AdaptiveTypography.chatMessageLineHeight(), color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
                     }
                 } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()
@@ -462,7 +468,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                         when (segment) {
                             is MessageSegment.Text -> {
                                 val markdownText = rememberMarkdownText(segment.content)
-                                Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp,
+                                Text(text = markdownText, fontSize = AdaptiveTypography.chatMessage(), lineHeight = AdaptiveTypography.chatMessageLineHeight(),
                                     color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
                             }
                             is MessageSegment.Image -> {

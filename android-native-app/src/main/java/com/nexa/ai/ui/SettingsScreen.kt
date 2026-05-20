@@ -73,9 +73,9 @@ fun SettingsScreen(
     onExportSettings: () -> Unit = {},
     onImportSettings: () -> Unit = {}
 ) {
-    // Standardized spacing measurement for uniformity
-    val sectionSpacing = 28.dp
-    val internalSpacing = 12.dp
+    // Standardized spacing measurement for uniformity — using adaptive system
+    val sectionSpacing = AdaptiveDimens.sectionSpacing()
+    val internalSpacing = AdaptiveDimens.spacingMd()
 
     val effectiveAccent = if (uiState.accentColor != 0L) Color(uiState.accentColor) else if (uiState.themeMode == ThemeMode.SYSTEM) dynamicPrimaryColor() else NexaAccent
 
@@ -127,7 +127,7 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(horizontal = AdaptiveDimens.horizontalPadding(), vertical = AdaptiveDimens.verticalPadding()),
                 verticalArrangement = Arrangement.spacedBy(sectionSpacing)
             ) {
 

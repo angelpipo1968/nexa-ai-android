@@ -79,6 +79,9 @@ fun NexaChatScreen(
     onExportSettings: () -> Unit = {},
     onImportSettings: () -> Unit = {}
 ) {
+    // Access adaptive info from CompositionLocal
+    val adaptiveInfo = LocalWindowAdaptiveInfo.current
+
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
         UpdateDialog(updateInfo = uiState.updateInfo, onDismiss = onDismissUpdate,
@@ -89,7 +92,7 @@ fun NexaChatScreen(
     val isSystemDark = isSystemInDarkTheme()
     val isDark = uiState.isDark(isSystemDark)
 
-    // Screen navigation
+    // Screen navigation — each screen uses adaptive layout internally
     when (uiState.currentScreen) {
         Screen.LOGIN -> LoginScreen(
             email = uiState.loginEmail, password = uiState.loginPassword,

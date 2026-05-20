@@ -200,6 +200,8 @@ fun TranslatorScreen(
             .fillMaxSize()
             .background(gradient)
     ) {
+        // Center content on wide screens
+        val adaptiveInfo = LocalWindowAdaptiveInfo.current
         // Top Bar
         TopAppBar(
             title = { Text("🌍 Traductor en Vivo", fontWeight = FontWeight.Bold) },
@@ -217,7 +219,7 @@ fun TranslatorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(AdaptiveDimens.horizontalPadding()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Language selector bar
