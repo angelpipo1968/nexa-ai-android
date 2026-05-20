@@ -75,8 +75,8 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
     LazyColumn(modifier = modifier.fillMaxWidth(), state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        contentPadding = chatContentPadding(),
+        verticalArrangement = Arrangement.spacedBy(NexaSpacing.itemSpacing())) {
         if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode, onQuickAction) }
         items(messages, key = { it.id }) { msg ->
             val isLast = msg == messages.lastOrNull()
@@ -97,7 +97,7 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
 @Composable
 fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickAction: (String) -> Unit = {}) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 120.dp, bottom = 40.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = NexaSizes.emptyStateTopPadding(), bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -377,8 +377,10 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     var swipeTriggered by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
+        val bubbleMaxWidth = NexaSizes.messageBubbleMaxWidth()
         Box(
             modifier = Modifier
+                .fillMaxWidth(fraction = bubbleMaxWidth)
                 .pointerInput(onCopy, onSpeak) {
                     detectHorizontalDragGestures(
                         onDragEnd = {

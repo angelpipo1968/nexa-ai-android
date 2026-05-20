@@ -1,7 +1,6 @@
 package com.nexa.ai.ui.theme
 
 import android.app.Activity
-import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -15,11 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.nexa.ai.viewmodel.ThemeMode
 
@@ -98,41 +94,10 @@ fun dynamicPrimaryColor(): Color {
 }
 
 // ═══════════════════════════════════════
-//  RESPONSIVE BREAKPOINTS
+//  RESPONSIVE HELPERS — Now in AdaptiveLayout.kt
 // ═══════════════════════════════════════
-
-enum class ScreenSize { COMPACT, MEDIUM, EXPANDED }
-
-@Composable
-fun rememberScreenSize(): ScreenSize {
-    val config = LocalConfiguration.current
-    return when {
-        config.screenWidthDp < 600 -> ScreenSize.COMPACT
-        config.screenWidthDp < 840 -> ScreenSize.MEDIUM
-        else -> ScreenSize.EXPANDED
-    }
-}
-
-@Composable
-fun <T> responsive(compact: T, medium: T, expanded: T): T {
-    return when (rememberScreenSize()) {
-        ScreenSize.COMPACT -> compact
-        ScreenSize.MEDIUM -> medium
-        ScreenSize.EXPANDED -> expanded
-    }
-}
-
-object NexaPadding {
-    @Composable fun horizontal(): Dp = responsive(16.dp, 24.dp, 32.dp)
-    @Composable fun vertical(): Dp = responsive(12.dp, 16.dp, 20.dp)
-    @Composable fun content(): Dp = responsive(12.dp, 16.dp, 24.dp)
-    @Composable fun card(): Dp = responsive(12.dp, 14.dp, 16.dp)
-}
-
-object NexaTextScale {
-    @Composable fun body(): Float = responsive(1f, 1.05f, 1.1f)
-    @Composable fun title(): Float = responsive(1f, 1.1f, 1.2f)
-}
+// Use: rememberAdaptiveInfo(), adaptive(), adaptiveText(), NexaSpacing, NexaTypographyScale
+// Import from com.nexa.ai.ui package
 
 // ═══════════════════════════════════════
 //  THEME COMPOSABLE

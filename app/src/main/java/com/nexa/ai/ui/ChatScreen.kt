@@ -95,6 +95,7 @@ fun ChatMainScreen(
     onCaptureImage: () -> Unit = {},
     onDismissPreview: () -> Unit = {}
 ) {
+    val adaptiveInfo = rememberAdaptiveInfo()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
 
@@ -103,167 +104,266 @@ fun ChatMainScreen(
         else if (!uiState.drawerOpen && drawerState.isOpen) drawerState.close()
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            DrawerContent(
-                uiState = uiState, onNewChat = onCreateSession,
-                onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
-                onClose = { coroutineScope.launch { drawerState.close() } },
-                onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
-                onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
-                onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
-                onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
-                onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
-                onPinSession = onPinSession, onRenameSession = onRenameSession,
-                onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
-                onShareSession = onShareSession, onDownloadSession = onDownloadSession
+    if (adaptiveInfo.shouldUseDualPane) {
+        // ── TABLET/LANDSCAPE: Dual-pane layout with permanent sidebar ──
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Permanent sidebar (drawer always visible)
+            Surface(
+                modifier = Modifier
+                    .width(adaptiveDrawerWidth())
+                    .fillMaxHeight(),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+            ) {
+                DrawerContent(
+                    uiState = uiState, onNewChat = onCreateSession,
+                    onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
+                    onClose = { /* No-op for permanent sidebar */ },
+                    onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
+                    onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
+                    onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
+                    onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
+                    onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
+                    onPinSession = onPinSession, onRenameSession = onRenameSession,
+                    onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
+                    onShareSession = onShareSession, onDownloadSession = onDownloadSession,
+                    useModalSheet = false
+                )
+            }
+            // Chat content
+            ChatContentPane(
+                uiState = uiState, isDarkTheme = isDarkTheme,
+                onSend = onSend, onInputChange = onInputChange,
+                onStartListening = onStartListening, onStopListening = onStopListening,
+                onToggleAutoSpeak = onToggleAutoSpeak, onStopSpeaking = onStopSpeaking,
+                onSpeakMessage = onSpeakMessage, onToggleVoiceMode = onToggleVoiceMode,
+                onStopVoiceMode = onStopVoiceMode, onDismissVoiceHelp = onDismissVoiceHelp,
+                onInterruptVoice = onInterruptVoice, onClearChat = onClearChat,
+                onDismissError = onDismissError, onToggleDrawer = onToggleDrawer,
+                onToggleSettings = onToggleSettings, onCopyMessage = onCopyMessage,
+                onExportMessage = onExportMessage, onSurpriseMe = onSurpriseMe,
+                onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
+                onRegenerate = onRegenerate, onShareMessage = onShareMessage,
+                onQuickAction = onQuickAction, onCaptureImage = onCaptureImage,
+                onDismissPreview = onDismissPreview
             )
-        },
-        gesturesEnabled = true
-    ) {
-        Scaffold(
-            topBar = {
-                ChatTopBar(
-                    uiState = uiState, 
-                    isDarkTheme = isDarkTheme, 
-                    onToggleDrawer = onToggleDrawer,
-                    onClearChat = onClearChat,
-                    onToggleSettings = onToggleSettings
+        }
+    } else {
+        // ── PHONE: Modal drawer layout (original behavior) ──
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                DrawerContent(
+                    uiState = uiState, onNewChat = onCreateSession,
+                    onSwitchSession = onSwitchSession, onDeleteSession = onDeleteSession,
+                    onClose = { coroutineScope.launch { drawerState.close() } },
+                    onNavigateToLogin = onNavigateToLogin, onLogout = onLogout,
+                    onSetLanguage = onSetLanguage, onSetVoiceType = onSetVoiceType,
+                    onToggleTheme = onCycleTheme, onToggleSettings = onToggleSettings,
+                    onToggleAutoSpeak = onToggleAutoSpeak, onSetDrawerView = onSetDrawerView,
+                    onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
+                    onPinSession = onPinSession, onRenameSession = onRenameSession,
+                    onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
+                    onShareSession = onShareSession, onDownloadSession = onDownloadSession
                 )
             },
-            containerColor = MaterialTheme.colorScheme.background
-        ) { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    AnimatedVisibility(visible = uiState.error != null) {
-                        ErrorBanner(uiState.error ?: "", onDismissError)
-                    }
+            gesturesEnabled = true
+        ) {
+            ChatContentPane(
+                uiState = uiState, isDarkTheme = isDarkTheme,
+                onSend = onSend, onInputChange = onInputChange,
+                onStartListening = onStartListening, onStopListening = onStopListening,
+                onToggleAutoSpeak = onToggleAutoSpeak, onStopSpeaking = onStopSpeaking,
+                onSpeakMessage = onSpeakMessage, onToggleVoiceMode = onToggleVoiceMode,
+                onStopVoiceMode = onStopVoiceMode, onDismissVoiceHelp = onDismissVoiceHelp,
+                onInterruptVoice = onInterruptVoice, onClearChat = onClearChat,
+                onDismissError = onDismissError, onToggleDrawer = onToggleDrawer,
+                onToggleSettings = onToggleSettings, onCopyMessage = onCopyMessage,
+                onExportMessage = onExportMessage, onSurpriseMe = onSurpriseMe,
+                onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
+                onRegenerate = onRegenerate, onShareMessage = onShareMessage,
+                onQuickAction = onQuickAction, onCaptureImage = onCaptureImage,
+                onDismissPreview = onDismissPreview
+            )
+        }
+    }
+}
 
-                    val haptic = LocalHapticFeedback.current
-                    var pullOffset by remember { mutableStateOf(0f) }
-                    val animatedPullOffset by animateFloatAsState(
-                        targetValue = pullOffset,
-                        animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
-                        label = "pullOffset"
-                    )
-                    val pullThreshold = 150f
-                    var refreshTriggered by remember { mutableStateOf(false) }
+// ═══════════════════════════════════════
+//  CHAT CONTENT PANE (extracted for dual-pane reuse)
+// ═══════════════════════════════════════
 
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .pointerInput(uiState.messages.isNotEmpty()) {
-                                if (uiState.messages.isNotEmpty()) {
-                                    detectVerticalDragGestures(
-                                        onDragEnd = {
-                                            if (pullOffset > pullThreshold && !refreshTriggered) {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                onClearChat()
-                                            }
-                                            refreshTriggered = false
-                                            pullOffset = 0f
-                                        },
-                                        onDragCancel = { pullOffset = 0f },
-                                        onVerticalDrag = { _, dragAmount ->
-                                            if (dragAmount > 0) {
-                                                pullOffset = (pullOffset + dragAmount).coerceAtMost(250f)
-                                            }
+@Composable
+fun ChatContentPane(
+    uiState: NexaUiState,
+    isDarkTheme: Boolean,
+    onSend: () -> Unit,
+    onInputChange: (String) -> Unit,
+    onStartListening: () -> Unit,
+    onStopListening: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
+    onStopSpeaking: () -> Unit,
+    onSpeakMessage: (String, String) -> Unit,
+    onToggleVoiceMode: () -> Unit,
+    onStopVoiceMode: () -> Unit,
+    onDismissVoiceHelp: () -> Unit,
+    onInterruptVoice: () -> Unit,
+    onClearChat: () -> Unit,
+    onDismissError: () -> Unit,
+    onToggleDrawer: () -> Unit,
+    onToggleSettings: () -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onExportMessage: (Message) -> Unit,
+    onSurpriseMe: () -> Unit,
+    onAttachFile: () -> Unit,
+    onClearAttachment: () -> Unit,
+    onRegenerate: () -> Unit,
+    onShareMessage: (String) -> Unit,
+    onQuickAction: (String) -> Unit,
+    onCaptureImage: () -> Unit,
+    onDismissPreview: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            ChatTopBar(
+                uiState = uiState,
+                isDarkTheme = isDarkTheme,
+                onToggleDrawer = onToggleDrawer,
+                onClearChat = onClearChat,
+                onToggleSettings = onToggleSettings
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                AnimatedVisibility(visible = uiState.error != null) {
+                    ErrorBanner(uiState.error ?: "", onDismissError)
+                }
+
+                val haptic = LocalHapticFeedback.current
+                var pullOffset by remember { mutableStateOf(0f) }
+                val animatedPullOffset by animateFloatAsState(
+                    targetValue = pullOffset,
+                    animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "pullOffset"
+                )
+                val pullThreshold = 150f
+                var refreshTriggered by remember { mutableStateOf(false) }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .pointerInput(uiState.messages.isNotEmpty()) {
+                            if (uiState.messages.isNotEmpty()) {
+                                detectVerticalDragGestures(
+                                    onDragEnd = {
+                                        if (pullOffset > pullThreshold && !refreshTriggered) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onClearChat()
                                         }
-                                    )
-                                }
-                            }
-                    ) {
-                        if (animatedPullOffset > 20f) {
-                            val progress = (animatedPullOffset / pullThreshold).coerceAtMost(1f)
-                            val infiniteTransition = rememberInfiniteTransition(label = "pullGlow")
-                            val glowAlpha by infiniteTransition.animateFloat(
-                                initialValue = 0.3f, targetValue = 0.8f,
-                                animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
-                                label = "pullGlow"
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(animatedPullOffset.dp * 0.4f)
-                                    .graphicsLayer { alpha = progress * 0.8f },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = null,
-                                        modifier = Modifier.size((16 + 8 * progress).dp),
-                                        tint = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * progress)
-                                    )
-                                    if (progress > 0.7f) {
-                                        Text(
-                                            NexaStrings.get("pull_to_clear", uiState.language),
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
-                                            letterSpacing = 0.5.sp
-                                        )
+                                        refreshTriggered = false
+                                        pullOffset = 0f
+                                    },
+                                    onDragCancel = { pullOffset = 0f },
+                                    onVerticalDrag = { _, dragAmount ->
+                                        if (dragAmount > 0) {
+                                            pullOffset = (pullOffset + dragAmount).coerceAtMost(250f)
+                                        }
                                     }
+                                )
+                            }
+                        }
+                ) {
+                    if (animatedPullOffset > 20f) {
+                        val progress = (animatedPullOffset / pullThreshold).coerceAtMost(1f)
+                        val infiniteTransition = rememberInfiniteTransition(label = "pullGlow")
+                        val glowAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.3f, targetValue = 0.8f,
+                            animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                            label = "pullGlow"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(animatedPullOffset.dp * 0.4f)
+                                .graphicsLayer { alpha = progress * 0.8f },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size((16 + 8 * progress).dp),
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * progress)
+                                )
+                                if (progress > 0.7f) {
+                                    Text(
+                                        NexaStrings.get("pull_to_clear", uiState.language),
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = glowAlpha * 0.6f),
+                                        letterSpacing = 0.5.sp
+                                    )
                                 }
                             }
                         }
-
-                        ChatMessages(
-                            messages = uiState.messages,
-                            isThinking = uiState.isThinking,
-                            language = uiState.language,
-                            speakingMessageId = uiState.speakingMessageId,
-                            onSpeakMessage = onSpeakMessage,
-                            onCopyMessage = onCopyMessage,
-                            onExportMessage = onExportMessage,
-                            onRegenerate = onRegenerate,
-                            isDarkTheme = isDarkTheme,
-                            themeMode = uiState.themeMode,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { translationY = animatedPullOffset * 0.3f },
-                            onClearChat = onClearChat,
-                            onStopSpeaking = onStopSpeaking,
-                            isSpeaking = uiState.isSpeaking,
-                            onActivateVoiceMode = onToggleVoiceMode,
-                            onShareMessage = onShareMessage,
-                            onQuickAction = onQuickAction
-                        )
                     }
 
-                    InputBar(text = uiState.inputText, language = uiState.language,
-                        isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
-                        pendingAttachment = uiState.pendingAttachment, onTextChange = onInputChange,
-                        onSend = onSend, onStartListening = onStartListening,
-                        onStopListening = onStopListening, onStopSpeaking = onStopSpeaking,
-                        onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
-                }
-
-                if (uiState.voiceMode) {
-                    VoiceModeOverlay(
-                        uiState = uiState,
-                        onStopVoiceMode = onStopVoiceMode,
-                        onInterrupt = onInterruptVoice,
-                        onDismissHelp = onDismissVoiceHelp
-                    )
-                }
-
-                // Voice commands help overlay
-                if (uiState.showVoiceCommandsHelp) {
-                    VoiceCommandsHelpOverlay(
+                    ChatMessages(
+                        messages = uiState.messages,
+                        isThinking = uiState.isThinking,
                         language = uiState.language,
-                        onDismiss = onDismissVoiceHelp
+                        speakingMessageId = uiState.speakingMessageId,
+                        onSpeakMessage = onSpeakMessage,
+                        onCopyMessage = onCopyMessage,
+                        onExportMessage = onExportMessage,
+                        onRegenerate = onRegenerate,
+                        isDarkTheme = isDarkTheme,
+                        themeMode = uiState.themeMode,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { translationY = animatedPullOffset * 0.3f },
+                        onClearChat = onClearChat,
+                        onStopSpeaking = onStopSpeaking,
+                        isSpeaking = uiState.isSpeaking,
+                        onActivateVoiceMode = onToggleVoiceMode,
+                        onShareMessage = onShareMessage,
+                        onQuickAction = onQuickAction
                     )
                 }
 
-                // Preview overlay for HTML/code content
-                if (uiState.showPreview && uiState.previewContent != null) {
-                    PreviewOverlay(
-                        content = uiState.previewContent,
-                        language = uiState.language,
-                        onDismiss = onDismissPreview
-                    )
-                }
+                InputBar(text = uiState.inputText, language = uiState.language,
+                    isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
+                    pendingAttachment = uiState.pendingAttachment, onTextChange = onInputChange,
+                    onSend = onSend, onStartListening = onStartListening,
+                    onStopListening = onStopListening, onStopSpeaking = onStopSpeaking,
+                    onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
+            }
+
+            if (uiState.voiceMode) {
+                VoiceModeOverlay(
+                    uiState = uiState,
+                    onStopVoiceMode = onStopVoiceMode,
+                    onInterrupt = onInterruptVoice,
+                    onDismissHelp = onDismissVoiceHelp
+                )
+            }
+
+            // Voice commands help overlay
+            if (uiState.showVoiceCommandsHelp) {
+                VoiceCommandsHelpOverlay(
+                    language = uiState.language,
+                    onDismiss = onDismissVoiceHelp
+                )
+            }
+
+            // Preview overlay for HTML/code content
+            if (uiState.showPreview && uiState.previewContent != null) {
+                PreviewOverlay(
+                    content = uiState.previewContent,
+                    language = uiState.language,
+                    onDismiss = onDismissPreview
+                )
             }
         }
     }
@@ -839,7 +939,8 @@ fun DrawerContent(
     onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {}, onNavigateToTranslator: () -> Unit = {},
     onPinSession: (String) -> Unit = {}, onRenameSession: (String) -> Unit = {},
     onCloneSession: (String) -> Unit = {}, onArchiveSession: (String) -> Unit = {},
-    onShareSession: (String) -> Unit = {}, onDownloadSession: (String) -> Unit = {}
+    onShareSession: (String) -> Unit = {}, onDownloadSession: (String) -> Unit = {},
+    useModalSheet: Boolean = true
 ) {
     val sessions = uiState.sessions
     val activeSessionId = uiState.activeSessionId
@@ -849,7 +950,7 @@ fun DrawerContent(
     val filteredSessions = if (searchQuery.isBlank()) sessions else
         sessions.filter { it.title.contains(searchQuery, ignoreCase = true) || it.messages.any { m -> m.content.contains(searchQuery, ignoreCase = true) } }
 
-    ModalDrawerSheet(modifier = Modifier.width(300.dp), drawerContainerColor = MaterialTheme.colorScheme.surface) {
+    val innerContent: @Composable ColumnScope.() -> Unit = {
         val drawerListState = rememberLazyListState()
         val headerParallaxOffset by remember {
             derivedStateOf { (drawerListState.firstVisibleItemScrollOffset * 0.4f) }
@@ -1004,6 +1105,12 @@ fun DrawerContent(
                     letterSpacing = 0.3.sp)
             }
         }
+    }
+
+    if (useModalSheet) {
+        ModalDrawerSheet(modifier = Modifier.width(adaptiveDrawerWidth()), drawerContainerColor = MaterialTheme.colorScheme.surface, content = innerContent)
+    } else {
+        Column(modifier = Modifier.fillMaxSize(), content = innerContent)
     }
 }
 
