@@ -18,6 +18,7 @@ import { searchWikipedia, getCountryData } from '@/lib/nexa-core/knowledge';
 import { getMemories, extractAndSaveFacts, logActivity } from '@/lib/nexa-core/memory';
 import { auditCode } from '@/lib/nexa-core/repairer';
 import { searchVideos, searchLibraries } from '@/lib/nexa-core/multimedia';
+import { generateVideo } from '@/lib/nexa-core/video-generation';
 import { searchReddit, searchYouTube } from '@/lib/nexa-core/social';
 import { searchSpotify } from '@/lib/nexa-core/spotify';
 import { getUserLocation, getLocalTime } from '@/lib/nexa-core/location';
@@ -620,11 +621,28 @@ Interacciones totales: ${userProfile.interaction_count}
             } catch {}
         }
 
-        // 11. MULTIMEDIA Y LIBRERÍAS
-        const triggerVideo = ['video de', 'clip de', 'metraje de', 'vídeo de'];
-        if (triggerVideo.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        // 11. VIDEO GENERATION (AI-powered video creation)
+        const triggerVideoGen = ['genera video', 'generar video', 'crea video', 'crear video', 'haz un video', 'generate video', 'create video', 'make a video', 'animación de', 'animacion de'];
+        if (triggerVideoGen.some(kw => lowerQuery.includes(kw)) && !toolContext) {
             try {
-                const topic = userQuery.replace(/video de|clip de|vídeo de/gi, "").trim();
+                const videoPrompt = userQuery.replace(/genera video|generar video|crea video|crear video|haz un video|generate video|create video|make a video|animación de|animacion de/gi, "").trim();
+                const style = lowerQuery.includes('anime') ? 'anime' :
+                              lowerQuery.includes('3d') ? '3d' :
+                              lowerQuery.includes('realista') || lowerQuery.includes('realistic') ? 'realistic' :
+                              lowerQuery.includes('artístico') || lowerQuery.includes('artistic') ? 'artistic' : 'cinematic';
+                const duration = lowerQuery.includes('10 segundo') || lowerQuery.includes('10 second') ? 10 :
+                                 lowerQuery.includes('3 segundo') || lowerQuery.includes('3 second') ? 3 : 5;
+                const aspectRatio = lowerQuery.includes('vertical') || lowerQuery.includes('9:16') ? '9:16' :
+                                    lowerQuery.includes('cuadrado') || lowerQuery.includes('1:1') ? '1:1' : '16:9';
+                toolContext += await generateVideo({ prompt: videoPrompt, duration, aspectRatio, style }) + "\n";
+            } catch {}
+        }
+
+        // 11b. VIDEO SEARCH (searching for existing videos)
+        const triggerVideoSearch = ['video de', 'clip de', 'metraje de', 'vídeo de', 'busca video', 'search video'];
+        if (triggerVideoSearch.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+            try {
+                const topic = userQuery.replace(/video de|clip de|metraje de|vídeo de|busca video|search video/gi, "").trim();
                 toolContext += await searchVideos(topic) + "\n";
             } catch {}
         }

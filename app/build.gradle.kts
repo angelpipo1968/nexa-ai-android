@@ -13,8 +13,8 @@ android {
         applicationId = "com.nexa.ai"
         minSdk = 26
         targetSdk = 35
-        versionCode = 45
-        versionName = "4.5"
+        versionCode = 50
+        versionName = "5.0"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
@@ -105,6 +105,19 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+
+    // ML Kit — On-device AI (optional, graceful fallback)
+    implementation("com.google.mlkit:language-id:16.1.0")
+    implementation("com.google.mlkit:entity-extraction:16.0.0-beta5")
+    implementation("com.google.mlkit:smart-reply:17.0.4")
+    implementation("com.google.mlkit:translate:17.0.3")
+
+    // TensorFlow Lite — On-device ML models
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
+    // Activity Recognition
+    implementation("com.google.android.gms:play-services-activity-recognition:16.0.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

@@ -13,7 +13,12 @@ import com.nexa.ai.data.SessionStore
 import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.StreamEvent
 import com.nexa.ai.data.UpdateChecker
+import com.nexa.ai.iot.IoTManager
+import com.nexa.ai.ml.OnDeviceMLEngine
+import com.nexa.ai.sensors.NexaSensorManager
 import com.nexa.ai.ui.NexaStrings
+import com.nexa.ai.voice.NaturalConversationEngine
+import com.nexa.ai.voice.VoiceEnhancer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +39,13 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
     private val settingsStore = SettingsStore(application)
+
+    // ML & AI Enhancement Managers
+    private val voiceEnhancer = VoiceEnhancer(application)
+    private val conversationEngine = NaturalConversationEngine(application)
+    private val sensorManager = NexaSensorManager(application)
+    private val iotManager = IoTManager(application)
+    private val mlEngine = OnDeviceMLEngine(application)
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -102,7 +114,65 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         } else {
             ""
         }
-        return advancedSystemPrompt + locationContext
+
+        // Build enriched context from ML, sensors, IoT, voice, and conversation engines
+        val enrichedContext = buildEnrichedContext()
+
+        return advancedSystemPrompt + locationContext + enrichedContext
+    }
+
+    /**
+     * Build enriched context from all AI enhancement subsystems.
+     * This makes the AI aware of the user's physical environment, emotional state,
+     * smart home devices, conversation context, and learned preferences.
+     */
+    private fun buildEnrichedContext(): String {
+        val parts = mutableListOf<String>()
+
+        // Sensor context (activity, environment, device state)
+        try {
+            val sensorCtx = sensorManager.getContextForAI()
+            if (sensorCtx.isNotBlank()) parts.add("\n\nSENSOR CONTEXT: $sensorCtx")
+        } catch (_: Exception) {}
+
+        // IoT context (smart home devices)
+        try {
+            val iotCtx = kotlinx.coroutines.runBlocking { iotManager.getIoTContextForAI() }
+            if (iotCtx.isNotBlank()) parts.add("\n\nIOT DEVICES: $iotCtx")
+        } catch (_: Exception) {}
+
+        // Voice emotion context
+        try {
+            val voiceCtx = voiceEnhancer.getVoiceContextForAI()
+            if (voiceCtx.isNotBlank()) parts.add("\n\nVOICE ANALYSIS: $voiceCtx")
+        } catch (_: Exception) {}
+
+        // Conversation context (topic, mood, turn count)
+        try {
+            val convCtx = conversationEngine.getConversationContextForAI()
+            if (convCtx.isNotBlank()) parts.add("\n\nCONVERSATION CONTEXT: $convCtx")
+        } catch (_: Exception) {}
+
+        // ML learned preferences and patterns
+        try {
+            val mlCtx = kotlinx.coroutines.runBlocking { mlEngine.getMLContextForAI() }
+            if (mlCtx.isNotBlank()) parts.add("\n\nLEARNED USER PROFILE: $mlCtx")
+        } catch (_: Exception) {}
+
+        // Proactive suggestions from ML engine
+        try {
+            val suggestions = kotlinx.coroutines.runBlocking { mlEngine.generateProactiveSuggestions() }
+            if (suggestions.isNotEmpty()) {
+                parts.add("\n\nPROACTIVE SUGGESTIONS: ${suggestions.take(3).joinToString("; ")}")
+            }
+        } catch (_: Exception) {}
+
+        return if (parts.isNotEmpty()) {
+            "\n\n═══ NEXA ENHANCED INTELLIGENCE ═══" + parts.joinToString("") +
+            "\n\nUse this context to provide personalized, context-aware responses. Adapt your tone, detail level, and suggestions based on the user's situation."
+        } else {
+            ""
+        }
     }
 
     // Debounce logic — prevents rapid/accidental voice triggers
@@ -147,6 +217,91 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         restoreState()
         // Auto-request location on startup
         requestLocation()
+        // Initialize ML & AI Enhancement subsystems
+        initializeEnhancementSystems()
+    }
+
+    // ═══════════════════════════════════════
+    //  ML & AI ENHANCEMENT INITIALIZATION
+    // ═══════════════════════════════════════
+
+    private fun initializeEnhancementSystems() {
+        // Start sensor monitoring
+        try { sensorManager.startListening() } catch (_: Exception) {}
+
+        // Initialize IoT demo devices
+        viewModelScope.launch {
+            try { iotManager.initDemoDevices() } catch (_: Exception) {}
+        }
+
+        // Voice enhancer: wake word detection
+        voiceEnhancer.onWakeWordDetected = {
+            if (_uiState.value.voiceMode) {
+                android.util.Log.d("NexaVM", "Wake word detected!")
+                // Already in voice mode, just acknowledge
+            } else {
+                // Activate voice mode on wake word
+                _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
+                speechManager.startVoiceAudioSession()
+                speechManager.startListening()
+            }
+        }
+
+        // Voice enhancer: IoT voice command detection
+        voiceEnhancer.onIoTVoiceCommand = { commandText ->
+            viewModelScope.launch {
+                try {
+                    val result = iotManager.processVoiceCommand(commandText)
+                    speak(result)
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Voice enhancer: language detection
+        voiceEnhancer.onLanguageDetected = { language, confidence ->
+            if (confidence > 0.7f) {
+                val detectedLang = when (language) {
+                    "en" -> AppLanguage.ENGLISH
+                    "es" -> AppLanguage.SPANISH
+                    else -> null
+                }
+                if (detectedLang != null && detectedLang != _uiState.value.language) {
+                    android.util.Log.d("NexaVM", "Auto-detected language: $language ($confidence)")
+                    // Don't auto-switch, just log for now — user may be bilingual
+                }
+            }
+        }
+
+        // Sensor manager: context changes
+        sensorManager.onContextChanged = { oldContext, newContext ->
+            android.util.Log.d("NexaVM", "Context changed: $oldContext → $newContext")
+        }
+
+        // Sensor manager: activity changes
+        sensorManager.onActivityChanged = { activity ->
+            android.util.Log.d("NexaVM", "Activity detected: $activity")
+            // Adapt voice settings based on activity
+            when (activity) {
+                "driving" -> {
+                    speechManager.setVolumeBoost(true)
+                    speechManager.setSpeechRate(0.9f)
+                }
+                "still" -> {
+                    speechManager.setSpeechRate(1.0f)
+                }
+                "running", "walking" -> {
+                    speechManager.setVolumeBoost(true)
+                    speechManager.setSpeechRate(1.1f)
+                }
+            }
+        }
+
+        // Sensor manager: battery low
+        sensorManager.onBatteryLow = {
+            // Reduce background activity when battery is low
+            voiceEnhancer.stopWakeWordDetection()
+            android.util.Log.d("NexaVM", "Battery low — reducing background activity")
+        }
     }
 
     // ═══════════════════════════════════════
@@ -854,6 +1009,37 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 sendMessage(codePrompt)
                 return
             }
+            // Voice command: IoT / Smart Home control
+            if (iotManager.isIoTCommand(cmd)) {
+                viewModelScope.launch {
+                    try {
+                        val result = iotManager.processVoiceCommand(cmd)
+                        speak(result)
+                    } catch (e: Exception) {
+                        speak(if (lang == AppLanguage.SPANISH) "Error al procesar comando de casa inteligente" else "Error processing smart home command")
+                    }
+                }
+                return
+            }
+            // Voice command: Good morning / Good night routines
+            if (cmd.contains("buenos días") || cmd.contains("good morning") || cmd.contains("buenas noches") || cmd.contains("good night")) {
+                val routineId = when {
+                    cmd.contains("buenos días") || cmd.contains("good morning") -> "routine_good_morning"
+                    cmd.contains("buenas noches") || cmd.contains("good night") -> "routine_good_night"
+                    else -> null
+                }
+                if (routineId != null) {
+                    viewModelScope.launch {
+                        try {
+                            val result = iotManager.executeRoutine(routineId)
+                            speak(result)
+                        } catch (e: Exception) {
+                            speak(if (lang == AppLanguage.SPANISH) "No pude ejecutar la rutina" else "Could not execute the routine")
+                        }
+                    }
+                    return
+                }
+            }
         }
 
         val attachmentName = _uiState.value.pendingAttachment
@@ -951,6 +1137,26 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                                 s.copy(messages = updated, updatedAt = System.currentTimeMillis())
                             }
                             _uiState.value = _uiState.value.copy(isThinking = false)
+
+                            // ML Learning: learn from this interaction
+                            if (fullResponse.isNotBlank()) {
+                                viewModelScope.launch {
+                                    try {
+                                        val voiceEmotion = voiceEnhancer.voiceState.value.voiceEmotion
+                                        mlEngine.learnFromInteraction(
+                                            userMessage = content,
+                                            aiResponse = fullResponse,
+                                            emotionDetected = voiceEmotion
+                                        )
+                                        // Update conversation context
+                                        conversationEngine.updateContext(
+                                            userMessage = content,
+                                            aiResponse = fullResponse,
+                                            emotion = voiceEmotion
+                                        )
+                                    } catch (_: Exception) {}
+                                }
+                            }
 
                             if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
                                 // Add a tiny "breathing" delay before speaking in voice mode
@@ -1376,5 +1582,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     override fun onCleared() {
         super.onCleared()
         speechManager.destroy()
+        voiceEnhancer.shutdown()
+        sensorManager.stopListening()
     }
 }
