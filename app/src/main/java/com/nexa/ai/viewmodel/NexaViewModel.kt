@@ -178,7 +178,12 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                     // Start actual speech recognition if not already listening
                     if (!_uiState.value.isListening && !_uiState.value.isThinking) {
                         viewModelScope.launch {
-                            kotlinx.coroutines.delay(300)
+                            // ═══ v5.1 BUG 3 FIX ═══
+                            // Increased from 300ms to 700ms — on Samsung/Xiaomi/OPPO
+                            // devices the audio system needs more time to switch from
+                            // TTS output to mic input. 300ms caused SpeechRecognizer
+                            // errors and restart loops.
+                            kotlinx.coroutines.delay(700)
                             if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                                 !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                                 speechManager.startListening()
@@ -198,7 +203,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
                 // Start actual speech recognition now
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(80)
+                    // ═══ v5.1 FIX ═══
+                    // Increased from 80ms to 200ms — gives audio system
+                    // more time to stabilize after stopping TTS output
+                    kotlinx.coroutines.delay(200)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening) {
                         speechManager.startListening()
                     }
@@ -282,7 +290,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(1500) // Reduced from 2s for faster retry
+                    // ═══ v5.1 BUG 3 FIX ═══
+                    // Increased back to 2000ms — 1500ms was too aggressive
+                    // and caused rapid restart loops on some devices
+                    kotlinx.coroutines.delay(2000)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
@@ -880,12 +891,17 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
                 // Use Groq PRO mode if API key is set, otherwise use backend
                 val groqKey = _uiState.value.groqApiKey
+                val loc = _uiState.value.locationData
                 val messageFlow = if (groqKey.isNotBlank()) {
                     repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code)
                 } else {
                     repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
                         language = _uiState.value.language.code,
-                        systemPrompt = buildSystemPrompt())
+                        systemPrompt = buildSystemPrompt(),
+                        latitude = if (loc.isAvailable) loc.latitude else null,
+                        longitude = if (loc.isAvailable) loc.longitude else null,
+                        city = if (loc.isAvailable) loc.city else null,
+                        country = if (loc.isAvailable) loc.country else null)
                 }
 
                 messageFlow.collect { event ->

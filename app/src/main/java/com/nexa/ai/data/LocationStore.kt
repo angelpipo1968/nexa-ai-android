@@ -14,8 +14,11 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -290,10 +293,13 @@ class LocationStore(private val context: Context) {
 
     /**
      * Resolves a Location to a human-readable address using Geocoder.
-     * Handles both API 33+ async and legacy sync APIs with proper waiting.
-     * v4.0: Added fallback for when Geocoder fails — still returns coordinates.
+     * v5.1: Changed to suspend function — avoids blocking the calling thread
+     * with CountDownLatch. Now runs Geocoder on IO dispatcher.
+     * Handles both API 33+ async and legacy sync APIs.
+     * Fallback: If Geocoder fails, still returns coordinates.
      */
-    private fun resolveAddress(location: Location): LocationData {
+    private suspend fun resolveAddress(location: Location): LocationData =
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
         val geocoder = Geocoder(context, Locale.getDefault())
         var address = ""
         var city = ""
@@ -301,23 +307,33 @@ class LocationStore(private val context: Context) {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val latch = java.util.concurrent.CountDownLatch(1)
-                geocoder.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
-                    override fun onGeocode(addresses: MutableList<Address>) {
-                        val addr = addresses.firstOrNull()
-                        if (addr != null) {
-                            address = addr.getAddressLine(0) ?: ""
-                            city = addr.locality ?: addr.subAdminArea ?: ""
-                            country = addr.countryName ?: ""
+                val result = suspendCancellableCoroutine<Pair<String, String>?> { cont ->
+                    geocoder.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
+                        override fun onGeocode(addresses: MutableList<Address>) {
+                            val addr = addresses.firstOrNull()
+                            val result = if (addr != null) {
+                                val addrLine = addr.getAddressLine(0) ?: ""
+                                val cityVal = addr.locality ?: addr.subAdminArea ?: ""
+                                val countryVal = addr.countryName ?: ""
+                                Pair("$addrLine|$cityVal|$countryVal", "")
+                            } else null
+                            cont.resume(result)
                         }
-                        latch.countDown()
+                        override fun onError(errorMessage: String?) {
+                            android.util.Log.w("LocationStore", "Geocoder error: $errorMessage")
+                            cont.resume(null)
+                        }
+                    })
+                    cont.invokeOnCancellation { cont.resume(null) }
+                }
+                if (result != null) {
+                    val parts = result.first.split("|")
+                    if (parts.size >= 3) {
+                        address = parts[0]
+                        city = parts[1]
+                        country = parts[2]
                     }
-                    override fun onError(errorMessage: String?) {
-                        android.util.Log.w("LocationStore", "Geocoder error: $errorMessage")
-                        latch.countDown()
-                    }
-                })
-                latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
+                }
             } else {
                 @Suppress("DEPRECATION")
                 val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
@@ -332,27 +348,37 @@ class LocationStore(private val context: Context) {
             android.util.Log.w("LocationStore", "Geocoder failed: ${e.message}")
         }
 
-        // v4.0: If Geocoder couldn't resolve address, try English locale as fallback
+        // v5.1: If Geocoder couldn't resolve address, try English locale as fallback
         if (city.isBlank() && country.isBlank()) {
             try {
                 val geocoderEn = Geocoder(context, Locale.US)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val latch = java.util.concurrent.CountDownLatch(1)
-                    geocoderEn.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
-                        override fun onGeocode(addresses: MutableList<Address>) {
-                            val addr = addresses.firstOrNull()
-                            if (addr != null) {
-                                if (address.isBlank()) address = addr.getAddressLine(0) ?: ""
-                                if (city.isBlank()) city = addr.locality ?: addr.subAdminArea ?: ""
-                                if (country.isBlank()) country = addr.countryName ?: ""
+                    val result = suspendCancellableCoroutine<Pair<String, String>?> { cont ->
+                        geocoderEn.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: MutableList<Address>) {
+                                val addr = addresses.firstOrNull()
+                                val result = if (addr != null) {
+                                    val addrLine = addr.getAddressLine(0) ?: ""
+                                    val cityVal = addr.locality ?: addr.subAdminArea ?: ""
+                                    val countryVal = addr.countryName ?: ""
+                                    Pair("$addrLine|$cityVal|$countryVal", "")
+                                } else null
+                                cont.resume(result)
                             }
-                            latch.countDown()
+                            override fun onError(errorMessage: String?) {
+                                cont.resume(null)
+                            }
+                        })
+                        cont.invokeOnCancellation { cont.resume(null) }
+                    }
+                    if (result != null) {
+                        val parts = result.first.split("|")
+                        if (parts.size >= 3) {
+                            if (address.isBlank()) address = parts[0]
+                            if (city.isBlank()) city = parts[1]
+                            if (country.isBlank()) country = parts[2]
                         }
-                        override fun onError(errorMessage: String?) {
-                            latch.countDown()
-                        }
-                    })
-                    latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
+                    }
                 } else {
                     @Suppress("DEPRECATION")
                     val addresses = geocoderEn.getFromLocation(location.latitude, location.longitude, 1)
@@ -368,7 +394,40 @@ class LocationStore(private val context: Context) {
             }
         }
 
-        return LocationData(
+        // v5.1: Final fallback — use Nominatim reverse geocoding API if Geocoder failed
+        if (city.isBlank() && country.isBlank()) {
+            try {
+                val nominatimUrl = java.net.URL(
+                    "https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json&zoom=10&addressdetails=1"
+                )
+                val connection = nominatimUrl.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().readText()
+                    val json = org.json.JSONObject(response)
+                    val addressObj = json.optJSONObject("address")
+                    if (addressObj != null) {
+                        city = addressObj.optString("city", addressObj.optString("town", addressObj.optString("village", "")))
+                        country = addressObj.optString("country", "")
+                        if (address.isBlank()) {
+                            address = json.optString("display_name", "")
+                        }
+                    }
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.w("LocationStore", "Nominatim fallback failed: ${e.message}")
+            }
+        }
+
+        android.util.Log.d("LocationStore", "Location resolved: $city, $country (${location.latitude}, ${location.longitude})")
+
+        LocationData(
             latitude = location.latitude,
             longitude = location.longitude,
             address = address,

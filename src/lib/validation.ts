@@ -6,6 +6,11 @@ export const chatSchema = z.object({
     content: z.string(),
   })).min(1).max(50),
   mode: z.string().optional(),
+  // v5.1: Client-side GPS location from Android app
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  city: z.string().optional(),
+  country: z.string().optional(),
 });
 
 export const visionSchema = z.object({

@@ -24,7 +24,11 @@ data class ChatMessage(
 data class ChatRequest(
     val messages: List<ChatMessage>,
     val provider: String? = null,
-    val language: String? = null
+    val language: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val city: String? = null,
+    val country: String? = null
 )
 
 class NexaRepository {
@@ -227,13 +231,17 @@ class NexaRepository {
         baseUrl: String,
         provider: String? = null,
         language: String? = null,
-        systemPrompt: String? = null
+        systemPrompt: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        city: String? = null,
+        country: String? = null
     ): Flow<StreamEvent> = callbackFlow {
         val systemContent = systemPrompt ?: BACKEND_SYSTEM_PROMPT
         val systemMessage = ChatMessage("system", systemContent)
         val allMessages = listOf(systemMessage) + messages
 
-        val chatRequest = ChatRequest(allMessages, provider, language)
+        val chatRequest = ChatRequest(allMessages, provider, language, latitude, longitude, city, country)
         val body = gson.toJsonTree(chatRequest).asJsonObject
 
         val httpRequest = Request.Builder()

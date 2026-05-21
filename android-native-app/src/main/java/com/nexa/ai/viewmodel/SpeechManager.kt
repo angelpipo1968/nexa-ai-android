@@ -68,6 +68,21 @@ class SpeechManager(private val application: Application) {
     private var ttsReady = false
     private var isCurrentlyListening = false
 
+    // ═══════════════════════════════════════════════════════════════
+    //  v5.0 FIX: Hands-free cut-off prevention flags
+    // ═══════════════════════════════════════════════════════════════
+    // Bug 1 fix: Prevent speak() -> stopSpeaking() from triggering
+    // an unwanted listening restart via onSpeakingStateChanged(false)
+    @Volatile
+    private var isPreparingToSpeak = false
+
+    // Bug 2 fix: Track audio focus loss type for pause/resume
+    @Volatile
+    private var isPausedByFocusLoss = false
+
+    // Bug 5 fix: Ensure speaking state callbacks are synchronized
+    private val speechStateLock = Any()
+
     // Callbacks
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
     var onSpeakingStateChanged: ((Boolean, String?) -> Unit)? = null
@@ -88,7 +103,10 @@ class SpeechManager(private val application: Application) {
     // Cooldown: don't allow barge-in until TTS has been playing for this long
     // Prevents TTS audio from triggering false barge-in via mic bleed
     private var ttsStartedAt: Long = 0L
-    private val bargeInCooldownMs = 2500L // Reduced from 3s to 2.5s — faster response
+    // ═══ v5.0 BUG 4 FIX ═══
+    // Increased from 2.5s to 3.5s - 2.5s was too short and caused
+    // false barge-in triggers from TTS mic bleed on some devices
+    private val bargeInCooldownMs = 3500L
     private var lastBargeInAt: Long = 0L  // Prevents rapid re-triggers
 
     // Adaptive barge-in threshold — calibrates to device noise floor
@@ -100,7 +118,10 @@ class SpeechManager(private val application: Application) {
 
     // VAD (Voice Activity Detection) — zero-crossing rate
     // Helps distinguish actual voice from noise/tones
-    private val vadZcrThreshold = 15.0  // Zero-crossings per frame — voice typically 10-40
+    // ═══ v5.0 BUG 4 FIX ═══
+    // Increased from 15.0 to 18.0 - reduces false barge-in from
+    // TTS audio bleed that has some voice-like characteristics
+    private val vadZcrThreshold = 18.0
     private var vadEnabled = true
 
     // Continuous audio session — keeps mic open during entire voice mode
@@ -312,9 +333,33 @@ class SpeechManager(private val application: Application) {
                                 hasAudioFocus = false
                                 stopSpeaking()
                             }
+                            // ═══ v5.0 BUG 2 FIX ═══
+                            // Transient focus loss = notification, alarm, etc.
+                            // Don't kill TTS permanently - just pause it.
                             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                                hasAudioFocus = false
-                                stopSpeaking()
+                                if (isTtsActive && audioSessionActive) {
+                                    isPausedByFocusLoss = true
+                                    tts?.stop()
+                                    isTtsActive = false
+                                    // Don't abandon focus, don't trigger callbacks
+                                    android.util.Log.d("SpeechManager", "TTS paused by transient focus loss")
+                                } else {
+                                    hasAudioFocus = false
+                                    stopSpeaking()
+                                }
+                            }
+                            // ═══ v5.0 BUG 2 FIX ═══
+                            // Focus regained after transient loss - resume
+                            AudioManager.AUDIOFOCUS_GAIN -> {
+                                if (isPausedByFocusLoss && audioSessionActive) {
+                                    isPausedByFocusLoss = false
+                                    hasAudioFocus = true
+                                    reapplyHandsFreeRouting()
+                                    onSpeakingStateChanged?.invoke(false, null)
+                                    android.util.Log.d("SpeechManager", "TTS resuming after transient focus loss")
+                                } else {
+                                    hasAudioFocus = true
+                                }
                             }
                         }
                     }
@@ -330,10 +375,31 @@ class SpeechManager(private val application: Application) {
                 }
                 val result = audioManager.requestAudioFocus(
                     { focusChange ->
-                        if (focusChange == AudioManager.AUDIOFOCUS_LOSS ||
-                            focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                            hasAudioFocus = false
-                            stopSpeaking()
+                        when (focusChange) {
+                            AudioManager.AUDIOFOCUS_LOSS -> {
+                                hasAudioFocus = false
+                                stopSpeaking()
+                            }
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                                if (isTtsActive && audioSessionActive) {
+                                    isPausedByFocusLoss = true
+                                    tts?.stop()
+                                    isTtsActive = false
+                                } else {
+                                    hasAudioFocus = false
+                                    stopSpeaking()
+                                }
+                            }
+                            AudioManager.AUDIOFOCUS_GAIN -> {
+                                if (isPausedByFocusLoss && audioSessionActive) {
+                                    isPausedByFocusLoss = false
+                                    hasAudioFocus = true
+                                    reapplyHandsFreeRouting()
+                                    onSpeakingStateChanged?.invoke(false, null)
+                                } else {
+                                    hasAudioFocus = true
+                                }
+                            }
                         }
                     },
                     streamType,
@@ -492,6 +558,11 @@ class SpeechManager(private val application: Application) {
 
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
+                            // ═══ v5.1 BUG 1 FIX ═══
+                            // Reset the flag now that TTS has actually started.
+                            // This ensures onDone/onError will fire the callback
+                            // when this utterance completes.
+                            isPreparingToSpeak = false
                             onSpeakingStateChanged?.invoke(true, utteranceId)
                             // v4.0: Re-boost volume and re-apply speaker after TTS starts
                             // Some OEMs reset routing when TTS engine takes over audio
@@ -504,23 +575,31 @@ class SpeechManager(private val application: Application) {
                             }
                         }
                         override fun onDone(utteranceId: String?) {
-                            isTtsActive = false
-                            // v4.0 CRITICAL FIX: Don't abandon audio focus during voice mode!
-                            // Previously, abandoning focus after every TTS utterance caused
-                            // audio routing to reset to earpiece, making hands-free volume drop.
-                            if (!audioSessionActive) {
-                                abandonAudioFocus()
+                            synchronized(speechStateLock) {
+                                isTtsActive = false
+                                // v4.0 CRITICAL FIX: Don't abandon audio focus during voice mode!
+                                if (!audioSessionActive) {
+                                    abandonAudioFocus()
+                                }
+                                // ═══ v5.0 BUG 1 FIX ═══
+                                // Skip callback if speak() is about to start new TTS
+                                if (!isPreparingToSpeak) {
+                                    onSpeakingStateChanged?.invoke(false, null)
+                                }
                             }
-                            onSpeakingStateChanged?.invoke(false, null)
                         }
                         @Deprecated("Deprecated")
                         override fun onError(utteranceId: String?) {
-                            isTtsActive = false
-                            // v4.0 CRITICAL FIX: Same as onDone — don't abandon during voice mode
-                            if (!audioSessionActive) {
-                                abandonAudioFocus()
+                            synchronized(speechStateLock) {
+                                isTtsActive = false
+                                if (!audioSessionActive) {
+                                    abandonAudioFocus()
+                                }
+                                // ═══ v5.0 BUG 1 FIX ═══
+                                if (!isPreparingToSpeak) {
+                                    onSpeakingStateChanged?.invoke(false, null)
+                                }
                             }
-                            onSpeakingStateChanged?.invoke(false, null)
                         }
                     })
 
@@ -626,9 +705,17 @@ class SpeechManager(private val application: Application) {
             return
         }
 
+        // ═══ v5.1 BUG 1 FIX ═══
+        // Set flag BEFORE calling stopSpeaking() so that the
+        // onSpeakingStateChanged(false) callback knows NOT to
+        // trigger a listening restart - we're about to speak again.
+        isPreparingToSpeak = true
         stopSpeaking()
         val cleaned = cleanForSpeech(text)
-        if (cleaned.isBlank()) return
+        if (cleaned.isBlank()) {
+            isPreparingToSpeak = false
+            return
+        }
 
         try {
             // v4.0: Re-apply hands-free routing BEFORE requesting focus
@@ -704,13 +791,20 @@ class SpeechManager(private val application: Application) {
     }
 
     fun stopSpeaking() {
-        isTtsActive = false
-        tts?.stop()
-        // Don't abandon audio focus in voice mode — keep the session active
-        if (!audioSessionActive) {
-            abandonAudioFocus()
+        synchronized(speechStateLock) {
+            isTtsActive = false
+            tts?.stop()
+            // Don't abandon audio focus in voice mode — keep the session active
+            if (!audioSessionActive) {
+                abandonAudioFocus()
+            }
+            // ═══ v5.0 BUG 1 FIX ═══
+            // If we're preparing to speak again (speak() called stopSpeaking),
+            // don't fire the callback that would trigger listening restart.
+            if (!isPreparingToSpeak) {
+                onSpeakingStateChanged?.invoke(false, null)
+            }
         }
-        onSpeakingStateChanged?.invoke(false, null)
     }
 
     fun setLanguage(lang: AppLanguage) {
@@ -1214,8 +1308,11 @@ class SpeechManager(private val application: Application) {
                 val buffer = ShortArray(bufferSize.coerceAtLeast(1024))
                 var highEnergyFrames = 0
                 var vadVoiceFrames = 0
-                val requiredFrames = 8     // Reduced from 12 — faster barge-in response
-                val requiredVadFrames = 3   // Must have this many VAD-positive frames to confirm voice
+                // ═══ v5.0 BUG 4 FIX ═══
+                // Increased from 8/3 to 12/5 - reduces false barge-in
+                // triggers while still being responsive enough
+                val requiredFrames = 12     // Energy frames required
+                val requiredVadFrames = 5   // VAD-positive frames required
                 var framesSinceCooldown = 0
                 // Reset calibration for fresh start
                 calibrationFrames = 0

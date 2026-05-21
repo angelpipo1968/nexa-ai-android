@@ -13,7 +13,7 @@ import { getNASAAPOD, searchMarsPhotos } from '@/lib/nexa-core/nasa';
 import { getStockPrice, getCryptoPrice } from '@/lib/nexa-core/finance';
 import { getLotteryResults } from '@/lib/nexa-core/lottery';
 import { searchSkyscannerFlights } from '@/lib/nexa-core/skyscanner';
-import { searchGoogleFlights } from '@/lib/nexa-core/google-flights';
+import { searchGoogleFlights, searchPriceCalendar } from '@/lib/nexa-core/google-flights';
 import { searchWikipedia, getCountryData } from '@/lib/nexa-core/knowledge';
 import { getMemories, extractAndSaveFacts, logActivity } from '@/lib/nexa-core/memory';
 import { auditCode } from '@/lib/nexa-core/repairer';
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
         if (!body) return NextResponse.json({ error: 'Body vacío' }, { status: 400, headers: corsHeaders });
         const parsed = chatSchema.safeParse(body);
         if (!parsed.success) return NextResponse.json({ error: 'Formato inválido' }, { status: 400, headers: corsHeaders });
-        let { messages, mode = 'default' } = parsed.data;
+        let { messages, mode = 'default', latitude, longitude, city, country } = parsed.data;
         
         // --- NEXA INTELLIGENCE HUB (V3 - HIGH PRIORITY) ---
         const userQuery = messages[messages.length - 1].content;
@@ -303,14 +303,47 @@ export async function POST(req: NextRequest) {
         let toolContext = "";
 
         // 0. CONTEXTO DE UBICACIÓN Y TIEMPO (Auto-Inyectado)
-        // Extraer IP real del cliente (no la del servidor Vercel)
-        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-            || req.headers.get('x-real-ip')
-            || undefined;
-        const location = await getUserLocation(clientIp);
-        const timeStr = await getLocalTime(location?.timezone);
+        // v5.1: Prioritize client-side GPS location over IP-based location.
+        // The Android app sends real GPS coordinates; ip-api only gives
+        // the Vercel CDN server location, which is useless for the user.
+        let userCity = city || '';
+        let userCountry = country || '';
+        let userLat = latitude;
+        let userLon = longitude;
+        
+        // If client didn't send GPS data, fall back to IP geolocation
+        if (!userLat || !userLon) {
+            const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+                || req.headers.get('x-real-ip')
+                || undefined;
+            const ipLocation = await getUserLocation(clientIp);
+            if (ipLocation) {
+                if (!userCity) userCity = ipLocation.city;
+                if (!userCountry) userCountry = ipLocation.country;
+                if (!userLat) userLat = ipLocation.lat;
+                if (!userLon) userLon = ipLocation.lon;
+            }
+        }
+        
+        // Get timezone from coordinates or default to UTC
+        let timeStr = '';
+        try {
+            // Try to determine timezone from coordinates
+            const tzResponse = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLon}&format=json&zoom=5`,
+                { headers: { 'User-Agent': 'NexaAssistant/1.0' } }
+            ).catch(() => null);
+            const tzData = tzResponse ? await tzResponse.json().catch(() => null) : null;
+            timeStr = await getLocalTime(tzData?.timezone || undefined);
+        } catch {
+            timeStr = await getLocalTime();
+        }
+        
+        const location = userCity && userCountry 
+            ? { city: userCity, country: userCountry, lat: userLat, lon: userLon }
+            : null;
         toolContext += `[CONTEXTO ACTUAL DEL USUARIO]:
-Ubicación: ${location?.city || 'Desconocida'}, ${location?.country || 'Desconocida'}
+Ubicación: ${userCity || 'Desconocida'}, ${userCountry || 'Desconocida'}${userLat && userLon ? ` (${userLat}, ${userLon})` : ''}
 Hora Local: ${timeStr}
 --------------------------------------------------\n\n`;
 
@@ -386,8 +419,8 @@ Hora Local: ${timeStr}
             } catch {}
         }
 
-        // 3. VUELOS (Estado y Precios)
-        if (lowerQuery.includes('vuelo') || lowerQuery.includes('viaje') || lowerQuery.includes('pasaje') || lowerQuery.includes('avión') || lowerQuery.includes('boleto') || lowerQuery.includes('aerolinea') || lowerQuery.includes('aerolínea')) {
+        // 3. VUELOS (Estado, Precios y Calendario)
+        if (lowerQuery.includes('vuelo') || lowerQuery.includes('viaje') || lowerQuery.includes('pasaje') || lowerQuery.includes('avión') || lowerQuery.includes('boleto') || lowerQuery.includes('aerolinea') || lowerQuery.includes('aerolínea') || lowerQuery.includes('avion')) {
             try {
                 const extractionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
@@ -402,18 +435,37 @@ Hora Local: ${timeStr}
                 
                 if (info.destination) {
                     const flightDate = info.date || new Date().toISOString().split('T')[0];
-                    // Buscar en Google Flights (precios + links de reserva)
+                    
+                    // 1. Google Flights (precios + links de reserva)
                     try {
                         toolContext += await searchGoogleFlights(info.origin || 'LAS', info.destination, flightDate, info.returnDate) + "\n";
                     } catch {}
-                    // También buscar en Skyscanner (más opciones)
+                    
+                    // 2. Skyscanner (más opciones + deep links)
                     try {
                         toolContext += await searchSkyscannerFlights(info.origin || 'LAS', info.destination, flightDate) + "\n";
                     } catch {}
-                    // Estado de vuelos en tiempo real
+                    
+                    // 3. Estado de vuelos en tiempo real
                     try {
                         toolContext += await searchFlights(info.origin || 'LAS', info.destination) + "\n";
                     } catch {}
+                    
+                    // 4. Calendario de precios (±3 días como Google Flights)
+                    // Only fetch if SERPAPI_KEY is available and query seems like a price comparison
+                    const wantsCalendar = lowerQuery.includes('precio') || lowerQuery.includes('barato') || lowerQuery.includes('más barato') || lowerQuery.includes('mas barato') || lowerQuery.includes('calendario') || lowerQuery.includes('comparar') || lowerQuery.includes('días') || lowerQuery.includes('dias') || lowerQuery.includes('mejor fecha') || lowerQuery.includes('cuando') || lowerQuery.includes('cuándo');
+                    
+                    if (wantsCalendar && (process.env.SERPAPI_KEY || process.env.GOOGLE_FLIGHTS_API_KEY)) {
+                        try {
+                            const { report: calendarReport } = await searchPriceCalendar(
+                                info.origin || 'LAS', 
+                                info.destination, 
+                                flightDate, 
+                                info.returnDate
+                            );
+                            toolContext += calendarReport + "\n";
+                        } catch {}
+                    }
                 }
             } catch {}
         }
@@ -614,7 +666,16 @@ Hora Local: ${timeStr}
         // INYECCIÓN DE CONTEXTO FINAL (ADJUNTO AL MENSAJE DEL USUARIO)
         if (toolContext) {
             const lastIndex = messages.length - 1;
-            messages[lastIndex].content += `\n\n[SISTEMA - INFORMACIÓN REAL OBTENIDA]:\n${toolContext}\n\nINSTRUCCIÓN: Usa los datos de arriba para responder. SI HAY UNA IMAGEN, DEBES MOSTRARLA USANDO Markdown: ![Imagen](URL). NO DIGAS QUE NO PUEDES.`;
+            // Check if this is a flight-related context
+            const isFlightContext = toolContext.includes('GOOGLE FLIGHTS') || toolContext.includes('SKYSCANNER') || toolContext.includes('VUELOS EN TIEMPO REAL') || toolContext.includes('CALENDARIO DE PRECIOS');
+            
+            let contextInstruction = `[SISTEMA - INFORMACIÓN REAL OBTENIDA]:\n${toolContext}\n\nINSTRUCCIÓN: Usa los datos de arriba para responder. SI HAY UNA IMAGEN, DEBES MOSTRARLA USANDO Markdown: ![Imagen](URL). NO DIGAS QUE NO PUEDES.`;
+            
+            if (isFlightContext) {
+                contextInstruction += `\n\n⚠️ FORMATO DE VUELOS OBLIGATORIO:\n- Cada vuelo DEBE tener un link clicable en formato Markdown: [**Reservar →**](URL)\n- NUNCA muestres URLs como texto plano\n- LOS LINKS SON LO MÁS IMPORTANTE - sin link el usuario no puede comprar\n- Muestra precios en negrita: **$XXX USD**\n- Ordena por precio (más barato primero)\n- Si hay calendario de precios, muéstralo como tabla\n- Al final muestra resumen: 🏆 Mejor precio con link directo`;
+            }
+            
+            messages[lastIndex].content += `\n\n${contextInstruction}`;
         }
 
         if (!messages.find((m: any) => m.role === 'system')) messages.unshift({ role: 'system', content: getSystemPrompt(mode as any) });

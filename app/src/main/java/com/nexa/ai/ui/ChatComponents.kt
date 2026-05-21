@@ -464,8 +464,10 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                         when (segment) {
                             is MessageSegment.Text -> {
                                 val markdownText = rememberMarkdownText(segment.content)
-                                Text(text = markdownText, fontSize = 15.sp, lineHeight = 22.sp,
-                                    color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
+                                MarkdownClickableText(
+                                    markdownText = markdownText,
+                                    color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface
+                                )
                             }
                             is MessageSegment.Image -> {
                                 Spacer(modifier = Modifier.height(8.dp))

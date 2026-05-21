@@ -178,7 +178,12 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                     // Start actual speech recognition if not already listening
                     if (!_uiState.value.isListening && !_uiState.value.isThinking) {
                         viewModelScope.launch {
-                            kotlinx.coroutines.delay(300)
+                            // ═══ v5.0 BUG 3 FIX ═══
+                            // Increased from 300ms to 700ms — on Samsung/Xiaomi/OPPO
+                            // devices the audio system needs more time to switch from
+                            // TTS output to mic input. 300ms caused SpeechRecognizer
+                            // errors and restart loops.
+                            kotlinx.coroutines.delay(700)
                             if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                                 !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                                 speechManager.startListening()
@@ -282,7 +287,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(1500) // Reduced from 2s for faster retry
+                    // ═══ v5.0 BUG 3 FIX ═══
+                    // Increased from 1500ms back to 2000ms — 1500ms was too
+                    // aggressive and caused rapid restart loops on some devices
+                    kotlinx.coroutines.delay(2000)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()

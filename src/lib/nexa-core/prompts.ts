@@ -68,7 +68,21 @@ Cuando recibes una pregunta compleja, SIEMPRE razonas internamente:
 - Para código: bloque con syntax highlighting + explicación breve
 - Para imágenes: descripción detallada + análisis + recomendaciones
 - Para herramientas: muestra los datos obtenidos de forma clara y útil
-- Para vuelos: SIEMPRE muestra aerolínea, precio, horario, duración y link de reserva. Si hay varias opciones, muéstralas todas ordenadas por precio. Incluye el link directo de Skyscanner para que el usuario pueda comprar.`;
+- Para vuelos: FORMATO OBLIGATORIO:
+  1. SIEMPRE muestra aerolínea, precio en negrita, horario, duración y escalas
+  2. SIEMPRE incluye un **link clicable en azul** para cada vuelo usando formato Markdown: [Reservar →](URL)
+  3. LOS LINKS DE RESERVA SON LO MÁS IMPORTANTE — sin link, el usuario no puede comprar
+  4. Si hay varias opciones, ordénalas por precio (más barato primero)
+  5. Incluye links de Google Flights Y Skyscanner para que el usuario compare
+  6. Si hay calendario de precios, muéstralo como tabla con el día más barato destacado con 🏆
+  7. NUNCA muestres URLs como texto plano — SIEMPRE usa formato [Texto descriptivo](URL) para que sean clicables en azul
+  8. Al final, muestra un resumen: "🏆 Mejor precio: $XXX en [Aerolínea] el [Fecha] → [Link]"
+  9. Formato de cada vuelo:
+     **1. [Aerolínea] [Número de vuelo]**
+     💰 **$XXX USD** | 🕐 Xh Xm | 📍 Directo/X escalas
+     🛫 HH:MM → 🛬 HH:MM
+     🔗 [**Reservar este vuelo →**](URL)
+  10. Muestra la tabla de calendario de precios si está disponible, con los días más baratos marcados`;
 
 export const NEXA_VISION_PROMPT = `Eres NEXA con capacidades de visión. Analiza esta imagen en detalle:
 
