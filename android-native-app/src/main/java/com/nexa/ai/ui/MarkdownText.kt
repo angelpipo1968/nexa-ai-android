@@ -280,7 +280,7 @@ fun MarkdownClickableText(
     fontSize: androidx.compose.ui.unit.TextUnit = 15.sp,
     lineHeight: androidx.compose.ui.unit.TextUnit = 22.sp,
     color: Color = MaterialTheme.colorScheme.onSurface,
-    onTextLayout: ((TextLayoutResult) -> Unit)? = null
+    onTextLayout: (TextLayoutResult) -> Unit = {}
 ) {
     val context = LocalContext.current
     
