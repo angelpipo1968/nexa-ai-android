@@ -381,7 +381,7 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
                 _sensorState.value = _sensorState.value.copy(proximity = event.values[0], isNear = isNear)
             }
             Sensor.TYPE_PRESSURE -> {
-                val altitude = sensorManager.getAltitude(
+                val altitude = android.hardware.SensorManager.getAltitude(
                     android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, event.values[0]
                 )
                 _sensorState.value = _sensorState.value.copy(pressure = event.values[0], altitude = altitude)
@@ -732,7 +732,7 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
     private fun scanForPresence() {
         // WiFi-based presence detection
         try {
-            val wifiManager = application.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val wifiManager = application.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
             // Note: WiFi scan requires location permission on Android 8.1+
             // In simulation mode, we generate mock presence data
             simulatePresenceScan()

@@ -879,8 +879,8 @@ class VoiceEnhancer(private val application: Application) {
         // Pitch range: standard deviation of recent pitch values
         val pitchMean = pitchHistory.average().toFloat()
         val pitchRange = sqrt(
-            pitchHistory.map { (it - pitchMean) * (it - pitchMean) }.average()
-        )
+            pitchHistory.map { (it.toDouble() - pitchMean.toDouble()) * (it.toDouble() - pitchMean.toDouble()) }.average()
+        ).toFloat()
 
         // Intensity contour
         val intensityContour = calculateContourSlope(energyHistory)
@@ -895,7 +895,7 @@ class VoiceEnhancer(private val application: Application) {
         val peakEnergies = energyHistory.filter { it > energyMean * 1.5f }
         val rhythmRegularity = if (peakEnergies.size > 2) {
             val peakMean = peakEnergies.average().toFloat()
-            val peakStd = sqrt(peakEnergies.map { (it - peakMean) * (it - peakMean) }.average())
+            val peakStd = sqrt(peakEnergies.map { (it.toDouble() - peakMean.toDouble()) * (it.toDouble() - peakMean.toDouble()) }.average()).toFloat()
             if (peakMean > 0f) 1f - (peakStd / peakMean).coerceIn(0f, 1f) else 0f
         } else 0.5f
 

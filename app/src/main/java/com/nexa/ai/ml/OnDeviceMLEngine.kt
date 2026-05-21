@@ -1910,7 +1910,7 @@ class OnDeviceMLEngine(private val application: Application) {
             val nounText = match.groupValues[1]
             // Check if it's likely a proper noun (not start of sentence)
             val isStartOfSentence = match.range.first == 0 ||
-                text.substring(0, match.range.first).trim().endsWith(Regex("[.!?¿¡]"))
+                text.substring(0, match.range.first).trim().let { prefix -> prefix.endsWith(".") || prefix.endsWith("!") || prefix.endsWith("?") || prefix.endsWith("¿") || prefix.endsWith("¡") }
             if (!isStartOfSentence) {
                 val mention = CoreferenceMention(
                     text = nounText,
@@ -2194,7 +2194,7 @@ class OnDeviceMLEngine(private val application: Application) {
 
         // Location context (from recent sensor data)
         val locationContext = try {
-            val recentSensor = db.sensorDataDao().getLatest("location", 1)
+            val recentSensor = kotlinx.coroutines.runBlocking { db.sensorDataDao().getLatest("location", 1) }
             when {
                 recentSensor.isEmpty() -> "unknown"
                 recentSensor[0].context?.contains("home") == true -> "home"
@@ -2206,7 +2206,7 @@ class OnDeviceMLEngine(private val application: Application) {
 
         // Activity context
         val activityContext = try {
-            val recentAccel = db.sensorDataDao().getLatest("accelerometer", 1)
+            val recentAccel = kotlinx.coroutines.runBlocking { db.sensorDataDao().getLatest("accelerometer", 1) }
             recentAccel.firstOrNull()?.context ?: "unknown"
         } catch (_: Exception) { "unknown" }
 
@@ -2215,7 +2215,7 @@ class OnDeviceMLEngine(private val application: Application) {
 
         // Device context
         val deviceContext = try {
-            val recentScreen = db.sensorDataDao().getLatest("screen_state", 1)
+            val recentScreen = kotlinx.coroutines.runBlocking { db.sensorDataDao().getLatest("screen_state", 1) }
             when {
                 recentScreen.any { it.context == "screen_on" } -> "phone_in_hand"
                 recentScreen.any { it.context == "headphones" } -> "headphones"
@@ -2226,7 +2226,7 @@ class OnDeviceMLEngine(private val application: Application) {
 
         // Social context (from presence data)
         val socialContext = try {
-            val recentPresence = db.sensorDataDao().getLatest("presence", 1)
+            val recentPresence = kotlinx.coroutines.runBlocking { db.sensorDataDao().getLatest("presence", 1) }
             when {
                 recentPresence.any { it.value > 1 } -> "with_people"
                 timeContext == "work_hours" && !isWeekend -> "in_meeting"
@@ -2415,7 +2415,7 @@ class OnDeviceMLEngine(private val application: Application) {
 
         // Anomaly 2: Unusual emotional state
         try {
-            val recentEmotions = db.emotionDao().getRecent(20)
+            val recentEmotions = kotlinx.coroutines.runBlocking { db.emotionDao().getRecent(20) }
             if (recentEmotions.size >= 10) {
                 val emotionCounts = recentEmotions.groupingBy { it.primaryEmotion }.eachCount()
                 val dominantEmotion = emotionCounts.maxByOrNull { it.value }?.key ?: "neutral"

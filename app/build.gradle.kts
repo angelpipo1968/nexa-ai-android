@@ -116,8 +116,10 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
-    // Activity Recognition
-    implementation("com.google.android.gms:play-services-activity-recognition:16.0.0")
+    // Activity Recognition — use play-services-location which includes
+    // ActivityRecognitionClient. The standalone artifact was removed in
+    // recent Google Play Services versions.
+    // implementation("com.google.android.gms:play-services-activity-recognition:16.0.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

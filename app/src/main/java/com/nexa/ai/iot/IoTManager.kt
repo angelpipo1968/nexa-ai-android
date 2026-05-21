@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -989,10 +991,8 @@ class IoTManager(private val application: Application) {
                 put("device_id", device.deviceId)
                 put("command", command)
             }
-            val body = okhttp3.RequestBody.create(
-                okhttp3.MediaType.parse("application/json"),
-                jsonBody.toString()
-            )
+            val mediaType = "application/json".toMediaType()
+            val body = jsonBody.toString().toRequestBody(mediaType)
             val request = okhttp3.Request.Builder()
                 .url("http://$endpoint/command")
                 .post(body)
@@ -1613,10 +1613,8 @@ class IoTManager(private val application: Application) {
                 put("device_id", device.deviceId)
                 put("command", command)
             }
-            val body = okhttp3.RequestBody.create(
-                okhttp3.MediaType.parse("application/json"),
-                jsonBody.toString()
-            )
+            val mediaType = "application/json".toMediaType()
+            val body = jsonBody.toString().toRequestBody(mediaType)
             val request = okhttp3.Request.Builder()
                 .url("$endpoint/command")
                 .post(body)
