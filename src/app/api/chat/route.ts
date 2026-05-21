@@ -27,6 +27,11 @@ import { searchSpecies } from '@/lib/nexa-core/nature';
 import { searchGlobalFacts } from '@/lib/nexa-core/world-knowledge';
 import { searchNews, getTopHeadlines } from '@/lib/nexa-core/news';
 import { translateText } from '@/lib/nexa-core/translator';
+import {
+    analyzeEmotion, analyzeEmotionAdvanced, detectImplicitSignals, recordLearningSignal,
+    getLearningInsights, getUserProfile, updateUserProfile, generatePersonalizationContext,
+    extractKnowledge, getRelatedKnowledge, analyzeMessageAdvanced, analyzeConversationContext
+} from '@/lib/nexa-core/machine-learning';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -345,6 +350,59 @@ export async function POST(req: NextRequest) {
         toolContext += `[CONTEXTO ACTUAL DEL USUARIO]:
 Ubicación: ${userCity || 'Desconocida'}, ${userCountry || 'Desconocida'}${userLat && userLon ? ` (${userLat}, ${userLon})` : ''}
 Hora Local: ${timeStr}
+--------------------------------------------------\n\n`;
+
+        // --- NEXA ML ENGINE V1 (Machine Learning) ---
+        const userId = "angelpipo1968"; // Id por defecto
+        
+        // 1. Emotion Analysis
+        const emotion = analyzeEmotion(userQuery);
+        
+        // 2. Advanced NLP Analysis
+        const nlpResult = await analyzeMessageAdvanced(userQuery);
+        
+        // 3. Get User Profile (learned preferences)
+        const userProfile = await getUserProfile(userId);
+        
+        // 4. Update profile with current interaction
+        await updateUserProfile(userId, userQuery, emotion, nlpResult.topics);
+        
+        // 5. Detect implicit learning signals
+        const previousAssistantMsg = messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
+        const implicitSignals = detectImplicitSignals(userQuery, previousAssistantMsg, emotion);
+        for (const signal of implicitSignals) {
+            await recordLearningSignal(userId, signal);
+        }
+        
+        // 6. Get learning insights
+        const learningInsights = await getLearningInsights(userId);
+        
+        // 7. Get related knowledge from knowledge graph
+        let knowledgeContext = '';
+        if (nlpResult.topics.length > 0) {
+            for (const topic of nlpResult.topics.slice(0, 3)) {
+                const knowledge = await getRelatedKnowledge(userId, topic);
+                if (knowledge) knowledgeContext += knowledge + '\n';
+            }
+        }
+        
+        // 8. Extract knowledge in background (non-blocking)
+        extractKnowledge(userId, userQuery).catch(() => {});
+        
+        // 9. Generate personalization context
+        const personalizationContext = generatePersonalizationContext(userProfile, emotion);
+        
+        // Add ML context to toolContext
+        toolContext += `[INTELIGENCIA DE NEXA - ML ENGINE]:
+Emoción detectada: ${emotion.primary} (${Math.round(emotion.intensity * 100)}%)${emotion.secondary ? ` + ${emotion.secondary}` : ''}
+Intención: ${nlpResult.intent}
+Temas: ${nlpResult.topics.join(', ') || 'general'}
+Urgencia: ${nlpResult.urgency}
+Complejidad: ${nlpResult.complexity}
+${personalizationContext ? `Personalización:\n${personalizationContext}` : ''}
+${learningInsights.recommendation ? `Aprendizaje: ${learningInsights.recommendation}` : ''}
+${knowledgeContext ? `Conocimiento previo:\n${knowledgeContext}` : ''}
+Interacciones totales: ${userProfile.interaction_count}
 --------------------------------------------------\n\n`;
 
         // --- DETECTOR DE INTENCIONES AVANZADO (NEXA BRAIN V4) ---
