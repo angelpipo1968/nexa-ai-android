@@ -165,10 +165,24 @@ fun chatContentPadding(): PaddingValues {
 //  ADAPTIVE TYPOGRAPHY SCALE
 // ═══════════════════════════════════════
 
+/** Adaptive Float value based on screen size class */
+@Composable
+fun adaptiveFloat(
+    compact: Float,
+    medium: Float = compact * 1.08f,
+    expanded: Float = compact * 1.15f
+): Float {
+    return when (rememberAdaptiveInfo().screenSizeClass) {
+        ScreenSizeClass.COMPACT -> compact
+        ScreenSizeClass.MEDIUM -> medium
+        ScreenSizeClass.EXPANDED -> expanded
+    }
+}
+
 object NexaTypographyScale {
-    @Composable fun bodyScale(): Float = adaptive(1f, 1.05f, 1.1f)
-    @Composable fun titleScale(): Float = adaptive(1f, 1.1f, 1.2f)
-    @Composable fun headlineScale(): Float = adaptive(1f, 1.12f, 1.25f)
+    @Composable fun bodyScale(): Float = adaptiveFloat(1f, 1.05f, 1.1f)
+    @Composable fun titleScale(): Float = adaptiveFloat(1f, 1.1f, 1.2f)
+    @Composable fun headlineScale(): Float = adaptiveFloat(1f, 1.12f, 1.25f)
 }
 
 // ═══════════════════════════════════════
