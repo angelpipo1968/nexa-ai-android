@@ -14,6 +14,7 @@ import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.StreamEvent
 import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.iot.IoTManager
+import com.nexa.ai.media.VideoGenerator
 import com.nexa.ai.ml.OnDeviceMLEngine
 import com.nexa.ai.sensors.NexaSensorManager
 import com.nexa.ai.ui.NexaStrings
@@ -46,6 +47,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val sensorManager = NexaSensorManager(application)
     private val iotManager = IoTManager(application)
     private val mlEngine = OnDeviceMLEngine(application)
+    private val videoGenerator = VideoGenerator(application)
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -151,6 +153,12 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         try {
             val convCtx = conversationEngine.getConversationContextForAI()
             if (convCtx.isNotBlank()) parts.add("\n\nCONVERSATION CONTEXT: $convCtx")
+        } catch (_: Exception) {}
+
+        // Video generation context
+        try {
+            val videoCtx = videoGenerator.getVideoContextForAI()
+            if (videoCtx.isNotBlank()) parts.add("\n\nVIDEO GENERATION: $videoCtx")
         } catch (_: Exception) {}
 
         // ML learned preferences and patterns
@@ -978,6 +986,35 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 else
                     "Create a professional and modern responsive web page with HTML, CSS, and JavaScript."
                 sendMessage(webPrompt)
+                return
+            }
+            // Voice command: generate video
+            if (cmd.contains("crear video") || cmd.contains("create video") || cmd.contains("genera video") ||
+                cmd.contains("generate video") || cmd.contains("haz un video") || cmd.contains("make a video") ||
+                cmd.contains("animar") || cmd.contains("animate") || cmd.contains("video de")) {
+                val videoPrompt = cmd
+                    .replace(Regex("(crear|genera|haz|create|generate|make|animate|animar)\\s+(un |a )?(video|animacion|animation)"), "")
+                    .replace(Regex("(de |of |about )"), "")
+                    .trim()
+                val style = when {
+                    cmd.contains("anime") -> com.nexa.ai.media.VideoGenerator.VideoStyles.ANIME
+                    cmd.contains("cinemat") -> com.nexa.ai.media.VideoGenerator.VideoStyles.CINEMATIC
+                    cmd.contains("realist") -> com.nexa.ai.media.VideoGenerator.VideoStyles.REALISTIC
+                    cmd.contains("abstract") -> com.nexa.ai.media.VideoGenerator.VideoStyles.ABSTRACT
+                    cmd.contains("vintage") || cmd.contains("retro") -> com.nexa.ai.media.VideoGenerator.VideoStyles.VINTAGE
+                    cmd.contains("ciencia ficcion") || cmd.contains("sci-fi") || cmd.contains("futurist") -> com.nexa.ai.media.VideoGenerator.VideoStyles.SCI_FI
+                    cmd.contains("naturaleza") || cmd.contains("nature") -> com.nexa.ai.media.VideoGenerator.VideoStyles.NATURE
+                    else -> com.nexa.ai.media.VideoGenerator.VideoStyles.CINEMATIC
+                }
+                val prompt = if (videoPrompt.isNotBlank()) videoPrompt else
+                    if (lang == AppLanguage.SPANISH) "Un video creativo e impresionante" else "A creative and impressive video"
+                videoGenerator.generateVideo(
+                    com.nexa.ai.media.VideoGenerator.VideoRequest(
+                        prompt = prompt,
+                        style = style
+                    )
+                )
+                speak(if (lang == AppLanguage.SPANISH) "Generando video: $prompt" else "Generating video: $prompt")
                 return
             }
             // Voice command: share last response
