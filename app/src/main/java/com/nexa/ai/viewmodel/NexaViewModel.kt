@@ -1215,7 +1215,13 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
                 if (isImageRequest) {
                     android.util.Log.d("NexaVM", "Image generation request detected")
-                    val imageUrl = repository.generateImageFree(content)
+                    // Extract just the description, remove trigger keywords
+                    val imagePrompt = content
+                        .replace(Regex("(?i)(genera|crea|haz|create|make|draw|dibujar)\\s+(una |an |a )?(imagen|image|logo|dibujo|drawing|picture|foto|photo)\\s*(de |of )?"), "")
+                        .replace(Regex("(?i)(imagen|image|picture)\\s+(de |of )+"), "")
+                        .trim()
+                    val finalPrompt = if (imagePrompt.isNotBlank()) imagePrompt else "creative artistic image"
+                    val imageUrl = repository.generateImageFree(finalPrompt)
                     val lang = _uiState.value.language
                     val imageResponse = if (lang == AppLanguage.SPANISH) {
                         "¡Aquí tienes tu imagen!\n\n![Imagen generada](${imageUrl})"
