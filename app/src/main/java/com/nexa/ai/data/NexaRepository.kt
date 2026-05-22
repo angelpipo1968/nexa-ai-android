@@ -64,7 +64,7 @@ class NexaRepository {
 
         // Free API — no key needed
         private const val POLLINATIONS_URL = "https://text.pollinations.ai/openai/chat/completions"
-        private const val POLLINATIONS_MODEL = "openai-large"
+        private const val POLLINATIONS_MODEL = "openai"
     }
 
     /**
@@ -163,7 +163,8 @@ class NexaRepository {
             "model" to POLLINATIONS_MODEL,
             "messages" to allMessages.map { mapOf("role" to it.role, "content" to it.content) },
             "stream" to true,
-            "temperature" to 0.7
+            "temperature" to 0.7,
+            "max_tokens" to 8192
         ))
 
         val httpRequest = Request.Builder()
