@@ -1241,13 +1241,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 val messageFlow = if (groqKey.isNotBlank()) {
                     repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code)
                 } else {
-                    repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
-                        language = _uiState.value.language.code,
-                        systemPrompt = buildSystemPrompt(),
-                        latitude = if (loc.isAvailable) loc.latitude else null,
-                        longitude = if (loc.isAvailable) loc.longitude else null,
-                        city = if (loc.isAvailable) loc.city else null,
-                        country = if (loc.isAvailable) loc.country else null)
+                    repository.sendMessageFree(allMessages, language = _uiState.value.language.code)
                 }
 
                 messageFlow.collect { event ->
