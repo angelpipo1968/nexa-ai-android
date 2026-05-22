@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://www.qualcomm.com/developer/blog/2025/11/nexa-ai-for-android-simple-way-to-bring-on-device-ai-to-smartphones-with-snapdragon",
+    "name": "NexaSDK for Android: a simple way to bring on-device AI to",
+    "snippet": "Build smarter Android apps with NexaSDK for Snapdragon. Run AI models on-device for speed, privacy, and efficiency.",
+    "host_name": "www.qualcomm.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/qualcomm/nexa-sdk",
+    "name": "GitHub - qualcomm/nexa-sdk",
+    "snippet": "NexaSDK lets you build the smartest and fastest on-device AI with minimum energy. It is a highly performant local inference framework that runs the latest ...",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.qualcomm.com/developer/blog/2025/09/omnineural-4b-nexaml-qualcomm-hexagon-npu",
+    "name": "OmniNeural-4B & NexaML: innovating Multimodal AI on Qualcomm",
+    "snippet": "Building on the strong collaboration between Qualcomm Technologies and Nexa AI, this expansion will unlock a new wave of on-device AI use cases— ...",
+    "host_name": "www.qualcomm.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.nexa.ai/en/nexa-sdk-android/overview",
+    "name": "Overview - Documentations - Nexa AI",
+    "snippet": "NexaSDK for Android enables on-device AI inference for Android applications. It built upon Nexa AI's proprietary NexaML engine and enables developers to run ...",
+    "host_name": "docs.nexa.ai",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.funblocks.net/aitools/reviews/nexa-sdk-2",
+    "name": "Nexa SDK: The Future of On-Device AI Development - FunBlocks AI",
+    "snippet": "Nexa SDK is an on-device AI inference framework that allows developers to run various AI models—including text, vision, audio, speech, and image ...",
+    "host_name": "www.funblocks.net",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.producthunt.com/products/nexasdk-for-mobile",
+    "name": "NexaSDK for Mobile: Easiest solution to deploy multimodal AI to",
+    "snippet": "NexaSDK for Mobile lets developers use the latest multimodal AI models fully on-device on iOS & Android apps with Apple Neural Engine and Snapdragon NPU ...",
+    "host_name": "www.producthunt.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.linkedin.com/posts/nexa-ai_nexasdk-for-android-a-simple-way-to-bring-activity-7401747398546628608-iE8_",
+    "name": "Qualcomm Features NexaSDK for Android AI Development - LinkedIn",
+    "snippet": "Qualcomm just featured NexaSDK for Android on the official blog as “a simple way to bring on-device AI to smartphones with Snapdragon.",
+    "host_name": "www.linkedin.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.qualcomm.com/developer/blog",
+    "name": "Qualcomm Developer Blog",
+    "snippet": "Qualcomm Developer blog keeps you updated on our technology advancements. From AI, compute, gaming, robotics, IoT to Snapdragon tools, the blog gives you ...",
+    "host_name": "www.qualcomm.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=n1ApYIU2UTk",
+    "name": "Snapdragon Summit 2025 Elite Experiences: AI is the New UI",
+    "snippet": "AI is not only transforming the functionality of devices but also redefining how ... In the next phase of connectivity, AI is not just a feature ...",
+    "host_name": "www.youtube.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://jimmysong.io/ai/nexa-sdk",
+    "name": "Nexa SDK: On-device inference SDK that runs multimodal and text",
+    "snippet": "Nexa SDK. An on-device inference SDK that runs multimodal and text models across CPU, GPU and NPUs, with support for multiple model formats.",
+    "host_name": "jimmysong.io",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

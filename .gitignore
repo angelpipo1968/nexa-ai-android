@@ -1,0 +1,47 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/app/build
+/android-native-app/build
+
+# Signing
+*.jks
+*.keystore
+!debug.keystore
+
+# APK outputs
+*.apk
+*.aab
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Node (Vercel backend)
+node_modules/
+.vercel/
+
+# Next.js build
+.next/
+out/
+
+# OS
+Thumbs.db
+.DS_Store
+screenshot.jpg
+
+# MISC
+temp/
+__pycache__/
+*.pyc
+app-debug.zip
+app-debug.apk
+android-native-app/build/
