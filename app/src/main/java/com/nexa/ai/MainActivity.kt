@@ -19,7 +19,6 @@ import androidx.core.content.ContextCompat
 import com.nexa.ai.ui.NexaChatScreen
 import com.nexa.ai.ui.theme.NexaTheme
 import com.nexa.ai.viewmodel.NexaViewModel
-import dagger.hilt.android.AndroidEntryPoint
 import java.io.ByteArrayOutputStream
 
 @AndroidEntryPoint
