@@ -1200,6 +1200,43 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
 
+                // ─── Check if user is requesting an image generation ───
+                val imageKeywords = listOf(
+                    "genera una imagen", "genera imagen", "crear imagen", "crea imagen",
+                    "crea una imagen", "generate image", "create image", "draw me",
+                    "haz una imagen", "haz imagen", "make an image",
+                    "genera un logo", "crear logo", "crea logo", "create logo",
+                    "dibuja", "draw", "dibujar", "genera una foto", "crear una foto",
+                    "genera foto", "crea foto", "make a picture", "create a picture",
+                    "imagen de", "imagen de un", "imagen de una", "picture of", "image of"
+                )
+                val lowerContent = content.lowercase()
+                val isImageRequest = imageKeywords.any { lowerContent.contains(it) }
+
+                if (isImageRequest) {
+                    android.util.Log.d("NexaVM", "Image generation request detected")
+                    val imageUrl = repository.generateImageFree(content)
+                    val lang = _uiState.value.language
+                    val imageResponse = if (lang == AppLanguage.SPANISH) {
+                        "¡Aquí tienes tu imagen!\n\n![Imagen generada](${imageUrl})"
+                    } else {
+                        "Here's your image!\n\n![Generated image](${imageUrl})"
+                    }
+                    fullResponse = imageResponse
+                    updateActiveSession { s ->
+                        s.copy(
+                            messages = s.messages + Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = false),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(isThinking = false, currentProvider = "pollinations-image")
+
+                    if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                        speak(if (lang == AppLanguage.SPANISH) "He generado tu imagen." else "I've generated your image.", assistantId)
+                    }
+                    return@launch
+                }
+
                 // ─── Smart Router: Decide online vs on-device ───
                 val routingDecision = smartRouter.routeChat(content)
                 _uiState.update { it.copy(isOnDeviceActive = routingDecision.useOnDevice, routingReason = routingDecision.reason) }

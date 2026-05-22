@@ -287,6 +287,20 @@ class NexaRepository {
         val eventSource = EventSources.createFactory(client).newEventSource(httpRequest, listener)
         awaitClose { eventSource.cancel() }
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * Generate an image using Pollinations.ai — completely FREE, no API key needed.
+     * @param prompt Description of the image to generate
+     * @param width Image width (default 1024)
+     * @param height Image height (default 1024)
+     * @return URL of the generated image
+     */
+    suspend fun generateImageFree(prompt: String, width: Int = 1024, height: Int = 1024): String {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val encodedPrompt = java.net.URLEncoder.encode(prompt, "UTF-8")
+            "https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true"
+        }
+    }
 }
 
 sealed class StreamEvent {
