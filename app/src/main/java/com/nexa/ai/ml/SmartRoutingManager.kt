@@ -102,7 +102,8 @@ class SmartRoutingManager(context: Context) {
     fun routeVision(): RoutingDecision {
         val online = _isOnline.value
         val hasVisionModel = onDeviceManager.getDownloadedModels().any {
-            it.type == OnDeviceInferenceManager.Companion.ModelType.VLM
+            val model = OnDeviceInferenceManager.AVAILABLE_MODELS.find { m -> m.id == it.id }
+            model?.type?.name == "VLM"
         }
 
         // Prefer cloud for vision (GLM-4.6V is much better than on-device VLM)

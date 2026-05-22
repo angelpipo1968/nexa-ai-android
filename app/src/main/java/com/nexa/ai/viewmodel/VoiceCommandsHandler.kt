@@ -65,8 +65,8 @@ class VoiceCommandsHandler(
         val c = cmd.lowercase().trim()
 
         // Helper to get localized string
-        fun s(key: String) = NexaStrings.get(context, key, lang)
-        fun sf(key: String, vararg args: Any) = NexaStrings.get(context, key, lang, *args)
+        fun s(key: String): String = NexaStrings.get(context, key, lang)
+        fun sf(key: String, vararg args: Any): String = NexaStrings.get(context, key, lang, *args)
 
         // Clear chat
         if (c.contains("limpiar chat") || c.contains("borra el chat") || c.contains("clear chat")) {

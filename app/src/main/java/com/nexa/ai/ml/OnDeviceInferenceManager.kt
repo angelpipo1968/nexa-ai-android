@@ -2,6 +2,14 @@ package com.nexa.ai.ml
 
 import android.content.Context
 import android.util.Log
+import com.nexa.sdk.NexaSdk
+import com.nexa.sdk.LlmWrapper
+import com.nexa.sdk.VlmWrapper
+import com.nexa.sdk.bean.LlmCreateInput
+import com.nexa.sdk.bean.VlmCreateInput
+import com.nexa.sdk.bean.ModelConfig
+import com.nexa.sdk.bean.GenerationConfig
+import com.nexa.sdk.bean.LlmStreamResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -323,31 +331,36 @@ class OnDeviceInferenceManager(private val context: Context) {
             var result = ""
 
             try {
-                // Nexa SDK v0.0.24 integration
-                // NOTE: Commented out to resolve compilation errors if SDK classes are missing at compile time
-                /*
-                val sdk = ai.nexa.core.NexaSdk.getInstance()
-                sdk.initialize(context)
+                // Attempt real Nexa SDK inference
+                val sdk = NexaSdk.getInstance()
+                sdk.init(context, object : NexaSdk.InitCallback {
+                    override fun onSuccess() {}
+                    override fun onFailure(message: String) {
+                        Log.w(TAG, "Nexa SDK init failed: $message")
+                    }
+                })
 
-                val wrapper = ai.nexa.core.LlmWrapper.builder()
+                val wrapper = LlmWrapper.builder()
                     .llmCreateInput(
-                        ai.nexa.core.LlmCreateInput(
+                        LlmCreateInput(
                             model_name = modelId,
                             model_path = modelFile.absolutePath,
                             plugin_id = backend,
-                            config = ai.nexa.core.ModelConfig(max_tokens = maxTokens)
+                            config = ModelConfig(max_tokens = maxTokens)
                         )
                     )
                     .build()
 
                 wrapper.onSuccess { llm ->
-                    val response = llm.generate(prompt)
-                    result = response
+                    llm.generateStreamFlow(prompt, GenerationConfig())
+                        .collect { streamResult ->
+                            if (streamResult is LlmStreamResult.Token) {
+                                result += streamResult.text
+                            }
+                        }
                 }.onFailure { error ->
                     Log.w(TAG, "Nexa SDK generation failed: $error — using fallback")
                 }
-                */
-                Log.w(TAG, "Nexa SDK logic currently disabled for build stability")
             } catch (sdkNotAvailable: Exception) {
                 Log.w(TAG, "Nexa SDK not available at runtime: ${sdkNotAvailable.message}")
             }
@@ -405,32 +418,35 @@ class OnDeviceInferenceManager(private val context: Context) {
             val result = StringBuilder()
 
             try {
-                // Nexa SDK VLM integration
-                /*
-                val sdk = ai.nexa.core.NexaSdk.getInstance()
-                sdk.initialize(context)
+                val sdk = NexaSdk.getInstance()
+                sdk.init(context, object : NexaSdk.InitCallback {
+                    override fun onSuccess() {}
+                    override fun onFailure(message: String) {
+                        Log.w(TAG, "Nexa SDK init failed: $message")
+                    }
+                })
 
-                val wrapper = ai.nexa.core.VlmWrapper.builder()
+                val wrapper = VlmWrapper.builder()
                     .vlmCreateInput(
-                        ai.nexa.core.VlmCreateInput(
+                        VlmCreateInput(
                             model_name = model.id,
                             model_path = modelFile.absolutePath,
                             plugin_id = if (isNPUAvailable()) "npu" else "cpu_gpu",
-                            config = ai.nexa.core.ModelConfig(max_tokens = 2048)
+                            config = ModelConfig(max_tokens = 2048)
                         )
                     )
                     .build()
 
                 wrapper.onSuccess { vlm ->
-                    vlm.generateStreamFlow("$question\n[IMAGE]$imageBase64[/IMAGE]")
-                        .collect { token ->
-                            result.append(token)
+                    vlm.generateStreamFlow("$question\n[IMAGE]$imageBase64[/IMAGE]", GenerationConfig())
+                        .collect { streamResult ->
+                            if (streamResult is LlmStreamResult.Token) {
+                                result.append(streamResult.text)
+                            }
                         }
                 }.onFailure { error ->
                     Log.w(TAG, "VLM inference failed: $error")
                 }
-                */
-                Log.w(TAG, "Nexa SDK VLM logic currently disabled for build stability")
             } catch (e: Exception) {
                 Log.w(TAG, "Nexa SDK VLM not available: ${e.message}")
             }

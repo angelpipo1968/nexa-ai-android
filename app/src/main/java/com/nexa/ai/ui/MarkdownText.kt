@@ -314,7 +314,7 @@ fun MarkdownClickableText(
                             putExtra(Intent.EXTRA_TEXT, annotation.item)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.open_link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.open_link)).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
                     } catch (_: Exception) {}
                 }
             }
