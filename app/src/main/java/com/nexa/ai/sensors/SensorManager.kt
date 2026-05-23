@@ -897,7 +897,7 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
                 "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
                     // Bluetooth audio state changed
                     val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                    val isBtConnected = audioManager?.isBluetoothA2dpOn ?: false
+                    @Suppress("DEPRECATION") val isBtConnected = audioManager?.isBluetoothA2dpOn ?: false
                     if (isBtConnected) {
                         updateHeadphoneState(true, "bluetooth_a2dp")
                     }
@@ -909,10 +909,10 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
     private fun updateHeadphoneState(isConnected: Boolean, type: String) {
         val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         val audioOutputRoute = when {
-            audioManager?.isBluetoothA2dpOn == true -> "bluetooth"
+            @Suppress("DEPRECATION") audioManager?.isBluetoothA2dpOn == true -> "bluetooth"
             isConnected && type.startsWith("wired") -> "headphones"
-            audioManager?.isSpeakerphoneOn == true -> "speaker"
-            audioManager?.isWiredHeadsetOn == true -> "headphones"
+            @Suppress("DEPRECATION") audioManager?.isSpeakerphoneOn == true -> "speaker"
+            @Suppress("DEPRECATION") audioManager?.isWiredHeadsetOn == true -> "headphones"
             else -> "speaker"
         }
 
@@ -940,8 +940,8 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
 
             // Check initial state
             val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            val isWired = audioManager?.isWiredHeadsetOn ?: false
-            val isBt = audioManager?.isBluetoothA2dpOn ?: false
+            @Suppress("DEPRECATION") val isWired = audioManager?.isWiredHeadsetOn ?: false
+            @Suppress("DEPRECATION") val isBt = audioManager?.isBluetoothA2dpOn ?: false
             when {
                 isBt -> updateHeadphoneState(true, "bluetooth_a2dp")
                 isWired -> updateHeadphoneState(true, "wired")
@@ -1497,8 +1497,8 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
                         registeredNFCTags[key] = NFCTag(
                             tagId = key,
                             tagType = tagJson.optString("type", "ndef"),
-                            associatedAction = tagJson.optString("action", null),
-                            label = tagJson.optString("label", null)
+                            associatedAction = tagJson.optString("action", ""),
+                            label = tagJson.optString("label", "")
                         )
                     }
                 }

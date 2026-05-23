@@ -1187,7 +1187,7 @@ class IoTManager(private val application: Application) {
                     val response = client.newCall(request).execute()
                     if (response.isSuccessful) {
                         val body = response.body?.string()
-                        body?.let { JSONObject(it).optString("state", null) }
+                        body?.let { JSONObject(it).optString("state", "") }
                     } else null
                 } catch (_: Exception) { null }
             }
@@ -1536,9 +1536,9 @@ class IoTManager(private val application: Application) {
 
     private suspend fun executeAdjustDevice(deviceType: String, property: String, delta: Int): String {
         val devices = db.iotDeviceDao().getByType(deviceType)
-        if (devices.isEmpty()) return "${property.capitalize()} ${if (delta > 0) "subido" else "bajado"}. (Simulation mode)"
+        if (devices.isEmpty()) return "${property.replaceFirstChar { it.uppercase() }} ${if (delta > 0) "subido" else "bajado"}. (Simulation mode)"
         val direction = if (delta > 0) "subido" else "bajado"
-        val results = devices.map { d -> "${d.name}: ${property.capitalize()} $direction" }
+        val results = devices.map { d -> "${d.name}: ${property.replaceFirstChar { it.uppercase() }} $direction" }
         refreshDevices()
         return results.joinToString(". ") + "."
     }

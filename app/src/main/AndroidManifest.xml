@@ -21,7 +21,6 @@
     <application
         android:name=".NexaApplication"
         android:allowBackup="false"
-        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:label="NEXA PRO"
         android:roundIcon="@mipmap/ic_launcher"

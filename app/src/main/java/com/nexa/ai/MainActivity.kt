@@ -233,7 +233,14 @@ class MainActivity : ComponentActivity() {
                         onExportSettings = { viewModel.exportSettings() },
                         onImportSettings = { viewModel.importSettings() },
                         onSetGroqApiKey = { viewModel.setGroqApiKey(it) },
-                        onDeleteGroqApiKey = { viewModel.deleteGroqApiKey() }
+                        onDeleteGroqApiKey = { viewModel.deleteGroqApiKey() },
+                        onPinSession = { viewModel.pinSession(it) },
+                        onRenameSession = { viewModel.renameSession(it, "") },  // Note: rename dialog would be in UI
+                        onCloneSession = { viewModel.cloneSession(it) },
+                        onArchiveSession = { viewModel.archiveSession(it) },
+                        onShareSession = { viewModel.shareSession(it) },
+                        onDownloadSession = { viewModel.downloadSession(it) },
+                        onRegenerate = { viewModel.regenerateLast() }
                     )
                 }
             }

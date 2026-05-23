@@ -21,7 +21,9 @@ data class ChatSession(
     val title: String = "",
     val messages: List<Message> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isPinned: Boolean = false,
+    val isArchived: Boolean = false
 )
 
 enum class VoiceType { MALE_1, MALE_2, MALE_3, FEMALE_1, FEMALE_2, FEMALE_3 }

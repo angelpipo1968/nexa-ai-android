@@ -535,7 +535,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
         if (isLastAssistant || (!isUser && !message.isStreaming && message.content.isNotEmpty())) {
             Row(modifier = Modifier.padding(start = 4.dp, top = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 AnimatedVisibility(isSpeaking, enter = fadeIn(), exit = fadeOut()) {
-                    Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)), tint = NexaAccent.copy(alpha = 0.6f))
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)), tint = NexaAccent.copy(alpha = 0.6f))
                 }
                 IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))

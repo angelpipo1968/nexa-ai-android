@@ -945,9 +945,12 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 return
             }
             
-            if (_uiState.value.voiceMode) {
-                clearChat()
-                speak(if (lang == AppLanguage.SPANISH) "Chat borrado" else "Chat cleared")
+            // Voice command: clear chat
+            if (cmd.contains("limpiar chat") || cmd.contains("clear chat") || cmd.contains("borrar chat") || cmd.contains("borra chat")) {
+                if (_uiState.value.voiceMode) {
+                    clearChat()
+                    speak(if (lang == AppLanguage.SPANISH) "Chat borrado" else "Chat cleared")
+                }
                 return
             }
             if (cmd.contains("exportar pdf") || cmd.contains("p d f") || cmd.contains("export pdf")) {
@@ -1764,7 +1767,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 val file = java.io.File(context.getExternalFilesDir(null), "nexa_settings_backup.json")
                 if (file.exists()) {
                     val json = file.readText()
-                    val settings = com.google.gson.Gson().fromJson(json, Map::class.java) as Map<String, String>
+                    @Suppress("UNCHECKED_CAST") val settings = com.google.gson.Gson().fromJson(json, Map::class.java) as Map<String, String>
                     settings["theme"]?.let { try { setThemeMode(ThemeMode.valueOf(it)) } catch (_: Exception) {} }
                     settings["language"]?.let { try { setLanguage(AppLanguage.valueOf(it)) } catch (_: Exception) {} }
                     settings["voice"]?.let { try { setVoiceType(VoiceType.valueOf(it)) } catch (_: Exception) {} }
@@ -1930,6 +1933,155 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             val errorMsg = if (lang == AppLanguage.SPANISH) "Error al generar PDF: ${e.localizedMessage}" else "Error generating PDF: ${e.localizedMessage}"
             android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
         }
+    }
+
+    // ═══════════════════════════════════════
+    //  SESSION MANAGEMENT — Extended Features
+    // ═══════════════════════════════════════
+
+    /** Pin a chat session to the top of the list. */
+    fun pinSession(sessionId: String) {
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == sessionId }
+        if (idx >= 0) {
+            val session = sessions[idx].copy(isPinned = true)
+            sessions[idx] = session
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessions()
+        }
+    }
+
+    /** Unpin a chat session. */
+    fun unpinSession(sessionId: String) {
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == sessionId }
+        if (idx >= 0) {
+            val session = sessions[idx].copy(isPinned = false)
+            sessions[idx] = session
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessions()
+        }
+    }
+
+    /** Rename a chat session. */
+    fun renameSession(sessionId: String, newTitle: String) {
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == sessionId }
+        if (idx >= 0) {
+            val session = sessions[idx].copy(title = newTitle.trim().takeIf { it.isNotBlank() } ?: sessions[idx].title)
+            sessions[idx] = session
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessions()
+        }
+    }
+
+    /** Clone a chat session. */
+    fun cloneSession(sessionId: String) {
+        val original = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        val cloned = ChatSession(
+            title = "${original.title} (${if (_uiState.value.language == AppLanguage.SPANISH) "copia" else "copy"})",
+            messages = original.messages.map { it.copy(id = "m-${System.currentTimeMillis()}-${it.id.take(5)}") }
+        )
+        _uiState.value = _uiState.value.copy(
+            sessions = listOf(cloned) + _uiState.value.sessions,
+            activeSessionId = cloned.id
+        )
+        persistSessions()
+    }
+
+    /** Archive a chat session (mark as archived). */
+    fun archiveSession(sessionId: String) {
+        val sessions = _uiState.value.sessions.toMutableList()
+        val idx = sessions.indexOfFirst { it.id == sessionId }
+        if (idx >= 0) {
+            val session = sessions[idx].copy(isArchived = true)
+            sessions[idx] = session
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+            persistSessions()
+        }
+    }
+
+    /** Share a chat session as text. */
+    fun shareSession(sessionId: String) {
+        val session = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        val text = buildString {
+            appendLine("NEXA PRO — ${session.title}")
+            appendLine("─".repeat(40))
+            for (msg in session.messages) {
+                val label = if (msg.role == "user") "👤" else "🤖"
+                appendLine("$label ${msg.content}")
+                appendLine()
+            }
+        }
+        shareText(text)
+    }
+
+    /** Download/export a chat session as JSON. */
+    fun downloadSession(sessionId: String) {
+        val session = _uiState.value.sessions.find { it.id == sessionId } ?: return
+        val json = com.google.gson.Gson().toJson(mapOf(
+            "title" to session.title,
+            "messages" to session.messages.map { mapOf("role" to it.role, "content" to it.content) },
+            "createdAt" to session.createdAt,
+            "updatedAt" to session.updatedAt
+        ))
+        val context = getApplication<Application>()
+        try {
+            val file = java.io.File(context.cacheDir, "nexa_session_${session.id.take(8)}.json")
+            file.writeText(json)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = android.content.Intent.createChooser(intent, "Export Session").apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            // Fallback: share as text
+            shareText(json)
+        }
+    }
+
+    /** Regenerate the last AI response. */
+    fun regenerateLast() {
+        val session = _uiState.value.activeSession ?: return
+        val messages = session.messages
+        if (messages.isEmpty()) return
+
+        // Find the last assistant message
+        val lastAssistantIdx = messages.indexOfLast { it.role == "assistant" }
+        if (lastAssistantIdx < 0) return
+
+        // Find the user message that preceded it
+        val lastUserIdx = messages.indexOfLast { it.role == "user" }
+        if (lastUserIdx < 0) return
+
+        val userContent = messages[lastUserIdx].content
+
+        // Remove the last assistant message from the session
+        val updatedMessages = messages.filterIndexed { idx, _ -> idx != lastAssistantIdx }
+        val updatedSession = session.copy(messages = updatedMessages, updatedAt = System.currentTimeMillis())
+        val sessions = _uiState.value.sessions.toMutableList()
+        val sessionIdx = sessions.indexOfFirst { it.id == _uiState.value.activeSessionId }
+        if (sessionIdx >= 0) {
+            sessions[sessionIdx] = updatedSession
+            _uiState.value = _uiState.value.copy(sessions = sessions)
+        }
+
+        // Re-send the user message
+        sendMessage(userContent)
+    }
+
+    /** Toggle auto-scroll behavior. */
+    fun toggleAutoScroll() {
+        _uiState.update { it.copy(autoScrollEnabled = !_uiState.value.autoScrollEnabled) }
     }
 
     override fun onCleared() {

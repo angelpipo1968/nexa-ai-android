@@ -286,7 +286,7 @@ fun MarkdownClickableText(
 ) {
     val context = LocalContext.current
     
-    ClickableText(
+    @Suppress("DEPRECATION") ClickableText(
         text = markdownText,
         style = androidx.compose.ui.text.TextStyle(
             fontSize = fontSize,

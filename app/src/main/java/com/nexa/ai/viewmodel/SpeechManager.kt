@@ -417,6 +417,7 @@ class SpeechManager(private val application: Application) {
                 } else {
                     AudioManager.STREAM_VOICE_CALL
                 }
+                @Suppress("DEPRECATION")
                 val result = audioManager.requestAudioFocus(
                     { focusChange ->
                         when (focusChange) {
