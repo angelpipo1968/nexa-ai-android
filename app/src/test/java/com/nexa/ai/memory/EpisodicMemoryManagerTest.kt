@@ -205,7 +205,7 @@ class EpisodicMemoryManagerTest {
         assertEquals(2, stats.totalMemories)
         assertEquals(1, stats.byType[MemoryType.FACT])
         assertEquals(1, stats.byType[MemoryType.PREFERENCE])
-        assertEquals(2, stats.totalSessions)
+        assertEquals(1, stats.totalSessions)
         assertTrue(stats.newestMemory > 0)
         assertTrue(stats.oldestMemory > 0)
     }

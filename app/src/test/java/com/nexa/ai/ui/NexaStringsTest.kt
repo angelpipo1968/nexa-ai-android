@@ -1,10 +1,20 @@
 package com.nexa.ai.ui
 
+import androidx.test.core.app.ApplicationProvider
 import com.nexa.ai.viewmodel.AppLanguage
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class NexaStringsTest {
+
+    @Before
+    fun setUp() {
+        NexaStrings.init(ApplicationProvider.getApplicationContext())
+    }
 
     @Test
     fun `Spanish translations exist for all keys`() {
