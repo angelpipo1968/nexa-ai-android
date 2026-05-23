@@ -346,7 +346,7 @@ private fun MessageImage(url: String, alt: String) {
                                 color = MaterialTheme.colorScheme.primary,
                                 strokeWidth = 2.dp
                             )
-                            Spacer(modifier = androidx.compose.foundation.layout.height(8.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "Generando imagen...",
                                 fontSize = 11.sp,
@@ -366,7 +366,7 @@ private fun MessageImage(url: String, alt: String) {
                                 color = MaterialTheme.colorScheme.error,
                                 textAlign = TextAlign.Center
                             )
-                            Spacer(modifier = androidx.compose.foundation.layout.height(8.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "Toca para reintentar",
                                 fontSize = 10.sp,
@@ -462,7 +462,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 )
             }
 
-        Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
+         Surface(shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (isUser) 20.dp else 6.dp, bottomEnd = if (isUser) 6.dp else 20.dp),
             color = if (isUser) userBubbleColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = if (!isUser) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)) else null) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -498,410 +498,148 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                             val textBefore = message.content.substring(lastIndex, match.range.first)
                             if (textBefore.isNotBlank()) segments.add(MessageSegment.Text(textBefore))
                         }
-                        // Add the image
+                        // Add image
                         segments.add(MessageSegment.Image(match.groupValues[2], match.groupValues[1]))
                         lastIndex = match.range.last + 1
                     }
+
                     // Add remaining text
                     if (lastIndex < message.content.length) {
-                        val remaining = message.content.substring(lastIndex)
-                        if (remaining.isNotBlank()) segments.add(MessageSegment.Text(remaining))
+                        val remainingText = message.content.substring(lastIndex)
+                        if (remainingText.isNotBlank()) segments.add(MessageSegment.Text(remainingText))
                     }
 
                     // Render segments
-                    segments.forEach { segment ->
-                        when (segment) {
-                            is MessageSegment.Text -> {
-                                val markdownText = rememberMarkdownText(segment.content)
-                                MarkdownClickableText(
-                                    markdownText = markdownText,
-                                    color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            is MessageSegment.Image -> {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                MessageImage(url = segment.url, alt = segment.alt)
-                                Spacer(modifier = Modifier.height(4.dp))
+                    if (segments.isEmpty()) {
+                        Text(message.content, fontSize = 15.sp, lineHeight = 22.sp, color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Start)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            segments.forEach { segment ->
+                                when (segment) {
+                                    is MessageSegment.Text -> Text(segment.content, fontSize = 15.sp, lineHeight = 22.sp, color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Start)
+                                    is MessageSegment.Image -> MessageImage(segment.url, segment.alt)
+                                }
                             }
                         }
                     }
-                }
-                // Action buttons INSIDE the message bubble, after the text
-                if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
-                    Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Speak button
-                Surface(onClick = onSpeak, shape = RoundedCornerShape(8.dp),
-                    color = if (isSpeaking) NexaAccent.copy(alpha = 0.12f) else Color.Transparent,
-                    modifier = Modifier.size(32.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (isSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp, null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                // Copy button
-                Surface(onClick = onCopy, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(32.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                    }
-                }
-                // Share button
-                Surface(onClick = onShare, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(32.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                    }
-                }
-                // More menu
-                var showMsgMenu by remember { mutableStateOf(false) }
-                Box {
-                    Surface(onClick = { showMsgMenu = true }, shape = RoundedCornerShape(8.dp), color = Color.Transparent, modifier = Modifier.size(32.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                        }
-                    }
-                    DropdownMenu(expanded = showMsgMenu, onDismissRequest = { showMsgMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("copy", language)) } },
-                            onClick = { showMsgMenu = false; onCopy() }
-                        )
-                        DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("share", language)) } },
-                            onClick = { showMsgMenu = false; onShare() }
-                        )
-                        DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("read_aloud", language)) } },
-                            onClick = { showMsgMenu = false; onSpeak() }
-                        )
-                        DropdownMenuItem(
-                            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp)); Text(NexaStrings.get("export_pdf", language)) } },
-                            onClick = { showMsgMenu = false; onExport() }
-                        )
-                        if (onRegenerate != null) {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-                            DropdownMenuItem(
-                                text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = NexaAccent); Text(NexaStrings.get("regenerate", language)) } },
-                                onClick = { showMsgMenu = false; onRegenerate() }
-                            )
-                        }
-                    }
-                }
-                // Clear chat button (only on last assistant message)
-                if (isLastAssistant) {
-                    Surface(onClick = onClearChat, shape = RoundedCornerShape(8.dp),
-                        color = Color.Transparent, modifier = Modifier.size(32.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                        }
-                    }
-                }
-                // Stop speaking button (only when globally speaking)
-                if (isGloballySpeaking) {
-                    Surface(onClick = onStopSpeaking, shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
-                        modifier = Modifier.size(32.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Stop, null, modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
-                        }
-                    }
-                }
                 }
             }
         }
-        } // swipe gesture Box
-    }
-}
-}
-
-@Composable
-fun ThinkingIndicator(lang: AppLanguage) {
-    // Neon sinusoidal wave indicator
-    val infiniteTransition = rememberInfiniteTransition(label = "thinking")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * Math.PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = LinearEasing)
-        ),
-        label = "wavePhase"
-    )
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAlpha"
-    )
-
-    Row(
-        modifier = Modifier.padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Sinusoidal neon wave
-        Box(
-            modifier = Modifier
-                .width(60.dp)
-                .height(20.dp)
-                .drawBehind {
-                    val width = size.width
-                    val height = size.height
-                    val centerY = height / 2f
-                    val amplitude = height * 0.35f
-                    val segments = 40
-
-                    // Glow layer
-                    for (i in 0 until segments - 1) {
-                        val x1 = width * i / segments
-                        val x2 = width * (i + 1) / segments
-                        val y1 = centerY + amplitude * kotlin.math.sin(phase + i * 0.5f)
-                        val y2 = centerY + amplitude * kotlin.math.sin(phase + (i + 1) * 0.5f)
-                        drawLine(
-                            color = NexaAccent.copy(alpha = glowAlpha * 0.15f),
-                            start = Offset(x1, y1),
-                            end = Offset(x2, y2),
-                            strokeWidth = 8.dp.toPx()
-                        )
+        }
+        if (isLastAssistant || (!isUser && !message.isStreaming && message.content.isNotEmpty())) {
+            Row(modifier = Modifier.padding(start = 4.dp, top = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                AnimatedVisibility(isSpeaking, enter = fadeIn(), exit = fadeOut()) {
+                    Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)), tint = NexaAccent.copy(alpha = 0.6f))
+                }
+                IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+                if (!isSpeaking) {
+                    IconButton(onClick = onSpeak, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                     }
-                    // Main neon line
-                    for (i in 0 until segments - 1) {
-                        val x1 = width * i / segments
-                        val x2 = width * (i + 1) / segments
-                        val y1 = centerY + amplitude * kotlin.math.sin(phase + i * 0.5f)
-                        val y2 = centerY + amplitude * kotlin.math.sin(phase + (i + 1) * 0.5f)
-                        drawLine(
-                            color = NexaAccent.copy(alpha = glowAlpha),
-                            start = Offset(x1, y1),
-                            end = Offset(x2, y2),
-                            strokeWidth = 2.dp.toPx()
-                        )
+                } else {
+                    IconButton(onClick = onStopSpeaking, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Stop, null, modifier = Modifier.size(16.dp), tint = NexaAccent.copy(alpha = 0.6f))
                     }
                 }
-        )
-        Text(
-            NexaStrings.get("thinking", lang),
-            fontSize = 12.sp,
-            color = NexaAccent.copy(alpha = glowAlpha * 0.5f),
-            letterSpacing = 0.5.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-fun DotsTyping() {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        repeat(3) { index ->
-            val infiniteTransition = rememberInfiniteTransition(label = "typing$index")
-            val alpha by infiniteTransition.animateFloat(initialValue = 0.15f, targetValue = 0.7f, animationSpec = infiniteRepeatable(animation = tween(600, delayMillis = index * 150), repeatMode = RepeatMode.Reverse), label = "typingAlpha$index")
-            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
+                IconButton(onClick = onExport, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.FileDownload, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+                IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+                if (isLastAssistant) {
+                    IconButton(onClick = { onRegenerate?.invoke() }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    }
+                }
+            }
         }
     }
 }
 
-// ═══════════════════════════════════════
-//  SHIMMER LOADING EFFECT
-// ═══════════════════════════════════════
+@Composable
+private fun ThinkingIndicator(language: AppLanguage) {
+    Row(
+        modifier = Modifier
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(NexaAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+            Text("⚡", fontSize = 5.sp)
+        }
+        Text(
+            NexaStrings.get("thinking", language),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(start = 4.dp)) {
+            repeat(3) {
+                val infiniteTransition = rememberInfiniteTransition(label = "dot$it")
+                val alpha by infiniteTransition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(600),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "dotAlpha$it"
+                )
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DotsTyping() {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(4.dp)) {
+        repeat(3) {
+            val infiniteTransition = rememberInfiniteTransition(label = "typing$it")
+            val translationY by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = -6f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(600),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "dotY$it"
+            )
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    .graphicsLayer { translationY = translationY }
+            )
+        }
+    }
+}
 
 @Composable
 fun ShimmerLoading(isDarkTheme: Boolean = true) {
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerTranslate by infiniteTransition.animateFloat(
-        initialValue = -300f,
-        targetValue = 900f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmerTranslate"
-    )
-
-    val baseColor = if (isDarkTheme) Color(0xFF1A1A26) else Color(0xFFF0F1F5)
-    val highlightColor = if (isDarkTheme) Color(0xFF2A2A3A) else Color(0xFFE0E2EA)
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Shimmer bubble - simulates AI response
-        Surface(
-            shape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp),
-            color = baseColor,
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f))
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                // NEXA label shimmer
-                Row(
-                    modifier = Modifier.padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(baseColor)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .width(32.dp)
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(baseColor)
-                    )
-                }
-                // Content line shimmers
-                repeat(3) { lineIndex ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(
-                                when (lineIndex) {
-                                    0 -> 0.9f
-                                    1 -> 0.7f
-                                    else -> 0.45f
-                                }
-                            )
-                            .height(12.dp)
-                            .padding(vertical = 2.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .drawBehind {
-                                drawRoundRect(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            baseColor,
-                                            highlightColor,
-                                            baseColor
-                                        ),
-                                        startX = shimmerTranslate - 100f,
-                                        endX = shimmerTranslate + 200f
-                                    ),
-                                    cornerRadius = CornerRadius(6.dp.toPx())
-                                )
-                            }
-                    )
-                }
-            }
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        repeat(3) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    .padding(vertical = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
         }
     }
 }
-
-// ═══════════════════════════════════════
-//  INPUT BAR
-// ═══════════════════════════════════════
-
-@Composable
-fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaking: Boolean,
-    pendingAttachment: String?, onTextChange: (String) -> Unit, onSend: () -> Unit,
-    onStartListening: () -> Unit, onStopListening: () -> Unit, onStopSpeaking: () -> Unit,
-    onAttachFile: () -> Unit, onClearAttachment: () -> Unit) {
-    val keyboardController = LocalSoftwareKeyboardController.current
-    var showMenu by remember { mutableStateOf(false) }
-    val hPad = AdaptivePadding.horizontal()
-    val vPad = AdaptivePadding.vertical()
-    val btnSize = AdaptivePadding.button()
-
-    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-        shadowElevation = 0.dp, border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))) {
-        Column(modifier = Modifier.padding(horizontal = hPad, vertical = vPad)) {
-            // Attachment preview
-            AnimatedVisibility(visible = pendingAttachment != null) {
-                Surface(shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.08f),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.15f), modifier = Modifier.size(32.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(16.dp), tint = NexaAccent) }
-                        }
-                        Text(pendingAttachment ?: "", fontSize = 13.sp, color = NexaAccent, fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        IconButton(onClick = onClearAttachment, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-
-            // Main input row
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // Attach menu
-                Box {
-                    Surface(onClick = { showMenu = true }, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)), modifier = Modifier.size(btnSize)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(btnSize * 0.47f)) }
-                    }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
-                        DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_pdf", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
-                    }
-                }
-
-                // Text input
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)), modifier = Modifier.weight(1f)) {
-                    Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextField(value = text, onValueChange = onTextChange,
-                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = btnSize),
-                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
-                            maxLines = 4, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp))
-                        Surface(onClick = { if (isListening) onStopListening() else onStartListening() }, shape = CircleShape,
-                            color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else Color.Transparent, modifier = Modifier.size(btnSize * 0.89f)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(if (isListening) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = null, tint = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp)) }
-                        }
-                    }
-                }
-
-                // Send button
-                val canSend = text.isNotBlank() || pendingAttachment != null
-                Surface(onClick = { onSend(); keyboardController?.hide() }, enabled = canSend, shape = CircleShape,
-                    color = if (canSend) NexaAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    border = if (canSend) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else null, modifier = Modifier.size(btnSize)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(btnSize * 0.44f)) }
-                }
-            }
-
-            // Hint
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 3.dp), horizontalArrangement = Arrangement.Center) {
-                Text(NexaStrings.get("mic_hint", language), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), letterSpacing = 0.8.sp)
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════
-//  UPDATE DIALOG
-// ═══════════════════════════════════════
-
-@Composable
-fun UpdateDialog(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdate: () -> Unit, language: AppLanguage = AppLanguage.SPANISH) {
-    AlertDialog(onDismissRequest = { if (!updateInfo.forceUpdate) onDismiss() }, containerColor = MaterialTheme.colorScheme.surface,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(NexaAccent.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center) { Text("🔄", fontSize = 14.sp) }
-                Text(NexaStrings.get("update_available", language), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp)
-            }
-        },
-        text = {
-            Column {
-                Text("v${updateInfo.versionName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 0.5.sp)
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(updateInfo.changelog, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), lineHeight = 20.sp)
-            }
-        },
-        confirmButton = { Button(onClick = onUpdate, colors = ButtonDefaults.buttonColors(containerColor = NexaAccent), shape = RoundedCornerShape(12.dp)) { Text(NexaStrings.get("update_now", language), color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) } },
-        dismissButton = { if (!updateInfo.forceUpdate) TextButton(onClick = onDismiss) { Text(NexaStrings.get("later", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) } },
-        shape = RoundedCornerShape(24.dp))
-}
-
-
