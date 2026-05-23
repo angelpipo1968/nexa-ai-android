@@ -290,6 +290,7 @@ class NexaRepository {
 
     /**
      * Generate an image using Pollinations.ai — completely FREE, no API key needed.
+     * Uses a seed derived from the prompt for consistent caching.
      * @param prompt Description of the image to generate
      * @param width Image width (default 1024)
      * @param height Image height (default 1024)
@@ -298,7 +299,9 @@ class NexaRepository {
     suspend fun generateImageFree(prompt: String, width: Int = 1024, height: Int = 1024): String {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val encodedPrompt = java.net.URLEncoder.encode(prompt, "UTF-8")
-            "https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true"
+            // Use a stable seed from the prompt hash so the same prompt always returns the same image
+            val seed = prompt.hashCode().toUInt().toLong()
+            "https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&seed=${seed}"
         }
     }
 }
