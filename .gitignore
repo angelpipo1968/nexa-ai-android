@@ -21,9 +21,8 @@ local.properties
 *.aab
 
 # Environment
-.env
-.env.local
-.env.production
+.env*
+!.env.example
 
 # Node (Vercel backend)
 node_modules/
