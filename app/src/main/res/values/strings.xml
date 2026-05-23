@@ -56,6 +56,8 @@
     <string name="confirm_password">Confirm password</string>
 
     <!-- Errors -->
+    <string name="mic_permission_denied">Microphone permission denied. Hands-free mode cannot start.</string>
+    <string name="mic_init_error">Microphone initialization error: %s</string>
     <string name="connection_error">Connection error</string>
     <string name="coordinates">Coordinates</string>
     <string name="copy">Copy</string>

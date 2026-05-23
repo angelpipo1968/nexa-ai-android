@@ -13,6 +13,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://nexa-sdk.s3.amazonaws.com/android/repo") }
     }
 }
 

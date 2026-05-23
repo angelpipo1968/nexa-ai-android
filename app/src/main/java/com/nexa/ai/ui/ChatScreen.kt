@@ -241,6 +241,14 @@ fun ChatContentPane(
                     ErrorBanner(uiState.error ?: "", onDismissError)
                 }
 
+                if (uiState.isLoadingLocation || uiState.isSearchingFlights) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = NexaAccent,
+                        trackColor = NexaAccent.copy(alpha = 0.1f)
+                    )
+                }
+
                 val haptic = LocalHapticFeedback.current
                 var pullOffset by remember { mutableStateOf(0f) }
                 val animatedPullOffset by animateFloatAsState(

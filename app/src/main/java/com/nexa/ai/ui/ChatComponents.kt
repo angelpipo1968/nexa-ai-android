@@ -400,18 +400,24 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     val isUser = message.role == "user"
 
     // Dynamic color for user bubble: SYSTEM mode uses Material You, others use custom colors
-    val userBubbleColor = when (themeMode) {
-        ThemeMode.SYSTEM -> {
-            if (isDarkTheme) dynamicPrimaryColor().copy(alpha = 0.15f)
-            else dynamicPrimaryColor().copy(alpha = 0.85f)
+    val dynamicPrimary = dynamicPrimaryColor()
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val userBubbleColor = remember(themeMode, isDarkTheme, dynamicPrimary) {
+        when (themeMode) {
+            ThemeMode.SYSTEM -> {
+                if (isDarkTheme) dynamicPrimary.copy(alpha = 0.15f)
+                else dynamicPrimary.copy(alpha = 0.85f)
+            }
+            ThemeMode.DARK -> NexaUserBubbleDark
+            ThemeMode.LIGHT -> NexaUserBubbleLight
         }
-        ThemeMode.DARK -> NexaUserBubbleDark
-        ThemeMode.LIGHT -> NexaUserBubbleLight
     }
-    val userTextColor = when (themeMode) {
-        ThemeMode.SYSTEM -> if (isDarkTheme) MaterialTheme.colorScheme.onSurface else Color.White
-        ThemeMode.DARK -> MaterialTheme.colorScheme.onSurface
-        ThemeMode.LIGHT -> Color.White
+    val userTextColor = remember(themeMode, isDarkTheme, onSurface) {
+        when (themeMode) {
+            ThemeMode.SYSTEM -> if (isDarkTheme) onSurface else Color.White
+            ThemeMode.DARK -> onSurface
+            ThemeMode.LIGHT -> Color.White
+        }
     }
     val haptic = LocalHapticFeedback.current
     // Swipe gesture state
@@ -487,26 +493,26 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()
                 } else {
-                    // Split content into text and image segments
-                    val imagePattern = Regex("!\\[([^]]*)]\\((https?://[^)]+)\\)")
-                    val segments = mutableListOf<MessageSegment>()
-                    var lastIndex = 0
+                    // Optimized: Split content into text and image segments once
+                    val segments = remember(message.content) {
+                        val pattern = Regex("!\\[([^]]*)]\\((https?://[^)]+)\\)")
+                        val result = mutableListOf<MessageSegment>()
+                        var lastIdx = 0
 
-                    imagePattern.findAll(message.content).forEach { match ->
-                        // Add text before this image
-                        if (match.range.first > lastIndex) {
-                            val textBefore = message.content.substring(lastIndex, match.range.first)
-                            if (textBefore.isNotBlank()) segments.add(MessageSegment.Text(textBefore))
+                        pattern.findAll(message.content).forEach { match ->
+                            if (match.range.first > lastIdx) {
+                                val textBefore = message.content.substring(lastIdx, match.range.first)
+                                if (textBefore.isNotBlank()) result.add(MessageSegment.Text(textBefore))
+                            }
+                            result.add(MessageSegment.Image(match.groupValues[2], match.groupValues[1]))
+                            lastIdx = match.range.last + 1
                         }
-                        // Add image
-                        segments.add(MessageSegment.Image(match.groupValues[2], match.groupValues[1]))
-                        lastIndex = match.range.last + 1
-                    }
 
-                    // Add remaining text
-                    if (lastIndex < message.content.length) {
-                        val remainingText = message.content.substring(lastIndex)
-                        if (remainingText.isNotBlank()) segments.add(MessageSegment.Text(remainingText))
+                        if (lastIdx < message.content.length) {
+                            val remainingText = message.content.substring(lastIdx)
+                            if (remainingText.isNotBlank()) result.add(MessageSegment.Text(remainingText))
+                        }
+                        result
                     }
 
                     // Render segments
@@ -621,7 +627,7 @@ private fun DotsTyping() {
                     .size(6.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                    .graphicsLayer { translationY = translationY }
+                    .graphicsLayer { this.translationY = translationY }
             )
         }
     }
@@ -642,4 +648,115 @@ fun ShimmerLoading(isDarkTheme: Boolean = true) {
             Spacer(modifier = Modifier.height(6.dp))
         }
     }
+}
+
+// ═══════════════════════════════════════
+//  INPUT BAR
+// ═══════════════════════════════════════
+
+@Composable
+fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaking: Boolean,
+    pendingAttachment: String?, onTextChange: (String) -> Unit, onSend: () -> Unit,
+    onStartListening: () -> Unit, onStopListening: () -> Unit, onStopSpeaking: () -> Unit,
+    onAttachFile: () -> Unit, onClearAttachment: () -> Unit) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var showMenu by remember { mutableStateOf(false) }
+    val hPad = AdaptivePadding.horizontal()
+    val vPad = AdaptivePadding.vertical()
+    val btnSize = AdaptivePadding.button()
+
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+        shadowElevation = 0.dp, border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))) {
+        Column(modifier = Modifier.padding(horizontal = hPad, vertical = vPad)) {
+            // Attachment preview
+            AnimatedVisibility(visible = pendingAttachment != null) {
+                Surface(shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.08f),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.15f), modifier = Modifier.size(32.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(16.dp), tint = NexaAccent) }
+                        }
+                        Text(pendingAttachment ?: "", fontSize = 13.sp, color = NexaAccent, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        IconButton(onClick = onClearAttachment, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            // Main input row
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Attach menu
+                Box {
+                    Surface(onClick = { showMenu = true }, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)), modifier = Modifier.size(btnSize)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(btnSize * 0.47f)) }
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
+                        DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_pdf", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
+                    }
+                }
+
+                // Text input
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)), modifier = Modifier.weight(1f)) {
+                    Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextField(value = text, onValueChange = onTextChange,
+                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = btnSize),
+                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
+                            maxLines = 4, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp))
+                        Surface(onClick = { if (isListening) onStopListening() else onStartListening() }, shape = CircleShape,
+                            color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else Color.Transparent, modifier = Modifier.size(btnSize * 0.89f)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(if (isListening) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = null, tint = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp)) }
+                        }
+                    }
+                }
+
+                // Send button
+                val canSend = text.isNotBlank() || pendingAttachment != null
+                Surface(onClick = { onSend(); keyboardController?.hide() }, enabled = canSend, shape = CircleShape,
+                    color = if (canSend) NexaAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                    border = if (canSend) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else null, modifier = Modifier.size(btnSize)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(btnSize * 0.44f)) }
+                }
+            }
+
+            // Hint
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 3.dp), horizontalArrangement = Arrangement.Center) {
+                Text(NexaStrings.get("mic_hint", language), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), letterSpacing = 0.8.sp)
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  UPDATE DIALOG
+// ═══════════════════════════════════════
+
+@Composable
+fun UpdateDialog(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdate: () -> Unit, language: AppLanguage = AppLanguage.SPANISH) {
+    AlertDialog(onDismissRequest = { if (!updateInfo.forceUpdate) onDismiss() }, containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(NexaAccent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center) { Text("🔄", fontSize = 14.sp) }
+                Text(NexaStrings.get("update_available", language), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp)
+            }
+        },
+        text = {
+            Column {
+                Text("v${updateInfo.versionName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 0.5.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(updateInfo.changelog, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), lineHeight = 20.sp)
+            }
+        },
+        confirmButton = { Button(onClick = onUpdate, colors = ButtonDefaults.buttonColors(containerColor = NexaAccent), shape = RoundedCornerShape(12.dp)) { Text(NexaStrings.get("update_now", language), color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) } },
+        dismissButton = { if (!updateInfo.forceUpdate) TextButton(onClick = onDismiss) { Text(NexaStrings.get("later", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) } },
+        shape = RoundedCornerShape(24.dp))
 }

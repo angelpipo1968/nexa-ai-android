@@ -56,6 +56,8 @@
     <string name="confirm_password">Confirmar contraseña</string>
 
     <!-- Errors -->
+    <string name="mic_permission_denied">Permiso de micrófono denegado. No se puede iniciar el modo manos libres.</string>
+    <string name="mic_init_error">Error de inicialización del micrófono: %s</string>
     <string name="connection_error">Error de conexión</string>
     <string name="coordinates">Coordenadas</string>
     <string name="copy">Copiar</string>

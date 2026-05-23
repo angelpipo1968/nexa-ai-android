@@ -85,6 +85,8 @@ data class NexaUiState(
     // Location
     val locationData: LocationStore.LocationData = LocationStore.LocationData(),
     val isLocating: Boolean = false,
+    val isLoadingLocation: Boolean = false,
+    val isSearchingFlights: Boolean = false,
     // Notifications
     val notificationsEnabled: Boolean = true,
     // Audio/Volume settings

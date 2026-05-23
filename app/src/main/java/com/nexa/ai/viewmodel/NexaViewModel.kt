@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.ChatMessage
+import com.nexa.ai.data.FlightOffer
+import com.nexa.ai.data.FlightRepository
 import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.NexaRepository
 import com.nexa.ai.data.PersistedMessage
@@ -64,6 +66,8 @@ class NexaViewModel @Inject constructor(
     // Managers still created locally (not yet in DI module — SpeechManager and AuthManager depend on Activity lifecycle)
     private val speechManager = SpeechManager(application)
     private val authManager = AuthManager(application)
+
+    private val flightRepository = FlightRepository()
 
     // ─── Smart Router: Online/Offline AI routing ───
     private val smartRouter = SmartRoutingManager(application)
@@ -926,11 +930,22 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         }
 
         // --- VOICE COMMAND DETECTION ---
-        if (_uiState.value.voiceMode) {
+        if (_uiState.value.voiceMode || true) { // Detection also in text mode
             val cmd = content.lowercase().trim()
             val lang = _uiState.value.language
+
+            // Intent: Where am I?
+            if (Regex("(dónde estoy|mi ubicación|ciudad actual|where am i|my location|current city)", RegexOption.IGNORE_CASE).containsMatchIn(cmd)) {
+                requestLocation()
+                return
+            }
+            // Intent: Flights
+            if (Regex("(vuelo|flight|volar|fly)", RegexOption.IGNORE_CASE).containsMatchIn(cmd)) {
+                searchFlightsFromCurrentCity()
+                return
+            }
             
-            if (cmd.contains("limpiar chat") || cmd.contains("borra el chat") || cmd.contains("clear chat")) {
+            if (_uiState.value.voiceMode) {
                 clearChat()
                 speak(if (lang == AppLanguage.SPANISH) "Chat borrado" else "Chat cleared")
                 return
@@ -1456,17 +1471,64 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isLocating = true) }
+            _uiState.update { it.copy(isLocating = true, isLoadingLocation = true) }
             try {
                 val location = locationStore.getCurrentLocation()
-                _uiState.update { it.copy(locationData = location, isLocating = false) }
+                _uiState.update { it.copy(locationData = location, isLocating = false, isLoadingLocation = false) }
                 if (location.isAvailable) {
                     android.util.Log.d("NexaVM", "Location obtained: ${location.city}, ${location.country} (${location.latitude}, ${location.longitude})")
+                    addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH) 
+                        "📍 Estás en ${location.city}, ${location.country}" 
+                        else "📍 You are in ${location.city}, ${location.country}")
+                } else {
+                    addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH)
+                        "⚠️ No pude obtener tu ubicación. Activa el GPS y permisos."
+                        else "⚠️ Could not get your location. Enable GPS and permissions.")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
-                _uiState.update { it.copy(isLocating = false) }
+                _uiState.update { it.copy(isLocating = false, isLoadingLocation = false) }
+                addSystemMessage("❌ Error: ${e.message}")
             }
+        }
+    }
+
+    fun searchFlightsFromCurrentCity() {
+        val city = _uiState.value.locationData.city
+        if (city.isBlank()) {
+            addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH)
+                "Primero necesito saber tu ubicación. Voy a obtenerla..."
+                else "First I need to know your location. I'm getting it...")
+            requestLocation()
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSearchingFlights = true) }
+            addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH)
+                "🔍 Buscando vuelos desde $city..."
+                else "🔍 Searching flights from $city...")
+            try {
+                val flights = flightRepository.searchFlightsFrom(city)
+                if (flights.isEmpty()) {
+                    addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH)
+                        "No encontré vuelos desde $city."
+                        else "No flights found from $city.")
+                } else {
+                    val list = flights.joinToString("\n") { "✈️ ${it.destination} - ${it.price} (${it.flightNumber})" }
+                    addSystemMessage("${if (_uiState.value.language == AppLanguage.SPANISH) "Vuelos disponibles" else "Available flights"}:\n$list")
+                }
+            } catch (e: Exception) {
+                addSystemMessage("Error: ${e.message}")
+            } finally {
+                _uiState.update { it.copy(isSearchingFlights = false) }
+            }
+        }
+    }
+
+    private fun addSystemMessage(content: String) {
+        val sysMsg = Message(role = "assistant", content = content)
+        updateActiveSession { session ->
+            session.copy(messages = session.messages + sysMsg, updatedAt = System.currentTimeMillis())
         }
     }
 

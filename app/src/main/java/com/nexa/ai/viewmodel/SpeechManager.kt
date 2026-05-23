@@ -25,7 +25,20 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
+
+/**
+ * Microphone status for UI reactivity.
+ */
+sealed interface MicState {
+    object Available : MicState
+    object Denied : MicState
+    data class Error(val cause: Throwable) : MicState
+    object Initializing : MicState
+}
 
 /**
  * Manages Text-to-Speech and Speech-to-Text functionality.
@@ -98,6 +111,15 @@ class SpeechManager(private val application: Application) {
 
     // Bug 5 fix: Ensure speaking state callbacks are synchronized
     private val speechStateLock = Any()
+
+    // ─── NEW: Mic state flow for UI reactivity ───
+    private val _micState = MutableStateFlow<MicState>(MicState.Initializing)
+    val micState: StateFlow<MicState> = _micState.asStateFlow()
+
+    // ─── NEW: Resume tracking for focus loss ───
+    private var lastSpokenText: String? = null
+    private var lastSpokenMessageId: String? = null
+    private var lastSpokenVoiceTag: String? = null
 
     // Callbacks
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
@@ -371,8 +393,14 @@ class SpeechManager(private val application: Application) {
                                     isPausedByFocusLoss = false
                                     hasAudioFocus = true
                                     reapplyHandsFreeRouting()
-                                    onSpeakingStateChanged?.invoke(false, null)
-                                    android.util.Log.d("SpeechManager", "TTS resuming after transient focus loss")
+                                    
+                                    // ─── NEW: Resume TTS if it was paused ───
+                                    lastSpokenText?.let { text ->
+                                        android.util.Log.d("SpeechManager", "TTS resuming (O+) after transient focus loss")
+                                        speak(text, lastSpokenMessageId, lastSpokenVoiceTag)
+                                    } ?: run {
+                                        onSpeakingStateChanged?.invoke(false, null)
+                                    }
                                 } else {
                                     hasAudioFocus = true
                                 }
@@ -411,7 +439,14 @@ class SpeechManager(private val application: Application) {
                                     isPausedByFocusLoss = false
                                     hasAudioFocus = true
                                     reapplyHandsFreeRouting()
-                                    onSpeakingStateChanged?.invoke(false, null)
+                                    
+                                    // ─── NEW: Resume TTS if it was paused ───
+                                    lastSpokenText?.let { text ->
+                                        android.util.Log.d("SpeechManager", "TTS resuming (Legacy) after transient focus loss")
+                                        speak(text, lastSpokenMessageId, lastSpokenVoiceTag)
+                                    } ?: run {
+                                        onSpeakingStateChanged?.invoke(false, null)
+                                    }
                                 } else {
                                     hasAudioFocus = true
                                 }
@@ -723,6 +758,11 @@ class SpeechManager(private val application: Application) {
             stopSpeaking()
             return
         }
+
+        // Save for potential resume on focus gain
+        lastSpokenText = text
+        lastSpokenMessageId = messageId
+        lastSpokenVoiceTag = currentSpeakingId
 
         // ═══ v5.1 BUG 1 FIX ═══
         // Set flag BEFORE calling stopSpeaking() so that the
@@ -1296,6 +1336,7 @@ class SpeechManager(private val application: Application) {
                 ).coerceAtLeast(2048)
 
                 try {
+                    _micState.value = MicState.Available
                     continuousAudioRecord = AudioRecord(
                         MediaRecorder.AudioSource.VOICE_COMMUNICATION, // Hardware echo cancellation
                         sampleRate,
@@ -1303,8 +1344,14 @@ class SpeechManager(private val application: Application) {
                         AudioFormat.ENCODING_PCM_16BIT,
                         bufferSize * 2
                     )
+                } catch (e: SecurityException) {
+                    android.util.Log.e("SpeechManager", "Mic permission denied for AudioRecord", e)
+                    _micState.value = MicState.Denied
+                    bargeInActive = false
+                    return@Thread
                 } catch (e: Exception) {
                     android.util.Log.e("SpeechManager", "AudioRecord create error: ${e.message}", e)
+                    _micState.value = MicState.Error(e)
                     bargeInActive = false
                     return@Thread
                 }
