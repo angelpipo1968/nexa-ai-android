@@ -10,7 +10,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const ADMIN_SECRET = 'nexa_ai_pro_secret_2024';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+if (!ADMIN_SECRET) {
+    console.warn('[NEXA ADMIN] ADMIN_SECRET environment variable is not set. Admin panel login will be disabled.');
+}
 
 // ─── Video API Key env names ───
 const VIDEO_KEYS = [
@@ -66,7 +69,7 @@ export async function GET(req: NextRequest) {
   const authQuery = new URL(req.url).searchParams.get('secret');
   const secret = authHeader || authQuery;
 
-  if (secret !== ADMIN_SECRET) {
+  if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
     return NextResponse.json(
       { error: 'No autorizado' },
       { status: 401, headers: corsHeaders }
@@ -137,7 +140,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('x-admin-secret');
-  if (authHeader !== ADMIN_SECRET) {
+  if (!ADMIN_SECRET || authHeader !== ADMIN_SECRET) {
     return NextResponse.json(
       { error: 'No autorizado' },
       { status: 401, headers: corsHeaders }
@@ -213,8 +216,8 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Use environment variable if set, otherwise fall back to default
-    const adminSecret = process.env.ADMIN_SECRET || ADMIN_SECRET;
+    // Use environment variable (required — no hardcoded fallback for security)
+    const adminSecret = ADMIN_SECRET;
 
     if (password === adminSecret) {
       return NextResponse.json({ success: true }, { headers: corsHeaders });

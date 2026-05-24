@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getIdentifier } from '@/lib/nexa-core/rate-limiter';
+import { getIdentifier, checkRateLimit, RATE_LIMITS } from '@/lib/nexa-core/rate-limiter';
 import { logger, generateRequestId } from '@/lib/nexa-core/logger';
 import { chatSchema } from '@/lib/validation';
 import { getSystemPrompt } from '@/lib/nexa-core/prompts';
@@ -26,12 +26,12 @@ import { searchPlace } from '@/lib/nexa-core/maps';
 import { searchArXiv, searchBooks } from '@/lib/nexa-core/academic';
 import { searchSpecies } from '@/lib/nexa-core/nature';
 import { searchGlobalFacts } from '@/lib/nexa-core/world-knowledge';
-import { searchNews, getTopHeadlines } from '@/lib/nexa-core/news';
+import { searchNews } from '@/lib/nexa-core/news';
 import { translateText } from '@/lib/nexa-core/translator';
 import {
-    analyzeEmotion, analyzeEmotionAdvanced, detectImplicitSignals, recordLearningSignal,
+    analyzeEmotion, detectImplicitSignals, recordLearningSignal,
     getLearningInsights, getUserProfile, updateUserProfile, generatePersonalizationContext,
-    extractKnowledge, getRelatedKnowledge, analyzeMessageAdvanced, analyzeConversationContext
+    extractKnowledge, getRelatedKnowledge, analyzeMessageAdvanced
 } from '@/lib/nexa-core/machine-learning';
 
 export const maxDuration = 60;
@@ -296,6 +296,17 @@ export async function OPTIONS() { return new Response(null, { headers: corsHeade
 
 export async function POST(req: NextRequest) {
     const requestId = generateRequestId();
+
+    // --- Rate Limiting ---
+    const identifier = getIdentifier(req);
+    const rateLimitResult = checkRateLimit(identifier, RATE_LIMITS.chat);
+    if (!rateLimitResult.allowed) {
+        return NextResponse.json(
+            { error: 'Demasiadas solicitudes. Intentá de nuevo en unos segundos.', retryAfterMs: rateLimitResult.retryAfterMs },
+            { status: 429, headers: { ...corsHeaders, 'Retry-After': String(Math.ceil((rateLimitResult.retryAfterMs || 60000) / 1000)) } }
+        );
+    }
+
     try {
         const body = await req.json().catch(() => null);
         if (!body) return NextResponse.json({ error: 'Body vacío' }, { status: 400, headers: corsHeaders });
@@ -354,7 +365,12 @@ Hora Local: ${timeStr}
 --------------------------------------------------\n\n`;
 
         // --- NEXA ML ENGINE V1 (Machine Learning) ---
-        const userId = "angelpipo1968"; // Id por defecto
+        // Derive userId from client IP or custom header (no auth system yet).
+        // When auth is implemented, replace this with the authenticated user ID.
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || req.headers.get('x-real-ip')
+            || 'anonymous';
+        const userId = body?.userId || clientIp;
         
         // 1. Emotion Analysis
         const emotion = analyzeEmotion(userQuery);

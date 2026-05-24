@@ -1,10 +1,10 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-    Terminal, Play, Code2, Globe, Rocket, 
+    Terminal, Code2, Globe, Rocket, 
     Database, Cpu, Send, Loader2, ArrowLeft, 
-    FileCode2, FolderTree, Sparkles, CheckCircle2, ChevronRight
+    FileCode2, Sparkles
 } from 'lucide-react';
 
 export default function DeveloperMode() {

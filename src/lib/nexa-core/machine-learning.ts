@@ -13,10 +13,24 @@
 
 import { Redis } from '@upstash/redis';
 
-const redis = new Redis({
-    url: process.env.REDIS_URL || '',
-    token: process.env.REDIS_TOKEN || '',
-});
+// Lazy-initialize Redis to prevent crashes when REDIS_URL is not set.
+// All functions that use redis call getRedis() and gracefully degrade if null.
+let _redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+    if (_redis) return _redis;
+    if (!process.env.REDIS_URL) return null;
+    try {
+        _redis = new Redis({
+            url: process.env.REDIS_URL,
+            token: process.env.REDIS_TOKEN || '',
+        });
+    } catch (e) {
+        console.error('[NEXA ML] Failed to initialize Redis:', e);
+        return null;
+    }
+    return _redis;
+}
 
 // ═══════════════════════════════════════
 //  TYPES
@@ -162,8 +176,9 @@ export async function recordLearningSignal(
     userId: string, 
     signal: LearningSignal
 ): Promise<void> {
-    if (!process.env.REDIS_URL) return;
-    
+    const redis = getRedis();
+    if (!redis) return;
+
     try {
         // Store the signal
         await redis.lpush(`learning:${userId}`, JSON.stringify(signal));
@@ -262,7 +277,8 @@ export async function getLearningInsights(userId: string): Promise<{
     totalSignals: number;
     recommendation: string;
 }> {
-    if (!process.env.REDIS_URL) {
+    const redis = getRedis();
+    if (!redis) {
         return { scores: {}, topTopics: [], totalSignals: 0, recommendation: '' };
     }
     
@@ -330,7 +346,8 @@ const DEFAULT_PROFILE: UserProfile = {
  * Get or create user profile
  */
 export async function getUserProfile(userId: string): Promise<UserProfile> {
-    if (!process.env.REDIS_URL) return DEFAULT_PROFILE;
+    const redis = getRedis();
+    if (!redis) return DEFAULT_PROFILE;
     
     try {
         const profile = await redis.get<UserProfile>(`profile:${userId}`);
@@ -401,7 +418,8 @@ export async function updateUserProfile(
     }
     
     // Save profile
-    if (process.env.REDIS_URL) {
+    const redis = getRedis();
+    if (redis) {
         try {
             await redis.set(`profile:${userId}`, JSON.stringify(profile));
         } catch {}
@@ -479,7 +497,8 @@ export async function addKnowledgeNode(
     userId: string,
     node: KnowledgeNode
 ): Promise<void> {
-    if (!process.env.REDIS_URL) return;
+    const redis = getRedis();
+    if (!redis) return;
     
     try {
         const key = `kg:${userId}:${node.entity.toLowerCase().replace(/\s+/g, '_')}`;
@@ -553,7 +572,8 @@ export async function extractKnowledge(userId: string, userMessage: string): Pro
  * Get related knowledge for context
  */
 export async function getRelatedKnowledge(userId: string, topic: string): Promise<string> {
-    if (!process.env.REDIS_URL) return '';
+    const redis = getRedis();
+    if (!redis) return '';
     
     try {
         const key = `kg:${userId}:${topic.toLowerCase().replace(/\s+/g, '_')}`;
