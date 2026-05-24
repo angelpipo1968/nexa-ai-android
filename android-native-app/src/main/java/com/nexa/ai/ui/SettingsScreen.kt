@@ -71,7 +71,8 @@ fun SettingsScreen(
     onPreviewVoice: () -> Unit = {},
     onSetAccentColor: (Color) -> Unit = {},
     onExportSettings: () -> Unit = {},
-    onImportSettings: () -> Unit = {}
+    onImportSettings: () -> Unit = {},
+    onSetTinyfishApiKey: (String) -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity — using adaptive system
     val sectionSpacing = AdaptiveDimens.sectionSpacing()
@@ -299,6 +300,30 @@ fun SettingsScreen(
                                 }
                                 FuturisticSwitch(checked = uiState.notificationsEnabled, onCheckedChange = { onToggleNotifications() })
                             }
+                        }
+                    }
+                }
+
+                // ── API Keys ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel("API KEYS")
+                        FuturisticCard {
+                            Text("TinyFish API Key", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = effectiveAccent.copy(alpha = 0.8f))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = uiState.tinyfishApiKey,
+                                onValueChange = { onSetTinyfishApiKey(it) },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("sk-tinyfish-...") },
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = effectiveAccent,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                ),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
                     }
                 }

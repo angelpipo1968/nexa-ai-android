@@ -5,7 +5,7 @@ const hasSentryToken = !!process.env.SENTRY_AUTH_TOKEN;
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
-    output: 'export',
+    output: process.env.VERCEL === '1' ? undefined : 'export',
     eslint: { ignoreDuringBuilds: true },
     typescript: { ignoreBuildErrors: true },
     webpack: (config) => {

@@ -240,7 +240,9 @@ class MainActivity : ComponentActivity() {
                         onArchiveSession = { viewModel.archiveSession(it) },
                         onShareSession = { viewModel.shareSession(it) },
                         onDownloadSession = { viewModel.downloadSession(it) },
-                        onRegenerate = { viewModel.regenerateLast() }
+                        onRegenerate = { viewModel.regenerateLast() },
+                        onSetTinyfishApiKey = { viewModel.setTinyfishApiKey(it) },
+                        onDeleteTinyfishApiKey = { viewModel.deleteTinyfishApiKey() }
                     )
                 }
             }

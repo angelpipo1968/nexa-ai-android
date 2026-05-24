@@ -90,15 +90,22 @@ function getKeyList(envValue: string | undefined, envKey?: string): string[] {
     
     // Also check _2 and _3 suffixed versions
     if (envKey) {
-        for (let i = 1; i <= 5; i++) {
-            const suffix = i === 1 ? '' : `_${i}`;
-            const val = process.env[`${envKey}${suffix}`];
-            if (val) {
-                // Support comma-separated within each var too
-                val.split(',').map(k => k.trim()).filter(k => k.length > 0).forEach(k => keys.push(k));
+        const envKeysToCheck = [envKey];
+        if (envKey === 'GOOGLE_AI_API_KEY') {
+            envKeysToCheck.push('GEMINI_API_KEY');
+        }
+        
+        for (const currentKey of envKeysToCheck) {
+            for (let i = 1; i <= 5; i++) {
+                const suffix = i === 1 ? '' : `_${i}`;
+                const val = process.env[`${currentKey}${suffix}`];
+                if (val) {
+                    // Support comma-separated within each var too
+                    val.split(',').map(k => k.trim()).filter(k => k.length > 0).forEach(k => keys.push(k));
+                }
             }
         }
-        return keys;
+        if (keys.length > 0) return keys;
     }
     
     if (!envValue) return [];

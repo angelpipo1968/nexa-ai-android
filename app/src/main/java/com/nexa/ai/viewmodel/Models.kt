@@ -125,6 +125,8 @@ data class NexaUiState(
     val accentColor: Long = 0L,  // ARGB color value, 0 means default
     // Groq API Key
     val groqApiKey: String = "",  // Empty = FREE mode (Pollinations), non-empty = PRO mode (Groq)
+    // TinyFish API Key
+    val tinyfishApiKey: String = "",
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false,

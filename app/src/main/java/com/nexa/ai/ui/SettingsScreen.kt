@@ -77,7 +77,9 @@ fun SettingsScreen(
     onExportSettings: () -> Unit = {},
     onImportSettings: () -> Unit = {},
     onSetGroqApiKey: (String) -> Unit = {},
-    onDeleteGroqApiKey: () -> Unit = {}
+    onDeleteGroqApiKey: () -> Unit = {},
+    onSetTinyfishApiKey: (String) -> Unit = {},
+    onDeleteTinyfishApiKey: () -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity
     val sectionSpacing = 28.dp
@@ -264,6 +266,78 @@ fun SettingsScreen(
 
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(NexaStrings.get("groq_key_info", uiState.language), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), lineHeight = 12.sp)
+                        }
+                    }
+                }
+
+                // ── TinyFish API Key ──
+                StaggeredFadeIn(visible = sectionsVisible, index = 2) {
+                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
+                        SectionLabel("TINYFISH API KEY")
+                        FuturisticCard {
+                            Text("TinyFish Configuration", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // API Key input field
+                            var tfKeyInput by remember { mutableStateOf(uiState.tinyfishApiKey) }
+                            var tfShowKey by remember { mutableStateOf(false) }
+
+                            OutlinedTextField(
+                                value = tfKeyInput,
+                                onValueChange = { tfKeyInput = it },
+                                label = { Text("TinyFish API Key", fontSize = 11.sp) },
+                                visualTransformation = if (tfShowKey) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        MinimalIconButton(onClick = { tfShowKey = !tfShowKey }) {
+                                            Icon(if (tfShowKey) Icons.Default.Visibility else Icons.Default.VisibilityOff, null, modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = effectiveAccent.copy(alpha = 0.5f),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                    focusedLabelColor = effectiveAccent.copy(alpha = 0.7f),
+                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    cursorColor = effectiveAccent
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Save / Delete buttons
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    onClick = { if (tfKeyInput.isNotBlank()) onSetTinyfishApiKey(tfKeyInput) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = effectiveAccent.copy(alpha = 0.10f),
+                                    border = BorderStroke(0.5.dp, effectiveAccent.copy(alpha = 0.25f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(12.dp), tint = effectiveAccent)
+                                        Text(NexaStrings.get("save_key", uiState.language), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = effectiveAccent)
+                                    }
+                                }
+                                if (uiState.tinyfishApiKey.isNotBlank()) {
+                                    Surface(
+                                        onClick = { tfKeyInput = ""; onDeleteTinyfishApiKey() },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.05f),
+                                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                                            Text(NexaStrings.get("delete_key", uiState.language), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

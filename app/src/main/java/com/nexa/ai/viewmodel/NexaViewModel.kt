@@ -587,15 +587,18 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             val savedVoice = settingsStore.voiceType.first()
             val savedAccent = settingsStore.accentColor.first()
             val savedGroqKey = settingsStore.groqApiKey.first()
+            val savedTinyfishKey = settingsStore.tinyfishApiKey.first()
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
                 voiceType = savedVoice,
                 accentColor = savedAccent,
-                groqApiKey = savedGroqKey
+                groqApiKey = savedGroqKey,
+                tinyfishApiKey = savedTinyfishKey
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
+            webSearchManager.setApiKey(savedTinyfishKey)
 
             // Restore sessions
             val savedSessions = sessionStore.sessions.first()
@@ -1735,6 +1738,22 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     fun deleteGroqApiKey() {
         _uiState.update { it.copy(groqApiKey = "") }
         viewModelScope.launch { settingsStore.deleteGroqApiKey() }
+    }
+
+    fun setTinyfishApiKey(key: String) {
+        _uiState.update { it.copy(tinyfishApiKey = key.trim()) }
+        viewModelScope.launch { 
+            settingsStore.setTinyfishApiKey(key.trim()) 
+            webSearchManager.setApiKey(key.trim())
+        }
+    }
+
+    fun deleteTinyfishApiKey() {
+        _uiState.update { it.copy(tinyfishApiKey = "") }
+        viewModelScope.launch { 
+            settingsStore.deleteTinyfishApiKey() 
+            webSearchManager.setApiKey("")
+        }
     }
 
     fun previewVoice() {

@@ -94,4 +94,23 @@ class SettingsStore(private val context: Context) {
             prefs.remove(KEY_GROQ_API_KEY)
         }
     }
+
+    // TinyFish API Key
+    private val KEY_TINYFISH_API_KEY = stringPreferencesKey("tinyfish_api_key")
+
+    val tinyfishApiKey: Flow<String> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_TINYFISH_API_KEY] ?: "sk-tinyfish-qqRxqBR4XZgfIZEVZjQrIrFzqs6bGUnT"
+    }
+
+    suspend fun setTinyfishApiKey(key: String) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_TINYFISH_API_KEY] = key
+        }
+    }
+
+    suspend fun deleteTinyfishApiKey() {
+        context.settingsStore.edit { prefs ->
+            prefs.remove(KEY_TINYFISH_API_KEY)
+        }
+    }
 }

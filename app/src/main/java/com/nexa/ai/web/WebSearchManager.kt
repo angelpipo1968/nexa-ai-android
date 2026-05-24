@@ -55,6 +55,12 @@ class WebSearchManager {
         private const val CACHE_DURATION_MS = 5 * 60 * 1000L // 5 minutes
     }
 
+    var tinyfishApiKey: String = ""
+
+    fun setApiKey(key: String) {
+        tinyfishApiKey = key
+    }
+
     // ─── Web Search ───────────────────────────────────────────
 
     /**
@@ -72,6 +78,10 @@ class WebSearchManager {
         }
 
         val results = mutableListOf<SearchResult>()
+
+        // TinyFish API has been deprecated due to slow automation times.
+        // We now rely purely on the native DuckDuckGo Instant Answer API and Lite scraping.
+
 
         try {
             // Method 1: DuckDuckGo Instant Answer API
@@ -178,9 +188,65 @@ class WebSearchManager {
                 ))
             }
         } catch (e: Exception) {
-            Log.w(TAG, "HTML parsing error: ${e.message}")
+            Log.e(TAG, "HTML parsing error", e)
         }
         return results
+    }
+
+    private suspend fun searchTinyFish(query: String, maxResults: Int): List<SearchResult>? = withContext(Dispatchers.IO) {
+        try {
+            val encodedQuery = URLEncoder.encode(query, "UTF-8")
+            val url = URL("https://agent.tinyfish.ai/api/v1/search?query=$encodedQuery&num_results=$maxResults")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("Authorization", "Bearer $tinyfishApiKey")
+            conn.setRequestProperty("User-Agent", USER_AGENT)
+            conn.connectTimeout = CONNECT_TIMEOUT
+            conn.readTimeout = READ_TIMEOUT
+
+            if (conn.responseCode == 200) {
+                val response = conn.inputStream.bufferedReader().readText()
+                return@withContext parseTinyfishSearchResults(response)
+            }
+            Log.e(TAG, "TinyFish Search HTTP Error: ${conn.responseCode}")
+            conn.disconnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "TinyFish Search Error", e)
+        }
+        return@withContext null
+    }
+
+    private fun parseTinyfishSearchResults(text: String): List<SearchResult> {
+        val results = mutableListOf<SearchResult>()
+        try {
+            // Try to parse as JSON array
+            val jsonArray = org.json.JSONArray(text)
+            for (i in 0 until jsonArray.length()) {
+                val item = jsonArray.optJSONObject(i)
+                if (item != null) {
+                    results.add(SearchResult(
+                        title = item.optString("title", "Result"),
+                        url = item.optString("url", ""),
+                        snippet = item.optString("snippet", item.optString("content", "")),
+                        source = "TinyFish",
+                        relevanceScore = 1.0f - (i * 0.05f)
+                    ))
+                }
+            }
+            return results
+        } catch (e: Exception) {
+            // Fallback: If it's plain markdown or text, wrap it as a single result
+            if (text.isNotBlank()) {
+                results.add(SearchResult(
+                    title = "Web Search Result",
+                    url = "",
+                    snippet = text.take(500),
+                    source = "TinyFish",
+                    relevanceScore = 1.0f
+                ))
+            }
+            return results
+        }
     }
 
     // ─── Web Scraping ─────────────────────────────────────────
@@ -189,6 +255,10 @@ class WebSearchManager {
      * Scrape a web page and extract clean text content.
      */
     suspend fun scrapeWebPage(urlString: String): ScrapedContent? = withContext(Dispatchers.IO) {
+        // TinyFish API has been deprecated due to slow automation times.
+        // We now rely purely on the native JSoup/HTTP scraping.
+
+
         try {
             val url = URL(urlString)
             val conn = url.openConnection() as HttpURLConnection
@@ -261,6 +331,42 @@ class WebSearchManager {
             Log.e(TAG, "Error scraping $urlString: ${e.message}")
             null
         }
+    }
+
+    private suspend fun fetchTinyFish(urlString: String): ScrapedContent? = withContext(Dispatchers.IO) {
+        try {
+            val encodedUrl = URLEncoder.encode(urlString, "UTF-8")
+            val url = URL("https://agent.tinyfish.ai/api/v1/fetch?url=$encodedUrl")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("Authorization", "Bearer $tinyfishApiKey")
+            conn.setRequestProperty("User-Agent", USER_AGENT)
+            conn.connectTimeout = CONNECT_TIMEOUT
+            conn.readTimeout = READ_TIMEOUT
+
+            if (conn.responseCode == 200) {
+                val response = conn.inputStream.bufferedReader().readText()
+                val responseJson = JSONObject(response)
+                val text = responseJson.optString("content", responseJson.optString("text", ""))
+                val title = responseJson.optString("title", "Extracted Page")
+
+                if (text.isNotBlank()) {
+                    return@withContext ScrapedContent(
+                        url = urlString,
+                        title = title,
+                        text = text,
+                        cleanHtml = text,
+                        wordCount = text.split(Regex("\\s+")).size,
+                        language = detectLanguage(text)
+                    )
+                }
+            }
+            Log.e(TAG, "TinyFish Fetch HTTP Error: ${conn.responseCode}")
+            conn.disconnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "TinyFish Fetch Error", e)
+        }
+        return@withContext null
     }
 
     // ─── News Search ──────────────────────────────────────────

@@ -55,6 +55,7 @@ data class NexaUiState(
     val currentProvider: String? = null,
     val error: String? = null,
     val pendingAttachment: String? = null,
+    val tinyfishApiKey: String = "",
     // Speech
     val isListening: Boolean = false,
     val isSpeaking: Boolean = false,
