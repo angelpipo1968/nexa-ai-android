@@ -15,6 +15,7 @@ local.properties
 *.jks
 *.keystore
 !debug.keystore
+keystore.properties
 
 # APK outputs
 *.apk
