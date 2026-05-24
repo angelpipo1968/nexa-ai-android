@@ -1,6 +1,7 @@
 .{
-    .name = "nexa_inference",
+    .name = .nexa_inference,
     .version = "0.1.0",
+    .fingerprint = 0x45773453cc544a3b,
     .paths = .{
         "build.zig",
         "build.zig.zon",
