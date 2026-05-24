@@ -78,8 +78,9 @@ export async function POST(req: NextRequest) {
         logger.info(`Vision category detected: ${category}`, 'vision', { requestId });
 
         const hfKey = process.env.HUGGINGFACE_API_KEY;
-        const googleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        const googleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
         const openaiKey = process.env.OPENAI_API_KEY;
+        const openrouterKey = process.env.OPENROUTER_API_KEY;
         const userQuestion = question || DEFAULT_QUESTION;
 
         // ═══════════════════════════════════════════════
@@ -226,9 +227,59 @@ export async function POST(req: NextRequest) {
         }
 
         // ═══════════════════════════════════════════════
-        //  Provider 3: OpenAI GPT-4o Vision (fallback)
+        //  Provider 3: OpenRouter Vision (GPT-4o / Claude Vision)
+        //  Supports multiple vision models via OpenRouter API
         // ═══════════════════════════════════════════════
-        if (openaiKey && (!body.model || body.model === 'gpt-4o')) {
+        if (openrouterKey && (!body.model || body.model === 'gpt-4o' || body.model === 'openrouter')) {
+            try {
+                const visionModel = body.model === 'openrouter' ? 'openai/gpt-4o' : 'openai/gpt-4o';
+                const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${openrouterKey}`,
+                        'HTTP-Referer': process.env.NEXT_PUBLIC_BACKEND_URL || 'https://www.nexa-ai.dev',
+                    },
+                    body: JSON.stringify({
+                        model: visionModel,
+                        messages: [
+                            { role: 'system', content: getSystemPrompt('vision') + '\n\n' + advancedData },
+                            {
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: userQuestion },
+                                    { type: 'image_url', image_url: { url: `data:${mimeType || 'image/jpeg'};base64,${image}` } },
+                                ],
+                            },
+                        ],
+                        max_tokens: 4096,
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    logger.info('Vision analysis completed via OpenRouter', 'vision', { requestId, category });
+                    return NextResponse.json({
+                        response: data.choices[0]?.message?.content || '',
+                        provider: 'openrouter',
+                        model: visionModel,
+                        category,
+                    });
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    logger.warn(`OpenRouter vision failed (${res.status}): ${JSON.stringify(errData?.error || 'Unknown')}`, 'vision', { requestId });
+                }
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                logger.error(`OpenRouter vision error: ${msg}`, 'vision', { requestId });
+            }
+        }
+
+        // ═══════════════════════════════════════════════
+        //  Provider 4: OpenAI GPT-4o Vision (direct, fallback)
+        //  Only used if OPENAI_API_KEY is a real OpenAI key
+        // ═══════════════════════════════════════════════
+        if (openaiKey && !openaiKey.startsWith('sk-or-v1-') && (!body.model || body.model === 'gpt-4o')) {
             try {
                 const res = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
