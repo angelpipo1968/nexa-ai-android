@@ -148,12 +148,29 @@ textarea::placeholder, input::placeholder { color: #3a3a60; }
     .nexa-msg-bubble {
         max-width: 85% !important;
     }
+    .nexa-messages-container {
+        max-width: 85% !important;
+    }
 }
 
 /* ═══ Desktop (1025px+) ═══ */
 @media (min-width: 1025px) {
     .nexa-drawer {
         width: 320px !important;
+    }
+    .nexa-messages-container {
+        max-width: 800px !important;
+    }
+}
+
+/* ═══ Large desktop (1440px+) ═══ */
+@media (min-width: 1440px) {
+    .nexa-messages-container {
+        max-width: 900px !important;
+    }
+    .nexa-msg-bubble {
+        max-width: 80% !important;
+        padding: '16px 22px' !important;
     }
 }
 
@@ -186,6 +203,16 @@ textarea::placeholder, input::placeholder { color: #3a3a60; }
     .nexa-action-btn {
         min-width: 44px !important;
         min-height: 44px !important;
+    }
+    /* Ensure keyboard hints hidden on touch devices */
+    .nexa-keyboard-hints {
+        display: none !important;
+    }
+    /* Larger send/voice buttons on touch */
+    .nexa-send-btn,
+    .nexa-voice-btn {
+        width: 44px !important;
+        height: 44px !important;
     }
 }
 

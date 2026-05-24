@@ -16,7 +16,24 @@ export const LOTTERY_GAMES: Record<string, { id: string; name: string; country: 
     euromillions: { id: 'eu_euromillions', name: 'EuroMillions', country: 'Europa', numbers: 5, maxNumber: 50, bonusNumbers: 2, maxBonus: 12 },
     lotto: { id: 'uk_lotto', name: 'Lotto', country: 'UK', numbers: 6, maxNumber: 59, bonusNumbers: 1, maxBonus: 59 },
     el_gordo: { id: 'es_el_gordo', name: 'El Gordo', country: 'Espana', numbers: 5, maxNumber: 54, bonusNumbers: 1, maxBonus: 9 },
+    // --- Aliases for Android native app compatibility ---
+    baloto: { id: 'co_baloto', name: 'Baloto', country: 'Colombia', numbers: 5, maxNumber: 43, bonusNumbers: 1, maxBonus: 16 },
+    primitiva: { id: 'es_loteria_nacional', name: 'La Primitiva', country: 'Espana', numbers: 6, maxNumber: 49, bonusNumbers: 1, maxBonus: 9 },
 };
+
+/**
+ * Resolve a game key to its Magayo API game ID.
+ * Supports both short keys (e.g., "melate") and full IDs (e.g., "mx_melate").
+ */
+export function resolveGameId(game: string): string {
+    // 1. Direct match in LOTTERY_GAMES
+    if (LOTTERY_GAMES[game]) return LOTTERY_GAMES[game].id;
+    // 2. Check if it's already a full Magayo ID (e.g., "us_powerball")
+    const found = Object.values(LOTTERY_GAMES).find(g => g.id === game);
+    if (found) return found.id;
+    // 3. Return as-is (Magayo will return error if invalid)
+    return game;
+}
 
 /**
  * Obtiene resultados de un sorteo de loteria usando Magayo API
@@ -25,15 +42,17 @@ export async function getLotteryResults(game: string): Promise<string> {
     const apiKey = process.env.MAGAYO_API_KEY;
     if (!apiKey) return "Falta MAGAYO_API_KEY. Configurala en .env.local";
 
+    const gameId = resolveGameId(game);
+
     try {
-        const url = `https://www.magayo.com/api/results.php?api_key=${apiKey}&game=${game}`;
+        const url = `https://www.magayo.com/api/results.php?api_key=${apiKey}&game=${gameId}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
         const data = await res.json();
 
         if (data.error) return `Error de Magayo: ${data.error}`;
 
         // Buscar nombre del juego
-        const gameInfo = Object.values(LOTTERY_GAMES).find(g => g.id === game);
+        const gameInfo = LOTTERY_GAMES[game] || Object.values(LOTTERY_GAMES).find(g => g.id === gameId);
         const gameName = gameInfo?.name || game.toUpperCase();
 
         return `RESULTADOS DE LOTERIA (${gameName}):
@@ -54,14 +73,16 @@ export async function getNextDraw(game: string): Promise<string> {
     const apiKey = process.env.MAGAYO_API_KEY;
     if (!apiKey) return "Falta MAGAYO_API_KEY.";
 
+    const gameId = resolveGameId(game);
+
     try {
-        const url = `https://www.magayo.com/api/next_draw.php?api_key=${apiKey}&game=${game}`;
+        const url = `https://www.magayo.com/api/next_draw.php?api_key=${apiKey}&game=${gameId}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
         const data = await res.json();
 
         if (data.error) return `Error de Magayo: ${data.error}`;
 
-        const gameInfo = Object.values(LOTTERY_GAMES).find(g => g.id === game);
+        const gameInfo = LOTTERY_GAMES[game] || Object.values(LOTTERY_GAMES).find(g => g.id === gameId);
         const gameName = gameInfo?.name || game.toUpperCase();
 
         return `PROXIMO SORTEO (${gameName}):
@@ -78,13 +99,14 @@ Jackpot estimado: ${data.jackpot || 'No disponible'}`;
  */
 export async function generateLotteryNumbers(game: string): Promise<string> {
     const apiKey = process.env.MAGAYO_API_KEY;
-    const gameInfo = Object.values(LOTTERY_GAMES).find(g => g.id === game);
+    const gameId = resolveGameId(game);
+    const gameInfo = Object.values(LOTTERY_GAMES).find(g => g.id === gameId) || LOTTERY_GAMES[game];
     const gameName = gameInfo?.name || game.toUpperCase();
 
     // Intentar primero con la API de Magayo
     if (apiKey) {
         try {
-            const url = `https://www.magayo.com/api/numbers.php?api_key=${apiKey}&game=${game}`;
+            const url = `https://www.magayo.com/api/numbers.php?api_key=${apiKey}&game=${gameId}`;
             const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
             const data = await res.json();
 
@@ -98,10 +120,11 @@ export async function generateLotteryNumbers(game: string): Promise<string> {
     }
 
     // Fallback: generar numeros localmente basandose en las reglas del juego
-    if (gameInfo) {
-        const mainNumbers = generateRandomNumbers(gameInfo.numbers, 1, gameInfo.maxNumber);
-        const bonusNumbers = gameInfo.bonusNumbers > 0
-            ? generateRandomNumbers(gameInfo.bonusNumbers, 1, gameInfo.maxBonus)
+    const resolvedGameInfo = gameInfo || Object.values(LOTTERY_GAMES).find(g => g.id === gameId);
+    if (resolvedGameInfo) {
+        const mainNumbers = generateRandomNumbers(resolvedGameInfo.numbers, 1, resolvedGameInfo.maxNumber);
+        const bonusNumbers = resolvedGameInfo.bonusNumbers > 0
+            ? generateRandomNumbers(resolvedGameInfo.bonusNumbers, 1, resolvedGameInfo.maxBonus)
             : [];
 
         let result = `NUMEROS GENERADOS (${gameName}):\n`;

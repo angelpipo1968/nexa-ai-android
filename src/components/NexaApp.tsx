@@ -1050,7 +1050,7 @@ export function NexaApp() {
                                 </motion.div>
                             </div>
                         ) : (
-                            <div style={{ maxWidth: 700, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <div className="nexa-messages-container" style={{ maxWidth: 700, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
                                 {msgs.map((m, idx) => (
                                     <motion.div key={m.id} className="msg-enter"
                                         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -1205,6 +1205,7 @@ export function NexaApp() {
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
                                     <button aria-label={recording ? 'Detener' : 'Voz'} onClick={toggleRec}
+                                        className="nexa-voice-btn"
                                         style={{
                                             width: 36, height: 36, borderRadius: '50%',
                                             background: recording ? '#ef444420' : 'transparent',
@@ -1219,7 +1220,7 @@ export function NexaApp() {
 
                                     <button aria-label="Enviar" onClick={() => send()}
                                         disabled={(!input.trim() && attachedFiles.length === 0) || thinking || streaming}
-                                        className="glow-btn"
+                                        className="glow-btn nexa-send-btn"
                                         style={{
                                             width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                                             background: (input.trim() || attachedFiles.length > 0) && !thinking && !streaming ? accent : `${T.muted}20`,
@@ -1234,7 +1235,7 @@ export function NexaApp() {
                             </div>
 
                             {/* Keyboard hints */}
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, opacity: 0.3 }}>
+                            <div className="nexa-keyboard-hints" style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, opacity: 0.3 }}>
                                 <span style={{ fontSize: 10, color: T.muted }}>Enter enviar</span>
                                 <span style={{ fontSize: 10, color: T.muted }}>Shift+Enter nueva línea</span>
                                 <span style={{ fontSize: 10, color: T.muted }}>Tab autocompletar</span>
