@@ -365,30 +365,79 @@ class VisionRepository {
         val request = VisionRequest(image, mimeType, question, model)
         val body = gson.toJson(request).toRequestBody("application/json".toMediaType())
 
-        val httpRequest = Request.Builder()
-            .url("$baseUrl/api/vision")
-            .header("Content-Type", "application/json")
-            .post(body)
-            .build()
+        var lastException: Exception? = null
+        val maxRetries = 3
 
-        Log.d(TAG, "Sending vision request to $baseUrl/api/vision (image: ${image.length} chars)")
+        for (attempt in 0 until maxRetries) {
+            try {
+                val httpRequest = Request.Builder()
+                    .url("$baseUrl/api/vision")
+                    .header("Content-Type", "application/json")
+                    .post(body)
+                    .build()
 
-        val response = client.newCall(httpRequest).execute()
+                Log.d(TAG, "Sending vision request to $baseUrl/api/vision (attempt ${attempt + 1}, image: ${image.length} chars)")
 
-        if (!response.isSuccessful) {
-            val errorBody = response.body?.string() ?: "Unknown error"
-            Log.e(TAG, "Vision API error ${response.code}: $errorBody")
-            throw Exception("Vision API error ${response.code}: ${response.message}")
+                val response = client.newCall(httpRequest).execute()
+
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: throw Exception("Empty response body")
+                    val json = gson.fromJson(responseBody, JsonObject::class.java)
+
+                    // Check if backend returned a success response with actual content
+                    val responseText = json.get("response")?.asString
+                    if (!responseText.isNullOrBlank()) {
+                        return@withContext VisionResponse(
+                            response = responseText,
+                            provider = json.get("provider")?.asString ?: "unknown",
+                            model = json.get("model")?.asString,
+                            category = json.get("category")?.asString,
+                        )
+                    }
+
+                    // Backend returned 200 but with error info — check for retryable errors
+                    val errorCode = json.get("code")?.asString
+                    val errorMessage = json.get("error")?.asString ?: "Unknown error"
+                    if (errorCode == "MODEL_LOADING") {
+                        val retryAfter = json.get("retryAfter")?.asInt ?: 20
+                        Log.w(TAG, "Model loading (attempt ${attempt + 1}), retrying in ${retryAfter}s...")
+                        kotlinx.coroutines.delay(retryAfter * 1000L)
+                        lastException = Exception(errorMessage)
+                        continue
+                    }
+
+                    // Non-retryable error from backend
+                    throw Exception(errorMessage)
+                }
+
+                // HTTP error response
+                val errorBody = response.body?.string() ?: "Unknown error"
+                Log.e(TAG, "Vision API error ${response.code}: $errorBody")
+
+                if (response.code == 503) {
+                    // Service unavailable — retry with exponential backoff
+                    val backoffMs = (attempt + 1) * 10000L // 10s, 20s, 30s
+                    Log.w(TAG, "Vision API 503 (attempt ${attempt + 1}), retrying in ${backoffMs / 1000}s...")
+                    kotlinx.coroutines.delay(backoffMs)
+                    lastException = Exception("Vision API error 503: Service Unavailable")
+                    continue
+                }
+
+                // Non-503 error — don't retry
+                throw Exception("Vision API error ${response.code}: ${response.message}")
+
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt < maxRetries - 1) {
+                    val backoffMs = (attempt + 1) * 5000L
+                    Log.w(TAG, "Vision request failed (attempt ${attempt + 1}): ${e.message}, retrying in ${backoffMs / 1000}s...")
+                    kotlinx.coroutines.delay(backoffMs)
+                }
+            }
         }
 
-        val responseBody = response.body?.string() ?: throw Exception("Empty response body")
-        val json = gson.fromJson(responseBody, JsonObject::class.java)
-
-        VisionResponse(
-            response = json.get("response")?.asString ?: "",
-            provider = json.get("provider")?.asString ?: "unknown",
-            model = json.get("model")?.asString,
-            category = json.get("category")?.asString,
-        )
+        throw lastException ?: Exception("Vision API failed after $maxRetries attempts")
     }
 }

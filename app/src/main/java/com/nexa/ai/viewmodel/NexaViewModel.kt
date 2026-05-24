@@ -1636,9 +1636,19 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NexaVM", "Vision error: ${e.message}")
+                val userMessage = when {
+                    e.message?.contains("503") == true ->
+                        if (lang == AppLanguage.SPANISH) "Servicio de visión temporalmente no disponible. El modelo se está cargando, intenta de nuevo en unos segundos."
+                        else "Vision service temporarily unavailable. Model is loading, try again in a few seconds."
+                    e.message?.contains("NO_VISION_PROVIDER") == true || e.message?.contains("No hay proveedor") == true ->
+                        if (lang == AppLanguage.SPANISH) "No hay proveedor de visión configurado. Agrega tu API key de HuggingFace (gratis) o Google Gemini en la configuración del backend."
+                        else "No vision provider configured. Add your HuggingFace API key (free) or Google Gemini key in backend settings."
+                    else ->
+                        if (lang == AppLanguage.SPANISH) "Error al analizar imagen: ${e.message}" else "Vision error: ${e.message}"
+                }
                 _uiState.update {
                     it.copy(
-                        error = if (lang == AppLanguage.SPANISH) "Error al analizar imagen: ${e.message}" else "Vision error: ${e.message}",
+                        error = userMessage,
                         isThinking = false
                     )
                 }

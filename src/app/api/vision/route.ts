@@ -93,75 +93,86 @@ export async function POST(req: NextRequest) {
                     ? image
                     : `data:${mimeType || 'image/jpeg'};base64,${image}`;
 
-                const res = await fetch(
-                    'https://api-inference.huggingface.co/models/zai-org/GLM-4.6V/v1/chat/completions',
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${hfKey}`,
-                        },
-                        body: JSON.stringify({
-                            model: 'zai-org/GLM-4.6V',
-                            messages: [
-                                {
-                                    role: 'system',
-                                    content: getSystemPrompt('vision') + '\n\n' + advancedData,
-                                },
-                                {
-                                    role: 'user',
-                                    content: [
-                                        { type: 'text', text: userQuestion },
-                                        {
-                                            type: 'image_url',
-                                            image_url: { url: imageUrl },
-                                        },
-                                    ],
-                                },
-                            ],
-                            max_tokens: 4096,
-                            temperature: 0.7,
-                        }),
-                    }
-                );
+                // Retry up to 3 times if HuggingFace returns 503 (model loading)
+                let lastError: string | null = null;
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const text = data.choices?.[0]?.message?.content || '';
-                    if (text) {
-                        logger.info('Vision analysis completed via GLM-4.6V', 'vision', { requestId, category });
-                        return NextResponse.json({
-                            response: text,
-                            provider: 'glm-4.6v',
-                            model: 'zai-org/GLM-4.6V',
-                            category,
-                            usage: data.usage,
-                        });
-                    }
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    logger.warn(
-                        `GLM-4.6V vision failed (${res.status}): ${JSON.stringify(errData?.error || 'Unknown')}`,
-                        'vision',
-                        { requestId }
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    const hfRes = await fetch(
+                        'https://api-inference.huggingface.co/models/zai-org/GLM-4.6V/v1/chat/completions',
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${hfKey}`,
+                            },
+                            body: JSON.stringify({
+                                model: 'zai-org/GLM-4.6V',
+                                messages: [
+                                    {
+                                        role: 'system',
+                                        content: getSystemPrompt('vision') + '\n\n' + advancedData,
+                                    },
+                                    {
+                                        role: 'user',
+                                        content: [
+                                            { type: 'text', text: userQuestion },
+                                            {
+                                                type: 'image_url',
+                                                image_url: { url: imageUrl },
+                                            },
+                                        ],
+                                    },
+                                ],
+                                max_tokens: 4096,
+                                temperature: 0.7,
+                            }),
+                        }
                     );
-                    // Model loading — return specific message
-                    if (res.status === 503) {
-                        const estimatedTime = errData?.estimated_time || 30;
-                        return NextResponse.json({
-                            error: `GLM-4.6V está cargando en HuggingFace. Intenta de nuevo en ~${estimatedTime}s.`,
-                            code: 'MODEL_LOADING',
-                            retryAfter: Math.ceil(estimatedTime),
-                        }, { status: 503 });
+
+                    if (hfRes.ok) {
+                        const data = await hfRes.json();
+                        const text = data.choices?.[0]?.message?.content || '';
+                        if (text) {
+                            logger.info('Vision analysis completed via GLM-4.6V', 'vision', { requestId, category, attempt });
+                            return NextResponse.json({
+                                response: text,
+                                provider: 'glm-4.6v',
+                                model: 'zai-org/GLM-4.6V',
+                                category,
+                                usage: data.usage,
+                            });
+                        }
+                    } else {
+                        const errData = await hfRes.json().catch(() => ({}));
+                        lastError = `GLM-4.6V (${hfRes.status}): ${JSON.stringify(errData?.error || 'Unknown')}`;
+                        logger.warn(
+                            `GLM-4.6V attempt ${attempt + 1} failed: ${lastError}`,
+                            'vision',
+                            { requestId }
+                        );
+
+                        if (hfRes.status === 503) {
+                            // Model is loading — wait and retry
+                            const waitTime = Math.min((errData?.estimated_time || 20) * 1000, 30000);
+                            logger.info(`Model loading, waiting ${waitTime / 1000}s before retry...`, 'vision', { requestId, attempt });
+                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                            continue; // retry
+                        }
+                        if (hfRes.status === 429) {
+                            logger.warn('HuggingFace rate limit hit, falling back to next provider', 'vision', { requestId });
+                            break; // fall through to next provider
+                        }
+                        if (hfRes.status === 401) {
+                            logger.error('HuggingFace API key invalid, falling back', 'vision', { requestId });
+                            break; // fall through to next provider
+                        }
+                        // Other errors — fall through to next provider
+                        break;
                     }
-                    // Rate limit on HF
-                    if (res.status === 429) {
-                        logger.warn('HuggingFace rate limit hit, falling back to next provider', 'vision', { requestId });
-                    }
-                    // Auth error
-                    if (res.status === 401) {
-                        logger.error('HuggingFace API key invalid', 'vision', { requestId });
-                    }
+                }
+                // If we exhausted retries, fall through to next provider
+                if (lastError) {
+                    logger.warn(`GLM-4.6V all attempts failed, falling back. Last: ${lastError}`, 'vision', { requestId });
                 }
             } catch (e: unknown) {
                 const msg = e instanceof Error ? e.message : String(e);
