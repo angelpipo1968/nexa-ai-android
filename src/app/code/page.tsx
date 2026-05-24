@@ -82,7 +82,7 @@ export default function CodePage() {
     };
 
     const detectLanguage = (code: string): string => {
-        if (code.includes('def ') || code.includes('import ') && code.includes('print(')) return 'python';
+        if (code.includes('def ') || (code.includes('import ') && code.includes('print('))) return 'python';
         if (code.includes('const ') || code.includes('=>') || code.includes('console.log')) return 'javascript';
         if (code.includes('interface ') || code.includes(': string') || code.includes(': number')) return 'typescript';
         if (code.includes('<div') || code.includes('<html') || code.includes('className')) return 'html';

@@ -5,13 +5,27 @@
 
 import { Redis } from '@upstash/redis';
 
-const redis = new Redis({
-    url: process.env.REDIS_URL || '',
-    token: process.env.REDIS_TOKEN || '',
-});
+// Lazy-initialize Redis to prevent crashes when REDIS_URL is not set.
+let _redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+    if (_redis) return _redis;
+    if (!process.env.REDIS_URL) return null;
+    try {
+        _redis = new Redis({
+            url: process.env.REDIS_URL,
+            token: process.env.REDIS_TOKEN || '',
+        });
+    } catch (e) {
+        console.error('[NEXA Memory] Failed to initialize Redis:', e);
+        return null;
+    }
+    return _redis;
+}
 
 export async function saveFact(userId: string, fact: string): Promise<void> {
-    if (!process.env.REDIS_URL) return;
+    const redis = getRedis();
+    if (!redis) return;
     try {
         // Guardamos el hecho en una lista para ese usuario
         await redis.lpush(`memory:${userId}`, fact);
@@ -23,7 +37,8 @@ export async function saveFact(userId: string, fact: string): Promise<void> {
 }
 
 export async function getMemories(userId: string): Promise<string[]> {
-    if (!process.env.REDIS_URL) return [];
+    const redis = getRedis();
+    if (!redis) return [];
     try {
         return await redis.lrange(`memory:${userId}`, 0, -1);
     } catch {
@@ -64,7 +79,8 @@ export async function extractAndSaveFacts(userId: string, userMessage: string): 
 }
 
 export async function logActivity(userId: string, city: string, country: string, topic: string): Promise<void> {
-    if (!process.env.REDIS_URL) return;
+    const redis = getRedis();
+    if (!redis) return;
     try {
         const timestamp = new Date().toISOString();
         const activity = { timestamp, city, country, topic };

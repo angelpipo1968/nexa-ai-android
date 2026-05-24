@@ -4,7 +4,7 @@
 
 export interface ToolResult {
     success: boolean;
-    output: string;
+    output?: string;
     error?: string;
 }
 
@@ -208,11 +208,11 @@ export async function executeIntent(intent: UserIntent): Promise<ToolResult> {
                 result = await callTool('countries', intent.query ? { name: intent.query } : {});
                 break;
             default:
-                return { success: false, output: '', error: 'Intent not handled by tools' };
+                return { success: false, output: undefined, error: 'Intent not handled by tools' };
         }
 
         return { success: true, output: JSON.stringify(result, null, 2) };
     } catch (error: any) {
-        return { success: false, output: '', error: error.message };
+        return { success: false, output: undefined, error: error.message };
     }
 }

@@ -1,9 +1,23 @@
 import { Redis } from '@upstash/redis';
 import { notFound } from 'next/navigation';
 
-const redis = Redis.fromEnv();
+// Lazy-initialize Redis to prevent crashes when REDIS_URL is not set.
+let _redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+    if (_redis) return _redis;
+    try {
+        _redis = Redis.fromEnv();
+    } catch {
+        return null;
+    }
+    return _redis;
+}
 
 export default async function PreviewPage({ params }: { params: { id: string } }) {
+    const redis = getRedis();
+    if (!redis) return notFound();
+
     const data: any = await redis.get(`preview:${params.id}`);
     
     if (!data) return notFound();

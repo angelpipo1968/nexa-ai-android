@@ -64,10 +64,9 @@ export async function OPTIONS() {
 // ═══════════════════════════════════════
 
 export async function GET(req: NextRequest) {
-  // Verify admin secret from query param or header
+  // Verify admin secret from header only (NOT from query param for security)
   const authHeader = req.headers.get('x-admin-secret');
-  const authQuery = new URL(req.url).searchParams.get('secret');
-  const secret = authHeader || authQuery;
+  const secret = authHeader;
 
   if (!ADMIN_SECRET || secret !== ADMIN_SECRET) {
     return NextResponse.json(

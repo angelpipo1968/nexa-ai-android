@@ -14,7 +14,7 @@ android {
     defaultConfig {
         applicationId = "com.nexa.ai"
         minSdk = 31
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 51
         versionName = "5.1"
 
@@ -24,9 +24,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("../nexa-release.keystore")
-            storePassword = "nexa123"
-            keyAlias = "nexa"
-            keyPassword = "nexa123"
+        storePassword = System.getenv("NEXA_KEYSTORE_PASSWORD") ?: project.findProperty("NEXA_KEYSTORE_PASSWORD") as String? ?: ""
+            keyAlias = System.getenv("NEXA_KEY_ALIAS") ?: project.findProperty("NEXA_KEY_ALIAS") as String? ?: "nexa"
+            keyPassword = System.getenv("NEXA_KEY_PASSWORD") ?: project.findProperty("NEXA_KEY_PASSWORD") as String? ?: ""
         }
     }
 

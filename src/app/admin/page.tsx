@@ -13,8 +13,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 // ─── Constants ──────────────────────────────────────────────
 
 // Admin password is verified server-side via /api/admin/keys
-// This client-side constant is a fallback for demo/offline mode only.
-const ADMIN_PASSWORD_FALLBACK = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '';
+// REMOVED: NEXT_PUBLIC_ADMIN_PASSWORD — it was exposed in the client bundle.
+// Now only server-side verification is used. Offline mode requires the server.
 
 const ACCENT = '#00e5a0';
 const ACCENT_DIM = 'rgba(0,229,160,0.12)';
@@ -77,26 +77,14 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       if (res.ok) {
         onLogin();
       } else {
-        // Fallback to client-side check for offline mode
-        if (ADMIN_PASSWORD_FALLBACK && password === ADMIN_PASSWORD_FALLBACK) {
-          onLogin();
-        } else {
-          setError('Contraseña incorrecta');
-          setShake(true);
-          setTimeout(() => setShake(false), 600);
-        }
-      }
-    } catch {
-      // Server unavailable — use fallback if configured
-      if (ADMIN_PASSWORD_FALLBACK && password === ADMIN_PASSWORD_FALLBACK) {
-        onLogin();
-      } else if (!ADMIN_PASSWORD_FALLBACK) {
-        setError('Servidor no disponible. Configura NEXT_PUBLIC_ADMIN_PASSWORD.');
-      } else {
+        // Server returned error — no client-side fallback for security
         setError('Contraseña incorrecta');
         setShake(true);
         setTimeout(() => setShake(false), 600);
       }
+    } catch {
+      // Server unavailable — cannot verify password without server
+      setError('Servidor no disponible. Intenta de nuevo más tarde.');
     } finally {
       setVerifying(false);
     }
@@ -1121,7 +1109,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       flexDirection: 'column',
       color: TEXT_PRIMARY,
       height: '100dvh',
-      height: '100vh',
       overflow: 'hidden',
     }}>
       {/* Override body overflow for admin page */}

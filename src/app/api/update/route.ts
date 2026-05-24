@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const CONFIG = {
-  latestVersionCode: 30,
-  latestVersionName: '3.0',
+  latestVersionCode: 51,
+  latestVersionName: '5.1',
   downloadUrl: 'https://github.com/angelpipo1968/nexa-ai-android/releases/latest/download/nexa-ai.apk',
-  releaseNotes: 'Versión inicial - Chat por voz con NEXA PRO',
+  releaseNotes: 'NEXA AI v5.1 — Mejoras de rendimiento, nuevas herramientas y correcciones de errores',
   forceUpdate: false,
 };
 

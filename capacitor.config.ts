@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
     appName: 'NEXA AI',
     webDir: 'out',
     server: {
+        // In production Android builds, API routes don't exist in the static export.
+        // Set NEXA_BACKEND_URL env var to point to your deployed Next.js backend
+        // (e.g., https://www.nexa-ai.dev). For local dev, leave empty to use relative URLs.
+        url: process.env.NEXA_BACKEND_URL || undefined,
         androidScheme: 'https',
     },
     android: {

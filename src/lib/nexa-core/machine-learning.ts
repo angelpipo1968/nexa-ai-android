@@ -585,7 +585,7 @@ export async function getRelatedKnowledge(userId: string, topic: string): Promis
         for (const rel of node.relations.slice(0, 5)) {
             context += `${rel.relation} ${rel.target} (confianza: ${Math.round(rel.strength * 100)}%), `;
         }
-        return context.trimEnd(', ');
+        return context.replace(/,\s*$/, '');
     } catch {
         return '';
     }

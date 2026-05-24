@@ -370,7 +370,7 @@ export function NexaApp() {
 
     const checkConn = async () => {
         setConn('check');
-        try { const r = await fetch('/', { method: 'HEAD', signal: AbortSignal.timeout(8000) }); setConn(r.ok ? 'ok' : 'err'); }
+        try { const r = await fetch('/api/health', { method: 'HEAD', signal: AbortSignal.timeout(8000) }); setConn(r.ok ? 'ok' : 'err'); }
         catch { setConn('err'); }
     };
 
