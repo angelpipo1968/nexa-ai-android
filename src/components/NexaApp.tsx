@@ -839,6 +839,7 @@ export function NexaApp() {
             <AnimatePresence>
                 {drawer && (
                     <motion.aside role="navigation" aria-label="Historial de conversaciones" initial={{ x: -290 }} animate={{ x: 0 }} exit={{ x: -290 }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                        className="nexa-drawer"
                         style={{ position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, width: 280, background: T.surf, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column' }}>
                         <div style={{ padding: '18px 14px 14px', borderBottom: `1px solid ${T.border}` }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -918,7 +919,7 @@ export function NexaApp() {
                 <main role="main" style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 10, minHeight: 0 }}>
 
                     {/* ─── Header ─── */}
-                    <header role="banner" style={{
+                    <header role="banner" className="nexa-header" style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         padding: '10px 16px', background: T.bg,
                         borderBottom: `1px solid ${T.border}`, flexShrink: 0, zIndex: 30,
@@ -1029,10 +1030,10 @@ export function NexaApp() {
                                         style={{ fontSize: 56, marginBottom: 16, filter: `drop-shadow(0 0 20px ${preset.glow})` }}>
                                         🧬
                                     </motion.div>
-                                    <h1 className="gradient-text" style={{ fontSize: 28, fontWeight: 900, margin: '0 0 8px', letterSpacing: -0.5, lineHeight: 1.2 }}>
+                                    <h1 className="gradient-text nexa-welcome-title" style={{ fontSize: 28, fontWeight: 900, margin: '0 0 8px', letterSpacing: -0.5, lineHeight: 1.2 }}>
                                         NEXA V3
                                     </h1>
-                                    <p style={{ fontSize: 14, color: T.muted, margin: 0, maxWidth: 360, lineHeight: 1.6 }}>
+                                    <p className="nexa-welcome-subtitle" style={{ fontSize: 14, color: T.muted, margin: 0, maxWidth: 360, lineHeight: 1.6 }}>
                                         Tu asistente inteligente. Pregunta lo que quieras.
                                     </p>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1055,7 +1056,7 @@ export function NexaApp() {
                                         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1], delay: idx === msgs.length - 1 ? 0.05 : 0 }}
                                         style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                                        <div style={{
+                                        <div className="nexa-msg-bubble" style={{
                                             position: 'relative', maxWidth: '88%',
                                             padding: '14px 18px',
                                             borderRadius: m.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
@@ -1161,7 +1162,7 @@ export function NexaApp() {
                     )}
 
                     {/* ─── Input area ─── */}
-                    <div role="region" aria-label="Área de entrada" style={{
+                    <div role="region" aria-label="Área de entrada" className="nexa-input-area" style={{
                         borderTop: `1px solid ${T.border}`,
                         background: `${T.bg}CC`, backdropFilter: 'blur(20px)',
                         padding: '12px 16px 20px', flexShrink: 0, zIndex: 20,

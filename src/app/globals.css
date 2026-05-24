@@ -13,6 +13,10 @@
     --nexa-text: #f8fafc;
     --nexa-text-dim: #94a3b8;
     --nexa-accent: #00e5a0;
+    --nexa-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --nexa-safe-top: env(safe-area-inset-top, 0px);
+    --nexa-safe-left: env(safe-area-inset-left, 0px);
+    --nexa-safe-right: env(safe-area-inset-right, 0px);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,6 +28,8 @@ body {
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Safe area for notched devices (Capacitor Android/iOS) */
+    padding: var(--nexa-safe-top) var(--nexa-safe-right) var(--nexa-safe-bottom) var(--nexa-safe-left);
 }
 ::selection { background: var(--nexa-accent, #00e5a0); color: #02020a; }
 
@@ -104,11 +110,95 @@ textarea::placeholder, input::placeholder { color: #3a3a60; }
     touch-action: pan-y;
 }
 
-/* ═══ Responsive ═══ */
+/* ═══ Responsive — Base mobile-first ═══ */
 @media (max-width: 640px) {
     ::-webkit-scrollbar { width: 2px; }
     .chat-scroll {
         overflow-y: scroll !important;
         -webkit-overflow-scrolling: touch !important;
     }
+    /* Smaller header on mobile */
+    .nexa-header {
+        padding: 8px 12px !important;
+    }
+    /* Compact messages on mobile */
+    .nexa-msg-bubble {
+        max-width: 92% !important;
+        padding: 12px 14px !important;
+        font-size: 14px !important;
+    }
+    /* Compact input on mobile */
+    .nexa-input-area {
+        padding: 10px 12px 16px !important;
+    }
+    /* Slightly smaller welcome text */
+    .nexa-welcome-title {
+        font-size: 24px !important;
+    }
+    .nexa-welcome-subtitle {
+        font-size: 13px !important;
+    }
+}
+
+/* ═══ Tablet (641px-1024px) ═══ */
+@media (min-width: 641px) and (max-width: 1024px) {
+    .nexa-drawer {
+        width: 300px !important;
+    }
+    .nexa-msg-bubble {
+        max-width: 85% !important;
+    }
+}
+
+/* ═══ Desktop (1025px+) ═══ */
+@media (min-width: 1025px) {
+    .nexa-drawer {
+        width: 320px !important;
+    }
+}
+
+/* ═══ Landscape mobile ═══ */
+@media (max-height: 500px) and (orientation: landscape) {
+    .nexa-header {
+        padding: 4px 12px !important;
+    }
+    .nexa-input-area {
+        padding: 6px 12px 10px !important;
+    }
+    .nexa-welcome-title {
+        font-size: 20px !important;
+    }
+}
+
+/* ═══ Safe area insets for Capacitor (notched phones) ═══ */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .nexa-input-area {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    }
+    .nexa-header {
+        padding-top: calc(10px + env(safe-area-inset-top)) !important;
+    }
+}
+
+/* ═══ Touch target sizes for mobile accessibility ═══ */
+@media (pointer: coarse) {
+    button[aria-label],
+    .nexa-action-btn {
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+}
+
+/* ═══ Prefers reduced motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+    .msg-enter { animation: none !important; }
+    .typing-dot { animation: none !important; opacity: 0.5; }
+    .gradient-text { animation: none !important; }
+    * { transition-duration: 0.01ms !important; }
+}
+
+/* ═══ Print styles ═══ */
+@media print {
+    .nexa-header, .nexa-input-area, .nexa-drawer { display: none !important; }
+    .chat-scroll { overflow: visible !important; height: auto !important; }
 }

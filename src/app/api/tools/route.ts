@@ -2,6 +2,8 @@
 // NEXA AI Tools Router — connects to free external APIs
 
 import { NextRequest, NextResponse } from 'next/server';
+import { searchStackOverflow, searchByTags } from '@/lib/nexa-core/stackoverflow';
+import { getLotteryResults, getNextDraw, generateLotteryNumbers, getAvailableGames, LOTTERY_GAMES } from '@/lib/nexa-core/lottery';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -277,6 +279,26 @@ export async function GET(req: NextRequest) {
             case 'countries':
                 result = await getCountries(params.name, params.code, params.region);
                 break;
+            case 'stackoverflow':
+                if (!params.q) return NextResponse.json({ error: 'Missing ?q=' }, { status: 400 });
+                result = await searchStackOverflow(params.q, parseInt(params.limit || '5'));
+                break;
+            case 'stackoverflow_tags':
+                if (!params.tags) return NextResponse.json({ error: 'Missing ?tags=' }, { status: 400 });
+                result = await searchByTags(params.tags.split(','), params.q, parseInt(params.limit || '5'));
+                break;
+            case 'lottery_results':
+                result = await getLotteryResults(params.game || 'us_powerball');
+                break;
+            case 'lottery_next':
+                result = await getNextDraw(params.game || 'us_powerball');
+                break;
+            case 'lottery_numbers':
+                result = await generateLotteryNumbers(params.game || 'us_powerball');
+                break;
+            case 'lottery_games':
+                result = { text: getAvailableGames(), games: LOTTERY_GAMES };
+                break;
             case 'list':
                 result = {
                     tools: [
@@ -292,6 +314,12 @@ export async function GET(req: NextRequest) {
                         { name: 'qrcode', desc: 'Generador QR', params: 'text, size' },
                         { name: 'time', desc: 'Hora mundial', params: 'tz' },
                         { name: 'countries', desc: 'Info de países', params: 'name | code | region' },
+                        { name: 'stackoverflow', desc: 'Buscar en StackOverflow', params: 'q, limit' },
+                        { name: 'stackoverflow_tags', desc: 'Buscar por tags en StackOverflow', params: 'tags, q, limit' },
+                        { name: 'lottery_results', desc: 'Resultados de lotería (Magayo)', params: 'game' },
+                        { name: 'lottery_next', desc: 'Próximo sorteo', params: 'game' },
+                        { name: 'lottery_numbers', desc: 'Generar números de lotería', params: 'game' },
+                        { name: 'lottery_games', desc: 'Juegos de lotería disponibles', params: '(none)' },
                     ],
                 };
                 break;

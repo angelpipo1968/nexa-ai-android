@@ -10,7 +10,8 @@ import { getWolframAnswer } from '@/lib/nexa-core/wolfram';
 import { searchMovies } from '@/lib/nexa-core/tmdb';
 import { getNASAAPOD, searchMarsPhotos } from '@/lib/nexa-core/nasa';
 import { getStockPrice, getCryptoPrice } from '@/lib/nexa-core/finance';
-import { getLotteryResults } from '@/lib/nexa-core/lottery';
+import { getLotteryResults, getNextDraw, generateLotteryNumbers, getAvailableGames } from '@/lib/nexa-core/lottery';
+import { searchStackOverflow, searchByTags } from '@/lib/nexa-core/stackoverflow';
 import { searchSkyscannerFlights } from '@/lib/nexa-core/skyscanner';
 import { searchGoogleFlights, searchPriceCalendar } from '@/lib/nexa-core/google-flights';
 import { searchWikipedia, getCountryData } from '@/lib/nexa-core/knowledge';
@@ -412,7 +413,7 @@ Interacciones totales: ${userProfile.interaction_count}
                         model: 'llama-3.1-8b-instant', // Usamos el modelo más rápido de Groq
                         messages: [{ 
                             role: 'system', 
-                            content: 'Analiza la pregunta e identifica herramientas necesarias: [movies, nasa, science, books, finance, flights, lottery, weather, knowledge, social, music, maps, nature, encyclopedia, news, preview, translate]. Responde solo con una lista separada por comas o "none".' 
+                            content: 'Analiza la pregunta e identifica herramientas necesarias: [movies, nasa, science, books, finance, flights, lottery, weather, knowledge, social, music, maps, nature, encyclopedia, news, preview, translate, stackoverflow, programming]. Responde solo con una lista separada por comas o "none".'
                         }, { role: 'user', content: userQuery }],
                         max_tokens: 20
                     }),
@@ -575,16 +576,39 @@ Interacciones totales: ${userProfile.interaction_count}
             } catch {}
         }
 
-        // 8. LOTERÍA
-        const triggerLottery = ['lotería', 'loteria', 'sorteo', 'powerball', 'megamillions', 'melate', 'chispazo'];
+        // 8. LOTERIA (Magayo API — resultados, proximo sorteo, generador)
+        const triggerLottery = ['lotería', 'loteria', 'sorteo', 'powerball', 'megamillions', 'melate', 'chispazo', 'baloto', 'euromillones', 'el gordo', 'jackpot'];
         if (triggerLottery.some(kw => lowerQuery.includes(kw))) {
             try {
-                // Mapeo básico de juegos comunes
+                // Mapeo de juegos comunes
                 let game = 'us_powerball';
                 if (lowerQuery.includes('mega')) game = 'us_megamillions';
-                if (lowerQuery.includes('melate')) game = 'mx_melate';
-                
-                toolContext += await getLotteryResults(game) + "\n";
+                if (lowerQuery.includes('melate') && !lowerQuery.includes('retro')) game = 'mx_melate';
+                if (lowerQuery.includes('chispazo')) game = 'mx_chispazo';
+                if (lowerQuery.includes('retro')) game = 'mx_melate_retro';
+                if (lowerQuery.includes('baloto') || lowerQuery.includes('super baloto')) game = 'co_baloto';
+                if (lowerQuery.includes('euromill') || lowerQuery.includes('euro mill')) game = 'eu_euromillions';
+                if (lowerQuery.includes('el gordo')) game = 'es_el_gordo';
+                if (lowerQuery.includes('nacional') && lowerQuery.includes('españ')) game = 'es_loteria_nacional';
+                if (lowerQuery.includes('uk lotto') || lowerQuery.includes('británica')) game = 'uk_lotto';
+
+                // Si pregunta por juegos disponibles
+                if (lowerQuery.includes('qué juegos') || lowerQuery.includes('que juegos') || lowerQuery.includes('disponibles') || lowerQuery.includes('cuáles hay')) {
+                    toolContext += getAvailableGames() + "\n";
+                }
+                // Si pide generar numeros
+                else if (lowerQuery.includes('genera') || lowerQuery.includes('números') || lowerQuery.includes('numeros') || lowerQuery.includes('recomienda') || lowerQuery.includes('sugerencia')) {
+                    toolContext += await generateLotteryNumbers(game) + "\n";
+                }
+                // Si pregunta por proximo sorteo
+                else if (lowerQuery.includes('próximo') || lowerQuery.includes('proximo') || lowerQuery.includes('cuándo') || lowerQuery.includes('cuando') || lowerQuery.includes('siguiente sorteo')) {
+                    toolContext += await getNextDraw(game) + "\n";
+                    toolContext += await getLotteryResults(game) + "\n";
+                }
+                // Default: mostrar resultados
+                else {
+                    toolContext += await getLotteryResults(game) + "\n";
+                }
             } catch {}
         }
 
@@ -612,6 +636,32 @@ Interacciones totales: ${userProfile.interaction_count}
                 // Si el mensaje contiene un bloque de código, lo extraemos, si no usamos todo el mensaje
                 const codeBlock = userQuery.match(/```[\s\S]*?```/)?.[0] || userQuery;
                 toolContext += await auditCode(codeBlock) + "\n";
+            } catch {}
+        }
+
+        // 10b. STACKOVERFLOW (Programming Q&A)
+        const triggerStackOverflow = ['stackoverflow', 'error en', 'bug en', 'no funciona', 'how to', 'cómo hacer', 'como hacer', 'problema con', 'issue con', 'debug', 'fix error', 'código error', 'codigo error', 'excepción', 'exception', 'TypeError', 'ReferenceError', 'SyntaxError', 'ImportError', 'ModuleNotFoundError'];
+        if (triggerStackOverflow.some(kw => lowerQuery.includes(kw)) || selectedTools.includes('stackoverflow') || selectedTools.includes('programming')) {
+            try {
+                // Extract programming language tags from query
+                const langTags: string[] = [];
+                const langMap: Record<string, string> = {
+                    'javascript': 'javascript', 'js': 'javascript', 'typescript': 'typescript', 'ts': 'typescript',
+                    'python': 'python', 'py': 'python', 'java': 'java', 'kotlin': 'kotlin', 'swift': 'swift',
+                    'rust': 'rust', 'go': 'go', 'golang': 'go', 'c++': 'c++', 'c#': 'c#', 'ruby': 'ruby',
+                    'php': 'php', 'react': 'react', 'vue': 'vue.js', 'angular': 'angular', 'node': 'node.js',
+                    'nextjs': 'next.js', 'next.js': 'next.js', 'android': 'android', 'flutter': 'flutter',
+                    'css': 'css', 'html': 'html', 'sql': 'sql', 'docker': 'docker', 'git': 'git',
+                };
+                for (const [keyword, tag] of Object.entries(langMap)) {
+                    if (lowerQuery.includes(keyword)) langTags.push(tag);
+                }
+                // Search with tags if found, otherwise plain text
+                if (langTags.length > 0) {
+                    toolContext += await searchByTags(langTags.slice(0, 3), userQuery) + "\n";
+                } else {
+                    toolContext += await searchStackOverflow(userQuery) + "\n";
+                }
             } catch {}
         }
 

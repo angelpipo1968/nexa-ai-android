@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { LOTTERY_GAMES, getLotteryResults, getNextDraw, generateLotteryNumbers, getAvailableGames } from '@/lib/nexa-core/lottery';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,66 +17,54 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get('action');
     const game = searchParams.get('game');
-    const apiKey = process.env.MAGAYO_API_KEY;
-
-    if (!game) {
-        return NextResponse.json({ error: 'Missing game parameter' }, { status: 400, headers: corsHeaders });
-    }
 
     try {
-        const isDemoMode = !apiKey;
-        
         switch (action) {
-            case 'results':
-                let data;
-                if (isDemoMode) {
-                    data = {
-                        results: Array.from({ length: 6 }, () => Math.floor(Math.random() * 49 + 1)).join(','),
-                        bonus: Math.floor(Math.random() * 10 + 1).toString(),
-                        draw_date: new Date().toLocaleDateString('es-MX'),
-                        draw_number: "DEMO-001"
-                    };
-                } else {
-                    const res = await fetch(`https://www.magayo.com/api/results.php?api_key=${apiKey}&game=${game}`);
-                    data = await res.json();
+            case 'results': {
+                if (!game) {
+                    return NextResponse.json({ error: 'Missing game parameter. Use ?game=us_powerball' }, { status: 400, headers: corsHeaders });
                 }
-                
-                // Map Magayo response to Android app format
-                // Magayo returns: { "game": "...", "draw_date": "...", "draw_number": "...", "results": "1,2,3,4,5", "bonus": "6" }
-                const numbers = data.results ? data.results.split(',') : [];
-                const bonus = data.bonus ? [data.bonus] : [];
+                const results = await getLotteryResults(game);
+                return NextResponse.json({ result: results, game }, { headers: corsHeaders });
+            }
 
-                return NextResponse.json({
-                    numbers,
-                    bonus,
-                    draw_date: data.draw_date,
-                    draw_number: data.draw_number
-                }, { headers: corsHeaders });
-
-            case 'tickets':
-                // Generate random tickets (simulated)
-                const count = parseInt(searchParams.get('tickets') || '5');
-                const tickets = [];
-                for (let i = 0; i < count; i++) {
-                    const nums = Array.from({ length: 6 }, () => Math.floor(Math.random() * 49 + 1).toString().padStart(2, '0'));
-                    tickets.push({ numbers: nums, bonus: [Math.floor(Math.random() * 10 + 1).toString()] });
+            case 'next_draw': {
+                if (!game) {
+                    return NextResponse.json({ error: 'Missing game parameter' }, { status: 400, headers: corsHeaders });
                 }
-                return NextResponse.json({ tickets }, { headers: corsHeaders });
+                const nextDraw = await getNextDraw(game);
+                return NextResponse.json({ result: nextDraw, game }, { headers: corsHeaders });
+            }
 
-            case 'numbers':
-                // Recommended numbers (simulated)
-                const recNums = Array.from({ length: 6 }, () => Math.floor(Math.random() * 49 + 1).toString().padStart(2, '0'));
-                return NextResponse.json({ numbers: recNums }, { headers: corsHeaders });
+            case 'numbers': {
+                if (!game) {
+                    return NextResponse.json({ error: 'Missing game parameter' }, { status: 400, headers: corsHeaders });
+                }
+                const numbers = await generateLotteryNumbers(game);
+                return NextResponse.json({ result: numbers, game }, { headers: corsHeaders });
+            }
 
-            case 'next_draw':
-                // Mock next draw info
-                return NextResponse.json({
-                    next_draw_date: "Próximo Sorteo",
-                    jackpot: "Acumulado Estimado"
-                }, { headers: corsHeaders });
+            case 'games': {
+                const gamesList = getAvailableGames();
+                const gamesData = Object.entries(LOTTERY_GAMES).map(([key, g]) => ({
+                    key,
+                    id: g.id,
+                    name: g.name,
+                    country: g.country,
+                    numbers: g.numbers,
+                    maxNumber: g.maxNumber,
+                    bonusNumbers: g.bonusNumbers,
+                }));
+                return NextResponse.json({ result: gamesList, games: gamesData }, { headers: corsHeaders });
+            }
 
             default:
-                return NextResponse.json({ error: 'Invalid action' }, { status: 400, headers: corsHeaders });
+                return NextResponse.json({
+                    error: 'Invalid action',
+                    available_actions: ['results', 'next_draw', 'numbers', 'games'],
+                    example: '/api/lottery?action=results&game=us_powerball',
+                    games: Object.fromEntries(Object.entries(LOTTERY_GAMES).map(([k, v]) => [k, v.id])),
+                }, { status: 400, headers: corsHeaders });
         }
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
