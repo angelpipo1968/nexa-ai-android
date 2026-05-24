@@ -16,6 +16,7 @@ import { searchSkyscannerFlights } from '@/lib/nexa-core/skyscanner';
 import { searchGoogleFlights, searchPriceCalendar } from '@/lib/nexa-core/google-flights';
 import { searchWikipedia, getCountryData } from '@/lib/nexa-core/knowledge';
 import { getMemories, extractAndSaveFacts, logActivity } from '@/lib/nexa-core/memory';
+import { getSkills, extractAndSaveSkills } from '@/lib/nexa-core/skills';
 import { auditCode } from '@/lib/nexa-core/repairer';
 import { searchVideos, searchLibraries } from '@/lib/nexa-core/multimedia';
 import { generateVideo } from '@/lib/nexa-core/video-generation';
@@ -119,7 +120,7 @@ function getRandomKey(envValue: string | undefined, envKey?: string): string | u
 }
 
 
-function createStream(requestId: string, messages: any[], keys: Record<string, string | undefined>, toolContext?: string) {
+function createStream(requestId: string, messages: any[], keys: Record<string, string | undefined>, userId: string, userQuery: string, toolContext?: string) {
     const encoder = new TextEncoder();
     return new ReadableStream({
         async start(controller) {
@@ -177,6 +178,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                                 }
                             }
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, fullResponse, provider: providerKey })}\n\n`));
+                            extractAndSaveSkills(userId, userQuery, fullResponse).catch(console.error);
                             controller.close();
                             return;
                         }
@@ -220,6 +222,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                                 }
                             }
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, fullResponse, provider: 'anthropic' })}\n\n`));
+                            extractAndSaveSkills(userId, userQuery, fullResponse).catch(console.error);
                             controller.close();
                             return;
                         }
@@ -265,6 +268,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                                 }
                             }
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, fullResponse, provider: 'gemini' })}\n\n`));
+                            extractAndSaveSkills(userId, userQuery, fullResponse).catch(console.error);
                             controller.close();
                             return;
                         }
@@ -778,6 +782,16 @@ Interacciones totales: ${userProfile.interaction_count}
             toolContext += `[MEMORIA DE SESIONES PASADAS - Lo que recuerdas de este usuario]:\n- ${memories.join('\n- ')}\n\n`;
         }
 
+        // 10b. HABILIDADES APRENDIDAS (Skills de Auto-Aprendizaje)
+        const userSkills = await getSkills(userId);
+        if (userSkills.length > 0) {
+            toolContext += `[HABILIDADES APRENDIDAS - Instrucciones autogeneradas por tu aprendizaje continuo]:\n`;
+            for (const skill of userSkills) {
+                toolContext += `\n[SKILL APRENDIDA: ${skill.name}]\nTrigger: ${skill.description}\nInstrucciones para ti:\n${skill.instructions}\n`;
+            }
+            toolContext += `\n--------------------------------------------------\n\n`;
+        }
+
 
         // EXTRACCIÓN DE NUEVOS RECUERDOS (En segundo plano)
         // No bloqueamos la respuesta, se ejecuta asíncronamente
@@ -815,7 +829,7 @@ Interacciones totales: ${userProfile.interaction_count}
             const count = getKeyList(v, k).length;
             if (count > 0) logger.info(`${k}: ${count} key(s) available`, 'keys');
         }
-        const stream = createStream(requestId, messages, keys);
+        const stream = createStream(requestId, messages, keys, userId, userQuery);
         return new Response(stream, { headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
     } catch (e: any) {
         logger.error(`Chat crash: ${e.message}`, 'chat', { requestId });
