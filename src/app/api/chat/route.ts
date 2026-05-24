@@ -722,7 +722,6 @@ Interacciones totales: ${userProfile.interaction_count}
         }
 
         // 10. MEMORIA DE LARGO PLAZO (Recuperación)
-        const userId = "angelpipo1968"; // Id por defecto
         const memories = await getMemories(userId);
         if (memories.length > 0) {
             toolContext += `[MEMORIA DE SESIONES PASADAS - Lo que recuerdas de este usuario]:\n- ${memories.join('\n- ')}\n\n`;

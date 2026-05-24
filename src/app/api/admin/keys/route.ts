@@ -48,7 +48,7 @@ function maskKey(key: string): string {
 /** CORS headers */
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -189,6 +189,41 @@ export async function POST(req: NextRequest) {
       note: '⚠️ Esta clave se almacenó en memoria del servidor. Para persistencia, añádela a .env.local o a las variables de entorno de Vercel.',
     }, { headers: corsHeaders });
 
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: `Error del servidor: ${error.message}` },
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}
+
+// ═══════════════════════════════════════
+//  PUT — Verify admin password
+// ═══════════════════════════════════════
+
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { password } = body;
+
+    if (!password || typeof password !== 'string') {
+      return NextResponse.json(
+        { error: 'Se requiere password' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Use environment variable if set, otherwise fall back to default
+    const adminSecret = process.env.ADMIN_SECRET || ADMIN_SECRET;
+
+    if (password === adminSecret) {
+      return NextResponse.json({ success: true }, { headers: corsHeaders });
+    } else {
+      return NextResponse.json(
+        { error: 'Contraseña incorrecta' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
   } catch (error: any) {
     return NextResponse.json(
       { error: `Error del servidor: ${error.message}` },

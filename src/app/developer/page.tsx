@@ -33,31 +33,74 @@ export default function DeveloperMode() {
         setIsThinking(true);
         setActiveTab('terminal');
 
-        // Simulamos el proceso de despliegue y creación de código
-        const newLogs = [
-            `> Analizando requerimientos: "${userMsg.content}"`,
-            `> Generando arquitectura de la aplicación...`,
-            `> Conectando con Supabase para esquemas de base de datos...`,
-            `> Escribiendo componentes React (Next.js)...`,
-            `> Configurando rutas API...`,
-        ];
+        // Add real processing log
+        setTerminalOutput(prev => [...prev, `> Analizando requerimientos: "${prompt.trim()}"`]);
 
-        for (let i = 0; i < newLogs.length; i++) {
-            await new Promise(r => setTimeout(r, 800));
-            setTerminalOutput(prev => [...prev, newLogs[i]]);
+        try {
+            // Call real backend API
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
+                    stream: true,
+                }),
+            });
+
+            setTerminalOutput(prev => [...prev, `> Conectado al servidor NEXA AI...`]);
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Error ${res.status}`);
+            }
+
+            const reader = res.body?.getReader();
+            const dec = new TextDecoder();
+            let full = '';
+            let buffer = '';
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += dec.decode(value, { stream: true });
+                    const parts = buffer.split('\n\n');
+                    buffer = parts.pop() ?? '';
+                    for (const part of parts) {
+                        const line = part.trim();
+                        if (!line.startsWith('data: ')) continue;
+                        try {
+                            const d = JSON.parse(line.slice(6));
+                            if (d.error) {
+                                setTerminalOutput(prev => [...prev, `> Error: ${d.error}`]);
+                            }
+                            if (d.text) {
+                                full += d.text;
+                            }
+                            if (d.provider) {
+                                setTerminalOutput(prev => [...prev, `> Proveedor: ${d.provider}`]);
+                            }
+                        } catch {}
+                    }
+                }
+            }
+
+            if (full) {
+                setTerminalOutput(prev => [...prev, `> ✅ Respuesta generada exitosamente.`]);
+                setMessages(prev => [...prev, { role: 'assistant', content: full }]);
+                setActiveTab('code');
+            } else {
+                throw new Error('No se recibió respuesta del servidor.');
+            }
+        } catch (e: any) {
+            setTerminalOutput(prev => [...prev, `> ❌ Error: ${e.message}`]);
+            setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: `Error: ${e.message}` 
+            }]);
+        } finally {
+            setIsThinking(false);
         }
-
-        await new Promise(r => setTimeout(r, 1000));
-        
-        setTerminalOutput(prev => [...prev, `> 🚀 ¡Aplicación lista y empaquetada! Preparando despliegue en Vercel...`]);
-        
-        setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: `He terminado de diseñar la arquitectura y escribir el código base para tu solicitud. En un entorno real de servidor, ahora ejecutaría los comandos MCP para guardar estos archivos y hacer el despliegue automático.\n\nRevisa el panel de código para ver la estructura sugerida.` 
-        }]);
-        
-        setIsThinking(false);
-        setActiveTab('code');
     };
 
     return (
@@ -197,9 +240,9 @@ export default function DeveloperMode() {
                                         <Database size={14} color="#00e5a0" /> schema.sql
                                     </div>
                                 </div>
-                                <div style={{ flex: 1, padding: 20, background: '#050505', fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: '#e0e0e0', whiteSpace: 'pre-wrap' }}>
+                                <div style={{ flex: 1, padding: 20, background: '#050505', fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: '#e0e0e0', whiteSpace: 'pre-wrap', overflow: 'auto' }}>
                                     {messages.length > 0 && !isThinking ? 
-                                    `import { useState } from 'react';\n\nexport default function App() {\n  return (\n    <div className="min-h-screen bg-black text-white">\n      <h1 className="text-2xl font-bold">App Autogenerada por Nexa</h1>\n      <p>Este código fue creado mediante el Modo Developer.</p>\n    </div>\n  );\n}` 
+                                    messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '// Sin respuesta aún'
                                     : '// Esperando instrucciones para generar código...'}
                                 </div>
                             </div>

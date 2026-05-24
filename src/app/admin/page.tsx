@@ -12,7 +12,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // ─── Constants ──────────────────────────────────────────────
 
-const ADMIN_PASSWORD = 'nexa_ai_pro_secret_2024';
+// Admin password is verified server-side via /api/admin/keys
+// This client-side constant is a fallback for demo/offline mode only.
+const ADMIN_PASSWORD_FALLBACK = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '';
 
 const ACCENT = '#00e5a0';
 const ACCENT_DIM = 'rgba(0,229,160,0.12)';
@@ -58,15 +60,45 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      onLogin();
-    } else {
-      setError('Contraseña incorrecta');
-      setShake(true);
-      setTimeout(() => setShake(false), 600);
+    if (!password.trim()) return;
+    setVerifying(true);
+
+    try {
+      // Verify password server-side
+      const res = await fetch('/api/admin/keys', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        onLogin();
+      } else {
+        // Fallback to client-side check for offline mode
+        if (ADMIN_PASSWORD_FALLBACK && password === ADMIN_PASSWORD_FALLBACK) {
+          onLogin();
+        } else {
+          setError('Contraseña incorrecta');
+          setShake(true);
+          setTimeout(() => setShake(false), 600);
+        }
+      }
+    } catch {
+      // Server unavailable — use fallback if configured
+      if (ADMIN_PASSWORD_FALLBACK && password === ADMIN_PASSWORD_FALLBACK) {
+        onLogin();
+      } else if (!ADMIN_PASSWORD_FALLBACK) {
+        setError('Servidor no disponible. Configura NEXT_PUBLIC_ADMIN_PASSWORD.');
+      } else {
+        setError('Contraseña incorrecta');
+        setShake(true);
+        setTimeout(() => setShake(false), 600);
+      }
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -1024,7 +1056,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [toast]);
 
-  // Save a key to localStorage (works offline, no API needed!)
+  // Save a key to localStorage AND sync to server via /api/admin/keys
   const handleSaveKey = async (keyId: string, keyValue: string) => {
     setSaving(true);
     try {
@@ -1043,14 +1075,35 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       // Save to localStorage
       setStoredKey(keyDef.envKey, keyValue);
 
+      // Sync to server via /api/admin/keys endpoint
+      try {
+        const res = await fetch('/api/admin/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyId, envKey: keyDef.envKey, value: keyValue }),
+        });
+        if (res.ok) {
+          setToast({
+            message: `${keyDef.name} guardada y sincronizada con el servidor.`,
+            type: 'success',
+          });
+        } else {
+          setToast({
+            message: `${keyDef.name} guardada en el navegador (error al sincronizar con servidor).`,
+            type: 'success',
+          });
+        }
+      } catch {
+        // Server sync failed, but localStorage save succeeded
+        setToast({
+          message: `${keyDef.name} guardada en el navegador (servidor no disponible).`,
+          type: 'success',
+        });
+      }
+
       // Reload to update UI
       const data = buildKeysData();
       setKeysData(data);
-
-      setToast({
-        message: `${keyDef.name} guardada correctamente en el navegador.`,
-        type: 'success',
-      });
     } catch (err) {
       setToast({ message: 'Error al guardar la clave', type: 'error' });
     } finally {

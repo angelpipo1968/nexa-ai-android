@@ -53,7 +53,7 @@ export default function CodePage() {
         setProvider('');
 
         try {
-            const res = await fetch('/api/generate/code', {
+            const res = await fetch('/api/code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt: prompt.trim(), language }),

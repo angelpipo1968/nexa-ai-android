@@ -469,7 +469,7 @@ export function NexaApp() {
         try {
             await sb.from('messages').insert({ conversation_id: currentCid, role: 'user', content: finalContent });
             
-            const res = await fetch('https://nexa-ai.dev/api/chat', {
+            const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
