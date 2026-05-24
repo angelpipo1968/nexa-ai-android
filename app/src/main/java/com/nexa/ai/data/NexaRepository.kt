@@ -74,9 +74,10 @@ class NexaRepository {
     fun sendMessageDirect(
         messages: List<ChatMessage>,
         apiKey: String,
-        language: String? = null
+        language: String? = null,
+        systemPrompt: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val systemMessage = ChatMessage("system", SYSTEM_PROMPT)
+        val systemMessage = ChatMessage("system", systemPrompt ?: SYSTEM_PROMPT)
         val allMessages = listOf(systemMessage) + messages
 
         val requestBody = Gson().toJson(mapOf(
@@ -154,9 +155,10 @@ class NexaRepository {
      */
     fun sendMessageFree(
         messages: List<ChatMessage>,
-        language: String? = null
+        language: String? = null,
+        systemPrompt: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val systemMessage = ChatMessage("system", SYSTEM_PROMPT)
+        val systemMessage = ChatMessage("system", systemPrompt ?: SYSTEM_PROMPT)
         val allMessages = listOf(systemMessage) + messages
 
         val requestBody = Gson().toJson(mapOf(

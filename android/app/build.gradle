@@ -17,9 +17,13 @@ android {
         }
     }
     buildTypes {
+        debug {
+            buildConfigField "String", "NEXA_BACKEND_URL", "\"https://nexa-ai.dev\""
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "NEXA_BACKEND_URL", "\"https://nexa-ai.dev\""
         }
     }
     compileOptions {

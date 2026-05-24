@@ -100,7 +100,7 @@ export async function searchFlights(originIata: string, destinationIata: string)
     if (!apiKey) return "Error: No hay API Key configurada para vuelos.";
 
     try {
-        const url = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&dep_iata=${originIata.toUpperCase()}&arr_iata=${destinationIata.toUpperCase()}&limit=10`;
+        const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&dep_iata=${originIata.toUpperCase()}&arr_iata=${destinationIata.toUpperCase()}&limit=10`;
         
         const response = await fetch(url);
         const data = await response.json();

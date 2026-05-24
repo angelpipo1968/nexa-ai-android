@@ -3,7 +3,6 @@ import { getIdentifier, checkRateLimit, RATE_LIMITS } from '@/lib/nexa-core/rate
 import { logger, generateRequestId } from '@/lib/nexa-core/logger';
 import { chatSchema } from '@/lib/validation';
 import { getSystemPrompt } from '@/lib/nexa-core/prompts';
-import { detectIntent, executeIntent } from '@/lib/nexa-core/tools';
 import { searchFlights } from '@/lib/nexa-core/aviation';
 import { getWeather } from '@/lib/nexa-core/weather';
 import { generateImage, searchPhotos } from '@/lib/nexa-core/images';
@@ -111,24 +110,6 @@ function getRandomKey(envValue: string | undefined, envKey?: string): string | u
     return keys[Math.floor(Math.random() * keys.length)];
 }
 
-// ─── Tool Integration: Detect and execute tools before AI responds ───
-async function processTools(userMessage: string): Promise<string | null> {
-    const intent = detectIntent(userMessage);
-    
-    // Only process tool-related intents (not chat/code/web/design/analysis/vision)
-    const toolTypes = ['weather', 'search', 'geolocation', 'geocode', 'exchange', 'translate', 'news', 'jokes', 'facts', 'time', 'qrcode', 'countries'];
-    if (!toolTypes.includes(intent.type)) return null;
-    
-    try {
-        const result = await executeIntent(intent);
-        if (result.success && result.output) {
-            return result.output;
-        }
-    } catch (e: any) {
-        logger.warn(`Tool execution failed: ${e.message}`, 'tools');
-    }
-    return null;
-}
 
 function createStream(requestId: string, messages: any[], keys: Record<string, string | undefined>, toolContext?: string) {
     const encoder = new TextEncoder();
@@ -356,9 +337,6 @@ export async function POST(req: NextRequest) {
             timeStr = await getLocalTime();
         }
         
-        const location = userCity && userCountry 
-            ? { city: userCity, country: userCountry, lat: userLat, lon: userLon }
-            : null;
         toolContext += `[CONTEXTO ACTUAL DEL USUARIO]:
 Ubicación: ${userCity || 'Desconocida'}, ${userCountry || 'Desconocida'}${userLat && userLon ? ` (${userLat}, ${userLon})` : ''}
 Hora Local: ${timeStr}
@@ -547,7 +525,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 4. WOLFRAM ALPHA (Ciencia, Datos, Matemáticas)
         const triggerWolfram = ['cuanto es', 'cuánto es', 'qué es', 'que es', 'quién es', 'quien es', 'distancia', 'masa', 'población', 'capital de'];
-        if (triggerWolfram.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerWolfram.some(kw => lowerQuery.includes(kw))) {
             try {
                 const answer = await getWolframAnswer(userQuery);
                 if (answer && !answer.includes('Error')) {
@@ -558,7 +536,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 5. PELÍCULAS Y SERIES (TMDB)
         const triggerMovies = ['película', 'serie', 'actor', 'director', 'estreno', 'reparto', 'quien sale en'];
-        if (triggerMovies.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerMovies.some(kw => lowerQuery.includes(kw))) {
             try {
                 const report = await searchMovies(userQuery);
                 if (report && !report.includes('Error')) {
@@ -569,7 +547,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 6. ESPACIO Y NASA
         const triggerSpace = ['nasa', 'espacio', 'marte', 'universo', 'estrella', 'galaxia', 'planeta'];
-        if (triggerSpace.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerSpace.some(kw => lowerQuery.includes(kw))) {
             try {
                 if (lowerQuery.includes('marte')) {
                     toolContext += await searchMarsPhotos() + "\n";
@@ -581,7 +559,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 7. FINANZAS (Cripto y Bolsa)
         const triggerFinance = ['precio de', 'cotización', 'cuanto vale', 'cuánto vale', 'bitcoin', 'ethereum', 'btc', 'eth', 'bolsa', 'acción', 'accion'];
-        if (triggerFinance.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerFinance.some(kw => lowerQuery.includes(kw))) {
             try {
                 if (lowerQuery.includes('bitcoin') || lowerQuery.includes('btc')) {
                     toolContext += await getCryptoPrice('bitcoin') + "\n";
@@ -599,7 +577,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 8. LOTERÍA
         const triggerLottery = ['lotería', 'loteria', 'sorteo', 'powerball', 'megamillions', 'melate', 'chispazo'];
-        if (triggerLottery.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerLottery.some(kw => lowerQuery.includes(kw))) {
             try {
                 // Mapeo básico de juegos comunes
                 let game = 'us_powerball';
@@ -612,7 +590,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 9. ENCICLOPEDIA (Wikipedia y Países)
         const triggerWiki = ['quien es', 'quién es', 'qué es', 'que es', 'significa', 'biografía', 'historia de'];
-        if (triggerWiki.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerWiki.some(kw => lowerQuery.includes(kw))) {
             try {
                 const topic = userQuery.replace(/quien es|quién es|qué es|que es|dime sobre|háblame de/gi, "").trim();
                 toolContext += await searchWikipedia(topic) + "\n";
@@ -620,7 +598,7 @@ Interacciones totales: ${userProfile.interaction_count}
         }
 
         const triggerCountry = ['población de', 'capital de', 'moneda de', 'continente de', 'país', 'pais'];
-        if (triggerCountry.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerCountry.some(kw => lowerQuery.includes(kw))) {
             try {
                 const country = userQuery.match(/de\s+([A-Z][a-z]+)/)?.[1] || userQuery.split(' ').pop();
                 if (country) toolContext += await getCountryData(country) + "\n";
@@ -629,7 +607,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 10. REPARADOR DE CÓDIGO (Auditoría y Arreglo)
         const triggerRepair = ['repara', 'arregla', 'audita', 'optimiza', 'qué está mal', 'que esta mal', 'check code'];
-        if ((triggerRepair.some(kw => lowerQuery.includes(kw)) || userQuery.includes('```')) && !toolContext) {
+        if (triggerRepair.some(kw => lowerQuery.includes(kw)) || userQuery.includes('```')) {
             try {
                 // Si el mensaje contiene un bloque de código, lo extraemos, si no usamos todo el mensaje
                 const codeBlock = userQuery.match(/```[\s\S]*?```/)?.[0] || userQuery;
@@ -639,7 +617,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 11. VIDEO GENERATION (AI-powered video creation)
         const triggerVideoGen = ['genera video', 'generar video', 'crea video', 'crear video', 'haz un video', 'generate video', 'create video', 'make a video', 'animación de', 'animacion de'];
-        if (triggerVideoGen.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerVideoGen.some(kw => lowerQuery.includes(kw))) {
             try {
                 const videoPrompt = userQuery.replace(/genera video|generar video|crea video|crear video|haz un video|generate video|create video|make a video|animación de|animacion de/gi, "").trim();
                 const style = lowerQuery.includes('anime') ? 'anime' :
@@ -656,7 +634,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 11b. VIDEO SEARCH (searching for existing videos)
         const triggerVideoSearch = ['video de', 'clip de', 'metraje de', 'vídeo de', 'busca video', 'search video'];
-        if (triggerVideoSearch.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerVideoSearch.some(kw => lowerQuery.includes(kw))) {
             try {
                 const topic = userQuery.replace(/video de|clip de|metraje de|vídeo de|busca video|search video/gi, "").trim();
                 toolContext += await searchVideos(topic) + "\n";
@@ -664,7 +642,7 @@ Interacciones totales: ${userProfile.interaction_count}
         }
 
         const triggerLib = ['librería', 'libreria', 'repo de', 'código de', 'github de', 'biblioteca de'];
-        if (triggerLib.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerLib.some(kw => lowerQuery.includes(kw))) {
             try {
                 const query = userQuery.replace(/librería|libreria|repo de|biblioteca de/gi, "").trim();
                 toolContext += await searchLibraries(query) + "\n";
@@ -673,7 +651,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 12. REDES SOCIALES (Reddit y YouTube)
         const triggerReddit = ['reddit', 'foro de', 'hilos de', 'que dicen en'];
-        if (triggerReddit.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerReddit.some(kw => lowerQuery.includes(kw))) {
             try {
                 // Intenta extraer el nombre del subreddit (ej: technology, gaming)
                 const subMatch = userQuery.match(/r\/(\w+)/i) || userQuery.match(/(?:en|de)\s+(\w+)/i);
@@ -683,7 +661,7 @@ Interacciones totales: ${userProfile.interaction_count}
         }
 
         const triggerYT = ['youtube', 'video tutorial', 'música', 'musica', 'ver video de'];
-        if (triggerYT.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerYT.some(kw => lowerQuery.includes(kw))) {
             try {
                 const query = userQuery.replace(/youtube|ver video de|busca en youtube/gi, "").trim();
                 toolContext += await searchYouTube(query) + "\n";
@@ -691,7 +669,7 @@ Interacciones totales: ${userProfile.interaction_count}
         }
 
         const triggerSpotify = ['spotify', 'canción de', 'cancion de', 'álbum de', 'album de', 'playlist de', 'escuchar a'];
-        if (triggerSpotify.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerSpotify.some(kw => lowerQuery.includes(kw))) {
             try {
                 let type: 'track' | 'playlist' | 'album' = 'track';
                 if (lowerQuery.includes('playlist')) type = 'playlist';
@@ -704,7 +682,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 13. FOTOS DE ALTA CALIDAD (Unsplash)
         const triggerPhotos = ['foto de', 'imagen de', 'paisaje de', 'fotografía de', 'fotografia de', 'unsplash'];
-        if (triggerPhotos.some(kw => lowerQuery.includes(kw)) && !toolContext && !lowerQuery.includes('crea') && !lowerQuery.includes('genera')) {
+        if (triggerPhotos.some(kw => lowerQuery.includes(kw)) && !lowerQuery.includes('crea') && !lowerQuery.includes('genera')) {
             try {
                 const query = userQuery.replace(/foto de|imagen de|paisaje de|fotografía de|fotografia de|unsplash/gi, "").trim();
                 toolContext += await searchPhotos(query) + "\n";
@@ -713,7 +691,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 14. MAPAS Y LUGARES (Cartógrafo)
         const triggerMaps = ['mapa de', 'dónde queda', 'donde queda', 'ubicación de', 'ubicacion de', 'dirección de', 'direccion de', 'lugar'];
-        if (triggerMaps.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerMaps.some(kw => lowerQuery.includes(kw))) {
             try {
                 const query = userQuery.replace(/mapa de|dónde queda|donde queda|ubicación de|ubicacion de|dirección de|direccion de/gi, "").trim();
                 toolContext += await searchPlace(query) + "\n";
@@ -722,7 +700,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 15. ACADÉMICO Y LIBROS (ArXiv y Gutenberg)
         const triggerScience = ['artículo de', 'estudio de', 'ciencia de', 'arxiv', 'investigación sobre'];
-        if (triggerScience.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerScience.some(kw => lowerQuery.includes(kw))) {
             try {
                 const query = userQuery.replace(/artículo de|estudio de|ciencia de|arxiv|investigación sobre/gi, "").trim();
                 toolContext += await searchArXiv(query) + "\n";
@@ -730,7 +708,7 @@ Interacciones totales: ${userProfile.interaction_count}
         }
 
         const triggerBooks = ['libro de', 'novela de', 'literatura de', 'gutenberg', 'leer a'];
-        if (triggerBooks.some(kw => lowerQuery.includes(kw)) && !toolContext) {
+        if (triggerBooks.some(kw => lowerQuery.includes(kw))) {
             try {
                 const query = userQuery.replace(/libro de|novela de|literatura de|gutenberg|leer a/gi, "").trim();
                 toolContext += await searchBooks(query) + "\n";
@@ -743,16 +721,11 @@ Interacciones totales: ${userProfile.interaction_count}
             toolContext += `[MEMORIA DE SESIONES PASADAS - Lo que recuerdas de este usuario]:\n- ${memories.join('\n- ')}\n\n`;
         }
 
-        // 4. OLD DETECT INTENT
-        if (!toolContext) {
-            const extraContext = await processTools(userQuery) || undefined;
-            if (extraContext) toolContext += extraContext + "\n";
-        }
 
         // EXTRACCIÓN DE NUEVOS RECUERDOS (En segundo plano)
         // No bloqueamos la respuesta, se ejecuta asíncronamente
         extractAndSaveFacts(userId, userQuery).catch(console.error);
-        logActivity(userId, location?.city || 'Unknown', location?.country || 'Unknown', lowerQuery).catch(console.error);
+        logActivity(userId, userCity || 'Unknown', userCountry || 'Unknown', lowerQuery).catch(console.error);
 
         // INYECCIÓN DE CONTEXTO FINAL (ADJUNTO AL MENSAJE DEL USUARIO)
         if (toolContext) {

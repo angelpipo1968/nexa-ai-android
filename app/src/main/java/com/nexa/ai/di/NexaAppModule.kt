@@ -8,8 +8,11 @@ import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.iot.IoTManager
 import com.nexa.ai.media.VideoGenerator
+import com.nexa.ai.data.FlightRepository
+import com.nexa.ai.data.NetworkMonitor
 import com.nexa.ai.ml.EnhancedEmotionAnalyzer
 import com.nexa.ai.ml.OnDeviceMLEngine
+import com.nexa.ai.ml.SmartRoutingManager
 import com.nexa.ai.ml.UserProfileManager
 import com.nexa.ai.memory.EpisodicMemoryManager
 import com.nexa.ai.sensors.NexaSensorManager
@@ -106,4 +109,17 @@ object NexaAppModule {
     @Provides
     @Singleton
     fun provideVideoGenerator(app: Application): VideoGenerator = VideoGenerator(app)
+
+    // ─── Smart Routing ──────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideSmartRoutingManager(app: Application, networkMonitor: NetworkMonitor): SmartRoutingManager =
+        SmartRoutingManager(app, networkMonitor)
+
+    // ─── Flight Data ────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideFlightRepository(): FlightRepository = FlightRepository()
 }

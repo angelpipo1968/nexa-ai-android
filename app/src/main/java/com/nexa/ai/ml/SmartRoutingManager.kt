@@ -2,9 +2,17 @@ package com.nexa.ai.ml
 
 import android.content.Context
 import android.util.Log
+import com.nexa.ai.data.NetworkMonitor
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -24,7 +32,11 @@ import kotlinx.coroutines.flow.asStateFlow
  *  5. Complex queries (>500 chars) → online (better reasoning)
  * ═══════════════════════════════════════════════════════════════════
  */
-class SmartRoutingManager(context: Context) {
+@Singleton
+class SmartRoutingManager @Inject constructor(
+    @ApplicationContext private val appContext: Context,
+    private val networkMonitor: NetworkMonitor
+) {
 
     companion object {
         private const val TAG = "NexaSmartRoute"
@@ -32,7 +44,7 @@ class SmartRoutingManager(context: Context) {
         private const val COMPLEX_QUERY_MIN_CHARS = 500
     }
 
-    private val appContext = context.applicationContext
+    private val scope = CoroutineScope(Dispatchers.Default)
     private val onDeviceManager = OnDeviceInferenceManager(appContext)
 
     // ─── Routing State ───────────────────────────
@@ -285,6 +297,12 @@ class SmartRoutingManager(context: Context) {
     // ─── Lifecycle ───────────────────────────────
 
     suspend fun initialize(): Boolean {
+        // Start monitoring network status
+        scope.launch {
+            networkMonitor.isOnline.collect { isOnline ->
+                updateNetworkStatus(isOnline)
+            }
+        }
         return onDeviceManager.initialize()
     }
 
@@ -292,6 +310,7 @@ class SmartRoutingManager(context: Context) {
     fun getOnDeviceManager() = onDeviceManager
 
     fun shutdown() {
+        scope.cancel()
         onDeviceManager.shutdown()
     }
 }

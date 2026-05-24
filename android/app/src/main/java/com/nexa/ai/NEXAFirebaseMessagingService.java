@@ -8,10 +8,12 @@ import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import com.nexa.ai.BuildConfig;
 
 public class NEXAFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String CHANNEL_ID = "nexa_notifications";
+    private static final String NEXA_BACKEND_URL = BuildConfig.NEXA_BACKEND_URL;
     private static final String CHANNEL_NAME = "NEXA Notificaciones";
     private static final String CHANNEL_DESC = "Notificaciones de NEXA AI";
 
@@ -86,7 +88,7 @@ public class NEXAFirebaseMessagingService extends FirebaseMessagingService {
         // Enviar al backend de NEXA para guardar el token
         new Thread(() -> {
             try {
-                java.net.URL url = new java.net.URL("https://nexa-ai-hgcapt695-nexais-projects-b6fdee72.vercel.app/api/push-token");
+                java.net.URL url = new java.net.URL(NEXA_BACKEND_URL + "/api/push-token");
                 java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");

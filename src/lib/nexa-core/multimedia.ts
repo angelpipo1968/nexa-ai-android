@@ -9,7 +9,7 @@ export async function searchVideos(query: string): Promise<string> {
     if (!apiKey) return "Falta PEXELS_API_KEY.";
 
     try {
-        const url = `https://api.pexels.com/v1/videos/search?query=${encodeURIComponent(query)}&per_page=1`;
+        const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=1`;
         const res = await fetch(url, {
             headers: { 'Authorization': apiKey }
         });

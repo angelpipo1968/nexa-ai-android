@@ -57,7 +57,9 @@ class NexaViewModel @Inject constructor(
     private val webResultProcessor: WebResultProcessor,
     private val episodicMemoryManager: EpisodicMemoryManager,
     private val enhancedEmotionAnalyzer: EnhancedEmotionAnalyzer,
-    private val userProfileManager: UserProfileManager
+    private val userProfileManager: UserProfileManager,
+    private val smartRouter: SmartRoutingManager,
+    private val flightRepository: FlightRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(NexaUiState())
@@ -66,11 +68,6 @@ class NexaViewModel @Inject constructor(
     // Managers still created locally (not yet in DI module — SpeechManager and AuthManager depend on Activity lifecycle)
     private val speechManager = SpeechManager(application)
     private val authManager = AuthManager(application)
-
-    private val flightRepository = FlightRepository()
-
-    // ─── Smart Router: Online/Offline AI routing ───
-    private val smartRouter = SmartRoutingManager(application)
 
     // Voice command handler — extracted from this ViewModel to reduce complexity
     private val voiceCommandsHandler = VoiceCommandsHandler(iotManager, videoGenerator)
@@ -135,7 +132,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 """.trimIndent()
 
     /** Builds a dynamic system prompt with location context when available. */
-    private fun buildSystemPrompt(): String {
+    private suspend fun buildSystemPrompt(): String {
         val loc = _uiState.value.locationData
         val locationContext = if (loc.isAvailable) {
             "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country} (coordinates: ${loc.latitude}, ${loc.longitude}). Use this location to provide weather, local recommendations, time zone awareness, and location-relevant information when appropriate."
@@ -154,7 +151,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
      * This makes the AI aware of the user's physical environment, emotional state,
      * smart home devices, conversation context, and learned preferences.
      */
-    private fun buildEnrichedContext(): String {
+    private suspend fun buildEnrichedContext(): String {
         val parts = mutableListOf<String>()
 
         // Sensor context (activity, environment, device state)
@@ -165,7 +162,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         // IoT context (smart home devices)
         try {
-            val iotCtx = kotlinx.coroutines.runBlocking { iotManager.getIoTContextForAI() }
+            val iotCtx = iotManager.getIoTContextForAI()
             if (iotCtx.isNotBlank()) parts.add("\n\nIOT DEVICES: $iotCtx")
         } catch (_: Exception) {}
 
@@ -189,13 +186,13 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         // ML learned preferences and patterns
         try {
-            val mlCtx = kotlinx.coroutines.runBlocking { mlEngine.getMLContextForAI() }
+            val mlCtx = mlEngine.getMLContextForAI()
             if (mlCtx.isNotBlank()) parts.add("\n\nLEARNED USER PROFILE: $mlCtx")
         } catch (_: Exception) {}
 
         // Proactive suggestions from ML engine
         try {
-            val suggestions = kotlinx.coroutines.runBlocking { mlEngine.generateProactiveSuggestions() }
+            val suggestions = mlEngine.generateProactiveSuggestions()
             if (suggestions.isNotEmpty()) {
                 parts.add("\n\nPROACTIVE SUGGESTIONS: ${suggestions.take(3).joinToString("; ")}")
             }
@@ -1215,6 +1212,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         viewModelScope.launch {
             try {
+                val dynamicSystemPrompt = buildSystemPrompt()
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
 
@@ -1300,9 +1298,9 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 val groqKey = _uiState.value.groqApiKey
                 val loc = _uiState.value.locationData
                 val messageFlow = if (groqKey.isNotBlank()) {
-                    repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code)
+                    repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code, systemPrompt = dynamicSystemPrompt)
                 } else {
-                    repository.sendMessageFree(allMessages, language = _uiState.value.language.code)
+                    repository.sendMessageFree(allMessages, language = _uiState.value.language.code, systemPrompt = dynamicSystemPrompt)
                 }
 
                 messageFlow.collect { event ->
@@ -1602,7 +1600,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 var result = ""
 
                 // Smart routing: try on-device first if offline, otherwise use cloud
-                val smartRouter = SmartRoutingManager(getApplication())
                 val visionDecision = smartRouter.routeVision()
 
                 if (visionDecision.useOnDevice) {
