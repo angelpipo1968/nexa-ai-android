@@ -19,8 +19,8 @@ class EpisodicMemoryManagerTest {
     // ─── Consent Tests ───────────────────────────────────────
 
     @Test
-    fun `Memory disabled by default`() {
-        assertFalse(manager.hasConsent())
+    fun `Memory enabled by default`() {
+        assertTrue(manager.hasConsent())
     }
 
     @Test
@@ -40,6 +40,7 @@ class EpisodicMemoryManagerTest {
 
     @Test
     fun `Store memory without consent returns entry but does not store`() {
+        manager.setConsent(false)
         val entry = manager.storeMemory(
             sessionId = "s1",
             type = MemoryType.FACT,
