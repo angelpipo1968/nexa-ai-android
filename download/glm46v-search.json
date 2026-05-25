@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://docs.z.ai/guides/vlm/glm-4.6v",
+    "name": "GLM-4.6V - Overview - Z.AI DEVELOPER DOCUMENT",
+    "snippet": "GLM-4.6V is equipped with native multimodal tool calling capability: Multimodal Input: Images, screenshots, and document pages can be passed directly as ...",
+    "host_name": "docs.z.ai",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.bentoml.com/blog/multimodal-ai-a-guide-to-open-source-vision-language-models",
+    "name": "Multimodal AI: The Best Open-Source Vision Language Models in",
+    "snippet": "Key features: Native multimodal tool calling: GLM-4.6V introduces end-to-end vision-driven tool use. Images, UI screenshots, document pages ...",
+    "host_name": "www.bentoml.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/AISEOInsider/comments/1pl1euw/glm_46v_the_vision_model_that_reads_entire_books",
+    "name": "GLM 4.6V — The Vision Model That Reads Entire Books and Acts",
+    "snippet": "Capabilities of GLM vision models. Latest updates on ZAI ... GLM 4.6V is a multimodal vision model with a 128,000-token context window.",
+    "host_name": "www.reddit.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/data-science-in-your-pocket/glm-4-6v-best-multimodal-llm-is-here-079aa69f2796",
+    "name": "GLM-4.6V : Best Multimodal LLM is here | by Mehul Gupta - Medium",
+    "snippet": "On standard evaluation suites, GLM-4.6V sits firmly in SoTA territory for models at comparable parameter scales. Across General VQA and ...",
+    "host_name": "medium.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://huggingface.co/zai-org/GLM-4.6V",
+    "name": "zai-org/GLM-4.6V - Hugging Face",
+    "snippet": "GLM-4.6V introduces several key features: Native Multimodal Function Calling Enables native vision-driven tool use. Images, screenshots, and ...",
+    "host_name": "huggingface.co",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://ai.plainenglish.io/glm-4-6v-by-z-ai-the-multimodal-ai-that-could-redefine-what-smart-means-e17d3aad846f",
+    "name": "GLM-4.6V by Z.ai — The Multimodal AI That Could Redefine What",
+    "snippet": "AI that can see, reason, search, understand documents, interpret UI layouts, write code, and tie everything together into actionable outputs ...",
+    "host_name": "ai.plainenglish.io",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.linkedin.com/posts/mohini-sss_glm-46v-redefining-multimodal-ai-glm-activity-7404698599315394560-zeXm",
+    "name": "GLM-4.6V: Next-Gen Multimodal AI for Image, Document, and Video",
+    "snippet": "GLM-4.6V looks like a major leap in multimodal AI. Its ability to analyze images, documents, and video with human-level reasoning—and even ...",
+    "host_name": "www.linkedin.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/aicuriosity/comments/1phcjnt/glm_46v_release_best_new_open_source_vision",
+    "name": "GLM 4.6V Release Best New Open Source Vision Language Model",
+    "snippet": "This release gives developers powerful vision AI capabilities without relying on closed commercial systems.",
+    "host_name": "www.reddit.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://debuggercafe.com/getting-started-with-glm-4-6v",
+    "name": "Getting Started with GLM-4.6V - DebuggerCafe",
+    "snippet": "GLM-4.6V integrates vision language tool calling with long context reasoning and visual web search for an integrated VLM model.",
+    "host_name": "debuggercafe.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/zai-org/GLM-V",
+    "name": "zai-org/GLM-V: GLM-4.6V/4.5V/4.1V-Thinking: Towards  - GitHub",
+    "snippet": "GLM-4.6V introduces several key features: Native Multimodal Function Calling Enables native vision-driven tool use. Images, screenshots, and document pages can ...",
+    "host_name": "github.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

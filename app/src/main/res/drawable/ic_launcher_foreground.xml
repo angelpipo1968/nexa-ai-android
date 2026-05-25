@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- NEXA diamond logo - purple outer diamond -->
+    <path
+        android:fillColor="#6d28d9"
+        android:pathData="M54,24L24,54L54,84L84,54Z" />
+    <!-- NEXA diamond logo - blue inner diamond -->
+    <path
+        android:fillColor="#2563eb"
+        android:pathData="M54,34L34,54L54,74L74,54Z" />
+</vector>

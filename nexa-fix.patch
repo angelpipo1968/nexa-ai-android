@@ -1,0 +1,599 @@
+From cb165f09acfc10a208cdc3b037579e3a389a2d14 Mon Sep 17 00:00:00 2001
+From: Angel <angel@nexa-ai.dev>
+Date: Thu, 14 May 2026 17:23:02 +0800
+Subject: [PATCH] fix: theme switching + crash handler + redesigned settings
+
+- Fix: onSetThemeMode connected in MainActivity (theme chips now work)
+- Fix: SSE callbacks wrapped in try-catch for robustness
+- New: CrashHandler captures uncaught exceptions
+- New: CrashActivity shows error with copy button for debugging
+- UI: Redesigned voice and theme sections in settings dialog
+---
+ app/src/main/AndroidManifest.xml              |   5 +
+ .../main/java/com/nexa/ai/CrashActivity.kt    | 209 ++++++++++++++++++
+ app/src/main/java/com/nexa/ai/CrashHandler.kt |  63 ++++++
+ app/src/main/java/com/nexa/ai/MainActivity.kt |   4 +
+ .../java/com/nexa/ai/data/NexaRepository.kt   |  52 +++--
+ .../java/com/nexa/ai/ui/ChatComponents.kt     | 133 ++++++++---
+ 6 files changed, 414 insertions(+), 52 deletions(-)
+ create mode 100644 app/src/main/java/com/nexa/ai/CrashActivity.kt
+ create mode 100644 app/src/main/java/com/nexa/ai/CrashHandler.kt
+
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index b283d39..4e7f9ec 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -24,6 +24,11 @@
+             </intent-filter>
+         </activity>
+ 
++        <activity
++            android:name=".CrashActivity"
++            android:exported="false"
++            android:theme="@style/Theme.NexaAI" />
++
+         <provider
+             android:name="androidx.core.content.FileProvider"
+             android:authorities="com.nexa.ai.fileprovider"
+diff --git a/app/src/main/java/com/nexa/ai/CrashActivity.kt b/app/src/main/java/com/nexa/ai/CrashActivity.kt
+new file mode 100644
+index 0000000..b33cf81
+--- /dev/null
++++ b/app/src/main/java/com/nexa/ai/CrashActivity.kt
+@@ -0,0 +1,209 @@
++package com.nexa.ai
++
++import android.content.ClipData
++import android.content.ClipboardManager
++import android.content.Context
++import android.content.Intent
++import android.os.Bundle
++import android.widget.Toast
++import androidx.activity.ComponentActivity
++import androidx.activity.compose.setContent
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.*
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.ContentCopy
++import androidx.compose.material.icons.filled.Refresh
++import androidx.compose.material3.*
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.text.font.FontFamily
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import com.nexa.ai.ui.theme.NexaAccent
++import com.nexa.ai.ui.theme.NexaTheme
++
++class CrashActivity : ComponentActivity() {
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++
++        val errorLog = intent.getStringExtra("crash_log") ?: "No log available"
++        val exceptionName = intent.getStringExtra("exception_name") ?: "Unknown"
++        val errorMessage = intent.getStringExtra("error_message") ?: ""
++
++        setContent {
++            NexaTheme(themeMode = com.nexa.ai.viewmodel.ThemeMode.DARK) {
++                CrashScreen(
++                    exceptionName = exceptionName,
++                    errorMessage = errorMessage,
++                    fullLog = errorLog,
++                    onRestart = {
++                        val intent = packageManager.getLaunchIntentForPackage(packageName)
++                        intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
++                        startActivity(intent)
++                        finish()
++                    }
++                )
++            }
++        }
++    }
++}
++
++@Composable
++fun CrashScreen(
++    exceptionName: String,
++    errorMessage: String,
++    fullLog: String,
++    onRestart: () -> Unit
++) {
++    val context = LocalContext.current
++
++    Surface(
++        modifier = Modifier.fillMaxSize(),
++        color = Color(0xFF050508)
++    ) {
++        Column(
++            modifier = Modifier
++                .fillMaxSize()
++                .verticalScroll(rememberScrollState())
++                .padding(24.dp),
++            horizontalAlignment = Alignment.CenterHorizontally,
++            verticalArrangement = Arrangement.Center
++        ) {
++            // Error icon
++            Box(
++                modifier = Modifier.size(64.dp)
++                    .background(
++                        Color(0xFFFF4D6A).copy(alpha = 0.1f),
++                        RoundedCornerShape(20.dp)
++                    ),
++                contentAlignment = Alignment.Center
++            ) {
++                Text("💥", fontSize = 32.sp)
++            }
++
++            Spacer(modifier = Modifier.height(20.dp))
++
++            Text(
++                "NEXA PRO tuvo un error",
++                fontSize = 20.sp,
++                fontWeight = FontWeight.Bold,
++                color = Color.White,
++                letterSpacing = 0.5.sp
++            )
++
++            Spacer(modifier = Modifier.height(8.dp))
++
++            Text(
++                "El error fue guardado automáticamente.\nCopia el error y envíalo para que lo pueda corregir.",
++                fontSize = 13.sp,
++                color = Color(0xFF6B6B80),
++                lineHeight = 20.sp,
++                textAlign = androidx.compose.ui.text.style.TextAlign.Center
++            )
++
++            Spacer(modifier = Modifier.height(24.dp))
++
++            // Error summary card
++            Surface(
++                shape = RoundedCornerShape(14.dp),
++                color = Color(0xFFFF4D6A).copy(alpha = 0.06f),
++                border = androidx.compose.foundation.BorderStroke(
++                    0.5.dp, Color(0xFFFF4D6A).copy(alpha = 0.15f)
++                ),
++                modifier = Modifier.fillMaxWidth()
++            ) {
++                Column(modifier = Modifier.padding(16.dp)) {
++                    Text(
++                        exceptionName,
++                        fontSize = 12.sp,
++                        fontWeight = FontWeight.Bold,
++                        color = Color(0xFFFF4D6A).copy(alpha = 0.8f),
++                        fontFamily = FontFamily.Monospace,
++                        letterSpacing = 0.5.sp
++                    )
++                    if (errorMessage.isNotEmpty()) {
++                        Spacer(modifier = Modifier.height(6.dp))
++                        Text(
++                            errorMessage,
++                            fontSize = 12.sp,
++                            color = Color(0xFFFF4D6A).copy(alpha = 0.6f),
++                            fontFamily = FontFamily.Monospace,
++                            maxLines = 3
++                        )
++                    }
++                }
++            }
++
++            Spacer(modifier = Modifier.height(16.dp))
++
++            // Full log card
++            Surface(
++                shape = RoundedCornerShape(14.dp),
++                color = Color(0xFF0D0D12),
++                border = androidx.compose.foundation.BorderStroke(
++                    0.5.dp, Color(0xFF1E1E2A)
++                ),
++                modifier = Modifier.fillMaxWidth()
++            ) {
++                Column(modifier = Modifier.padding(14.dp)) {
++                    Text(
++                        "STACK TRACE",
++                        fontSize = 9.sp,
++                        fontWeight = FontWeight.Bold,
++                        color = NexaAccent.copy(alpha = 0.5f),
++                        letterSpacing = 2.sp
++                    )
++                    Spacer(modifier = Modifier.height(8.dp))
++                    Text(
++                        fullLog.take(3000),
++                        fontSize = 10.sp,
++                        color = Color(0xFF6B6B80),
++                        fontFamily = FontFamily.Monospace,
++                        lineHeight = 16.sp
++                    )
++                }
++            }
++
++            Spacer(modifier = Modifier.height(24.dp))
++
++            // Copy button
++            Button(
++                onClick = {
++                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
++                    val clip = ClipData.newPlainText("NEXA Crash Log", fullLog)
++                    clipboard.setPrimaryClip(clip)
++                    Toast.makeText(context, "Error copiado ✓", Toast.LENGTH_SHORT).show()
++                },
++                modifier = Modifier.fillMaxWidth().height(48.dp),
++                shape = RoundedCornerShape(14.dp),
++                colors = ButtonDefaults.buttonColors(containerColor = NexaAccent)
++            ) {
++                Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp), tint = Color.Black)
++                Spacer(modifier = Modifier.width(8.dp))
++                Text("COPIAR ERROR", color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
++            }
++
++            Spacer(modifier = Modifier.height(12.dp))
++
++            // Restart button
++            OutlinedButton(
++                onClick = onRestart,
++                modifier = Modifier.fillMaxWidth().height(48.dp),
++                shape = RoundedCornerShape(14.dp),
++                border = androidx.compose.foundation.BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f))
++            ) {
++                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = NexaAccent)
++                Spacer(modifier = Modifier.width(8.dp))
++                Text("REINICIAR APP", color = NexaAccent, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/com/nexa/ai/CrashHandler.kt b/app/src/main/java/com/nexa/ai/CrashHandler.kt
+new file mode 100644
+index 0000000..7587eed
+--- /dev/null
++++ b/app/src/main/java/com/nexa/ai/CrashHandler.kt
+@@ -0,0 +1,63 @@
++package com.nexa.ai
++
++import android.content.Context
++import android.content.Intent
++import java.io.PrintWriter
++import java.io.StringWriter
++import java.text.SimpleDateFormat
++import java.util.*
++
++/**
++ * Captures uncaught exceptions and shows a crash screen with the error details.
++ * The user can copy the error and send it for debugging.
++ */
++class CrashHandler(
++    private val context: Context,
++    private val defaultHandler: Thread.UncaughtExceptionHandler?
++) : Thread.UncaughtExceptionHandler {
++
++    override fun uncaughtException(thread: Thread, throwable: Throwable) {
++        try {
++            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
++            val sw = StringWriter()
++            throwable.printStackTrace(PrintWriter(sw))
++            val stackTrace = sw.toString()
++
++            val log = buildString {
++                appendLine("═══════════════════════════════════════")
++                appendLine("NEXA PRO CRASH LOG")
++                appendLine("Time: $timestamp")
++                appendLine("Thread: ${thread.name}")
++                appendLine("Exception: ${throwable.javaClass.name}")
++                appendLine("Message: ${throwable.message}")
++                appendLine("═══════════════════════════════════════")
++                appendLine(stackTrace)
++                appendLine()
++            }
++
++            // Launch crash screen
++            val intent = Intent(context, CrashActivity::class.java).apply {
++                putExtra("crash_log", log)
++                putExtra("exception_name", throwable.javaClass.simpleName)
++                putExtra("error_message", throwable.message ?: "")
++                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
++            }
++            context.startActivity(intent)
++
++            // Kill the process
++            android.os.Process.killProcess(android.os.Process.myPid())
++            System.exit(1)
++
++        } catch (e: Exception) {
++            // If crash screen fails, fall back to default handler
++            defaultHandler?.uncaughtException(thread, throwable)
++        }
++    }
++
++    companion object {
++        fun install(context: Context) {
++            val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
++            Thread.setDefaultUncaughtExceptionHandler(CrashHandler(context.applicationContext, defaultHandler))
++        }
++    }
++}
+diff --git a/app/src/main/java/com/nexa/ai/MainActivity.kt b/app/src/main/java/com/nexa/ai/MainActivity.kt
+index 7d9f0f5..773fc48 100644
+--- a/app/src/main/java/com/nexa/ai/MainActivity.kt
++++ b/app/src/main/java/com/nexa/ai/MainActivity.kt
+@@ -41,6 +41,9 @@ class MainActivity : ComponentActivity() {
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+ 
++        // Install crash logger — saves to /sdcard/Documents/nexa_crash_log.txt
++        CrashHandler.install(this)
++
+         setContent {
+             val uiState by viewModel.uiState.collectAsState()
+ 
+@@ -74,6 +77,7 @@ class MainActivity : ComponentActivity() {
+                         onSetLanguage = { viewModel.setLanguage(it) },
+                         onSetVoiceType = { viewModel.setVoiceType(it) },
+                         onCycleTheme = { viewModel.cycleTheme() },
++                        onSetThemeMode = { viewModel.setThemeMode(it) },
+                         onNavigateToLogin = { viewModel.navigateToLogin() },
+                         onNavigateToRegister = { viewModel.navigateToRegister() },
+                         onNavigateToChat = { viewModel.navigateToChat() },
+diff --git a/app/src/main/java/com/nexa/ai/data/NexaRepository.kt b/app/src/main/java/com/nexa/ai/data/NexaRepository.kt
+index 45eec65..463f496 100644
+--- a/app/src/main/java/com/nexa/ai/data/NexaRepository.kt
++++ b/app/src/main/java/com/nexa/ai/data/NexaRepository.kt
+@@ -58,12 +58,12 @@ class NexaRepository {
+             }
+ 
+             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+-                if (data == "[DONE]") {
+-                    trySend(StreamEvent.Done)
+-                    return
+-                }
+-
+                 try {
++                    if (data == "[DONE]") {
++                        trySend(StreamEvent.Done)
++                        return
++                    }
++
+                     val obj = gson.fromJson(data, JsonObject::class.java)
+                     
+                     if (obj.has("done") && obj.get("done").asBoolean) {
+@@ -90,27 +90,39 @@ class NexaRepository {
+ 
+             override fun onClosed(eventSource: EventSource) {
+                 Log.d(TAG, "SSE Connection Closed")
+-                trySend(StreamEvent.Done)
+-                close()
++                try {
++                    trySend(StreamEvent.Done)
++                    close()
++                } catch (e: Exception) {
++                    Log.e(TAG, "Error closing SSE flow", e)
++                }
+             }
+ 
+             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                 Log.e(TAG, "SSE Failure: ${t?.message}", t)
+-                when {
+-                    response?.code == 401 -> {
+-                        trySend(StreamEvent.AuthExpired)
+-                    }
+-                    response?.code == 429 -> {
+-                        trySend(StreamEvent.Error("rate_limit"))
+-                    }
+-                    t != null -> {
+-                        trySend(StreamEvent.Error("connection_error:${t.localizedMessage}"))
+-                    }
+-                    else -> {
+-                        trySend(StreamEvent.Error("server_error:${response?.code}"))
++                try {
++                    when {
++                        response?.code == 401 -> {
++                            trySend(StreamEvent.AuthExpired)
++                        }
++                        response?.code == 429 -> {
++                            trySend(StreamEvent.Error("rate_limit"))
++                        }
++                        t != null -> {
++                            trySend(StreamEvent.Error("connection_error:${t.localizedMessage}"))
++                        }
++                        else -> {
++                            trySend(StreamEvent.Error("server_error:${response?.code}"))
++                        }
+                     }
++                } catch (e: Exception) {
++                    Log.e(TAG, "Error sending failure event", e)
++                }
++                try {
++                    close(t)
++                } catch (e: Exception) {
++                    Log.e(TAG, "Error closing flow", e)
+                 }
+-                close(t)
+             }
+         }
+ 
+diff --git a/app/src/main/java/com/nexa/ai/ui/ChatComponents.kt b/app/src/main/java/com/nexa/ai/ui/ChatComponents.kt
+index 98e2ba0..1c8a05c 100644
+--- a/app/src/main/java/com/nexa/ai/ui/ChatComponents.kt
++++ b/app/src/main/java/com/nexa/ai/ui/ChatComponents.kt
+@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import com.nexa.ai.data.UpdateInfo
+ import com.nexa.ai.ui.theme.NexaAccent
++import com.nexa.ai.ui.theme.NexaAccentDark
+ import com.nexa.ai.viewmodel.*
+ 
+ // ═══════════════════════════════════════
+@@ -336,9 +337,14 @@ fun GeneralSettingsDialog(
+                     }
+                 }
+                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+-                // Voice
++                // Voice — card grid with gradient highlight
+                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-                    Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
++                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                        Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(NexaAccent.copy(alpha = 0.1f)),
++                            contentAlignment = Alignment.Center) { Text("🎙️", fontSize = 10.sp) }
++                        Text(NexaStrings.get("voice", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
++                            color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
++                    }
+                     val voices = VoiceType.entries.toList()
+                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                         voices.chunked(3).forEach { rowVoices ->
+@@ -346,12 +352,47 @@ fun GeneralSettingsDialog(
+                                 rowVoices.forEach { voice ->
+                                     val isMale = voice.name.contains("MALE")
+                                     val selected = uiState.voiceType == voice
+-                                    Surface(modifier = Modifier.weight(1f).clickable { onSetVoiceType(voice) }, shape = RoundedCornerShape(12.dp),
+-                                        color = if (selected) NexaAccent.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+-                                        border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))) {
+-                                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+-                                            Text(if (isMale) "👨" else "👩", fontSize = 16.sp)
+-                                            Text(NexaStrings.get(voice.name.lowercase(), uiState.language), fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), textAlign = TextAlign.Center)
++                                    Surface(
++                                        modifier = Modifier.weight(1f).clickable { onSetVoiceType(voice) },
++                                        shape = RoundedCornerShape(14.dp),
++                                        color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
++                                        border = if (selected) BorderStroke(1.5.dp, NexaAccent.copy(alpha = 0.5f))
++                                            else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
++                                    ) {
++                                        Box(
++                                            modifier = if (selected) Modifier.background(
++                                                Brush.linearGradient(listOf(NexaAccent.copy(alpha = 0.12f), NexaAccent.copy(alpha = 0.04f)))
++                                            ) else Modifier
++                                        ) {
++                                            Column(
++                                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
++                                                horizontalAlignment = Alignment.CenterHorizontally,
++                                                verticalArrangement = Arrangement.spacedBy(4.dp)
++                                            ) {
++                                                Box(
++                                                    modifier = Modifier.size(32.dp).clip(CircleShape)
++                                                        .background(if (selected) NexaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
++                                                    contentAlignment = Alignment.Center
++                                                ) {
++                                                    Text(
++                                                        if (isMale) "👨" else "👩",
++                                                        fontSize = 16.sp
++                                                    )
++                                                }
++                                                Text(
++                                                    NexaStrings.get(voice.name.lowercase(), uiState.language),
++                                                    fontSize = 9.sp,
++                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
++                                                    color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
++                                                    textAlign = TextAlign.Center,
++                                                    letterSpacing = 0.3.sp
++                                                )
++                                                if (selected) {
++                                                    Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
++                                                } else {
++                                                    Spacer(modifier = Modifier.height(4.dp))
++                                                }
++                                            }
+                                         }
+                                     }
+                                 }
+@@ -360,40 +401,68 @@ fun GeneralSettingsDialog(
+                     }
+                 }
+                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+-                // Theme — 3 equal-width chips
++                // Theme — visual cards with preview colors
+                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-                    Text(NexaStrings.get("theme", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
++                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                        Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(NexaAccent.copy(alpha = 0.1f)),
++                            contentAlignment = Alignment.Center) { Text("🎨", fontSize = 10.sp) }
++                        Text(NexaStrings.get("theme", uiState.language), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
++                            color = NexaAccent.copy(alpha = 0.6f), letterSpacing = 1.sp)
++                    }
+                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                         listOf(
+-                            ThemeMode.DARK to NexaStrings.get("dark", uiState.language),
+-                            ThemeMode.LIGHT to NexaStrings.get("light", uiState.language),
+-                            ThemeMode.SYSTEM to NexaStrings.get("system", uiState.language)
+-                        ).forEach { (mode, label) ->
++                            Triple(ThemeMode.DARK, NexaStrings.get("dark", uiState.language), listOf(Color(0xFF1A1A24), Color(0xFF0D0D12))),
++                            Triple(ThemeMode.LIGHT, NexaStrings.get("light", uiState.language), listOf(Color(0xFFF8F9FC), Color(0xFFFFFFFF))),
++                            Triple(ThemeMode.SYSTEM, NexaStrings.get("system", uiState.language), listOf(Color(0xFF1A1A24), Color(0xFFF8F9FC)))
++                        ).forEach { (mode, label, previewColors) ->
+                             val selected = uiState.themeMode == mode
+-                            FilterChip(
+-                                selected = selected,
+-                                onClick = { onSetThemeMode(mode) },
+-                                modifier = Modifier.weight(1f),
+-                                label = {
++                            Surface(
++                                modifier = Modifier.weight(1f).clickable { onSetThemeMode(mode) },
++                                shape = RoundedCornerShape(14.dp),
++                                color = if (selected) NexaAccent.copy(alpha = 0.06f) else Color.Transparent,
++                                border = if (selected) BorderStroke(1.5.dp, NexaAccent.copy(alpha = 0.4f))
++                                    else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
++                            ) {
++                                Column(
++                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
++                                    horizontalAlignment = Alignment.CenterHorizontally,
++                                    verticalArrangement = Arrangement.spacedBy(6.dp)
++                                ) {
++                                    // Mini theme preview
++                                    Box(
++                                        modifier = Modifier.size(36.dp, 24.dp).clip(RoundedCornerShape(6.dp))
++                                            .background(Brush.linearGradient(previewColors)),
++                                        contentAlignment = Alignment.Center
++                                    ) {
++                                        if (mode == ThemeMode.SYSTEM) {
++                                            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
++                                                Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(2.dp)).background(NexaAccent.copy(alpha = 0.6f)))
++                                                Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.6f)))
++                                            }
++                                        } else {
++                                            Box(modifier = Modifier.size(8.dp, 2.dp).clip(RoundedCornerShape(1.dp))
++                                                .background(if (mode == ThemeMode.DARK) NexaAccent.copy(alpha = 0.7f) else NexaAccentDark.copy(alpha = 0.7f)))
++                                        }
++                                    }
+                                     Text(
+-                                        text = when (mode) {
++                                        when (mode) {
+                                             ThemeMode.DARK -> "🌙 $label"
+                                             ThemeMode.LIGHT -> "☀️ $label"
+                                             ThemeMode.SYSTEM -> "⚙️ $label"
+                                         },
+-                                        fontSize = 12.sp,
+-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+-                                        modifier = Modifier.fillMaxWidth(),
+-                                        textAlign = TextAlign.Center
++                                        fontSize = 10.sp,
++                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
++                                        color = if (selected) NexaAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
++                                        textAlign = TextAlign.Center,
++                                        letterSpacing = 0.3.sp
+                                     )
+-                                },
+-                                colors = FilterChipDefaults.filterChipColors(
+-                                    selectedContainerColor = NexaAccent.copy(alpha = 0.15f),
+-                                    selectedLabelColor = NexaAccent
+-                                ),
+-                                border = if (selected) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f))
+-                                else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+-                            )
++                                    if (selected) {
++                                        Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(NexaAccent))
++                                    } else {
++                                        Spacer(modifier = Modifier.height(4.dp))
++                                    }
++                                }
++                            }
+                         }
+                     }
+                 }
+-- 
+2.43.0
+

@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes Web AI - Premium Voice Chat</title>
+    <!-- Modern Premium Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-mesh: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #03001e 100%);
+            --glass-bg: rgba(10, 10, 25, 0.7);
+            --glass-border: rgba(99, 102, 241, 0.15);
+            --glass-border-focus: rgba(168, 85, 247, 0.4);
+            --primary-glow: 0 0 20px rgba(99, 102, 241, 0.4);
+            --secondary-glow: 0 0 20px rgba(168, 85, 247, 0.4);
+            
+            --primary: #6366f1; /* Neon Purple-Blue */
+            --primary-hover: #4f46e5;
+            --secondary: #a855f7; /* Magenta-Violet */
+            --secondary-hover: #9333ea;
+            --accent: #10b981; /* Emerald Green */
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: #03001e;
+            background-image: var(--bg-mesh);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Ambient Glowing Background Elements */
+        .glowing-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: 0;
+            opacity: 0.4;
+            pointer-events: none;
+            animation: float 20s infinite alternate;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: var(--secondary);
+            bottom: -150px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, 30px) scale(1.1); }
+            100% { transform: translate(-20px, -40px) scale(0.9); }
+        }
+
+        /* App Wrapper Container */
+        .app-wrapper {
+            position: relative;
+            z-index: 1;
+            width: 92%;
+            max-width: 1000px;
+            height: 85vh;
+            background: var(--glass-bg);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Premium Header Styling */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 2rem;
+            background: rgba(15, 12, 35, 0.4);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .header-identity {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-container {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--primary-glow);
+        }
+
+        .logo-container i {
+            font-size: 1.3rem;
+            color: white;
+            animation: pulse-icon 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse-icon {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); filter: drop-shadow(0 0 4px white); }
+        }
+
+        .status-dot {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border: 2px solid #03001e;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .pulse-animation::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            animation: pulse-ring 1.8s infinite;
+            top: -2px;
+            left: -2px;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.6); opacity: 1; }
+            100% { transform: scale(1.8); opacity: 0; }
+        }
+
+        .header-title-wrapper h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: 0.5px;
+            background: linear-gradient(to right, #ffffff, #c7d2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title-wrapper p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .control-btn:hover {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: transparent;
+            color: white;
+            box-shadow: var(--primary-glow);
+        }
+
+        /* Chat Message Area */
+        .chat-area {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            scroll-behavior: smooth;
+        }
+
+        /* Webkit Scrollbar Customization */
+        .chat-area::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        .chat-area::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.4);
+        }
+
+        /* Message Bubbles styling */
+        .message-row {
+            display: flex;
+            width: 100%;
+            animation: messageFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(15px);
+        }
+
+        @keyframes messageFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .message-row.bot {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 1.1rem 1.4rem;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .user .message-content {
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border-bottom-right-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .bot .message-content {
+            background: rgba(20, 20, 45, 0.6);
+            color: #e2e8f0;
+            border-bottom-left-radius: 4px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .message-meta {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
+        }
+
+        .bot .message-meta {
+            justify-content: flex-start;
+        }
+
+        .bot-avatar-inline {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+            font-size: 0.75rem;
+            color: white;
+        }
+
+        /* Voice Speaker Trigger Button inside Bot Messages */
+        .msg-speak-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: var(--transition);
+            margin-left: 8px;
+        }
+
+        .msg-speak-btn:hover {
+            color: var(--secondary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Typing Indicator Styling */
+        .typing-bubble {
+            background: rgba(20, 20, 45, 0.6);
+            border: 1px solid var(--glass-border);
+            padding: 1.1rem 1.6rem;
+            border-radius: var(--radius-md);
+            border-bottom-left-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: fit-content;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            animation: messageFadeIn 0.3s ease-out forwards;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--secondary);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: typingAnimation 1.4s infinite ease-in-out;
+            box-shadow: 0 0 5px var(--secondary);
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+            background: var(--primary);
+            box-shadow: 0 0 5px var(--primary);
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+            background: var(--accent);
+            box-shadow: 0 0 5px var(--accent);
+        }
+
+        @keyframes typingAnimation {
+            0%, 100% { transform: translateY(0); opacity: 0.6; }
+            50% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        /* Premium Input Panel */
+        .input-panel {
+            padding: 1.5rem 2rem 2rem 2rem;
+            background: rgba(10, 8, 25, 0.7);
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .input-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: rgba(5, 3, 15, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+        }
+
+        .input-container:focus-within {
+            border-color: var(--secondary);
+            box-shadow: var(--secondary-glow);
+            background: rgba(5, 3, 15, 0.9);
+        }
+
+        .input-container input, .input-container textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 1.1rem 1.5rem;
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .input-container textarea {
+            resize: none;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+
+        .input-container input::placeholder, .input-container textarea::placeholder {
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        /* Mic Button Styling */
+        .mic-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            padding: 0 1.25rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .mic-btn:hover {
+            color: #ef4444; /* Neon red when hovered */
+            transform: scale(1.1);
+        }
+
+        .mic-btn.listening {
+            color: #ef4444;
+            animation: pulse-mic 1.2s infinite alternate;
+        }
+
+        .mic-btn.listening::after {
+            content: '';
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid #ef4444;
+            animation: pulse-mic-ring 1.2s infinite linear;
+        }
+
+        @keyframes pulse-mic {
+            from { filter: drop-shadow(0 0 2px #ef4444); }
+            to { filter: drop-shadow(0 0 12px #ef4444) scale(1.15); }
+        }
+
+        @keyframes pulse-mic-ring {
+            0% { transform: scale(0.6); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        /* Send button */
+        .send-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            height: 52px;
+            padding: 0 1.8rem;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--primary-glow);
+            filter: brightness(1.1);
+        }
+
+        .send-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Interactive SoundWaves (for speaking state) */
+        .soundwave-container {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 24px;
+            padding: 0 10px;
+        }
+
+        .soundwave-container.active {
+            display: flex;
+        }
+
+        .soundwave-bar {
+            width: 3px;
+            height: 6px;
+            background: linear-gradient(to top, var(--primary), var(--secondary));
+            border-radius: 20px;
+            animation: wave 1.2s ease-in-out infinite alternate;
+        }
+
+        .soundwave-bar:nth-child(2) { animation-delay: 0.15s; height: 14px; }
+        .soundwave-bar:nth-child(3) { animation-delay: 0.3s; height: 22px; }
+        .soundwave-bar:nth-child(4) { animation-delay: 0.45s; height: 12px; }
+        .soundwave-bar:nth-child(5) { animation-delay: 0.6s; height: 5px; }
+
+        @keyframes wave {
+            0% { transform: scaleY(1); }
+            100% { transform: scaleY(2.5); }
+        }
+
+        /* Mode and category selection badge container */
+        .category-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            overflow-x: auto;
+        }
+        .category-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .category-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .category-badge:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+        }
+
+        .category-badge.active {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: var(--secondary);
+            color: #d8b4fe;
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+        }
+
+        /* STT Permission warning bar */
+        .warning-bar {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-top: 0.5rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        /* Settings Modal */
+        .settings-modal {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .settings-modal.active {
+            display: flex;
+        }
+        .settings-content {
+            background: rgba(15, 12, 35, 0.95);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 2rem;
+            width: 320px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .settings-header h3 {
+            font-family: 'Outfit';
+            font-size: 1.1rem;
+            color: var(--text-main);
+        }
+        .settings-header button {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        .settings-body {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .settings-body label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .settings-body input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+        }
+        .settings-body select {
+            background: rgba(5, 3, 15, 0.6);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Orbs -->
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <div class="app-wrapper">
+        <!-- Settings Modal -->
+        <div class="settings-modal" id="settingsModal">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h3>Configuración de Voz</h3>
+                    <button id="closeSettingsBtn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="settings-body">
+                    <label>Velocidad: <span id="rateVal">1.0</span></label>
+                    <input type="range" id="voiceRate" min="0.5" max="2" step="0.1" value="1.0">
+                    
+                    <label>Tono (Pitch): <span id="pitchVal">1.05</span></label>
+                    <input type="range" id="voicePitch" min="0.5" max="2" step="0.05" value="1.05">
+                    
+                    <label>Idioma:</label>
+                    <select id="voiceLang">
+                        <option value="es-ES" selected>Español (España)</option>
+                        <option value="es-MX">Español (México)</option>
+                        <option value="en-US">Inglés (US)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- App Header -->
+        <header class="header">
+            <div class="header-identity">
+                <div class="logo-container">
+                    <i class="fa-solid fa-brain"></i>
+                    <div class="status-dot pulse-animation"></div>
+                </div>
+                <div class="header-title-wrapper">
+                    <h1>Hermes AI Assistant</h1>
+                    <p><i class="fa-solid fa-shield-halved" style="color: var(--accent); font-size: 0.75rem;"></i> Voice v5.0 Connected & Secure</p>
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <!-- Sound Speech Toggle (TTS) -->
+                <button class="control-btn active" id="voiceToggle" title="Activar/Desactivar Voz (Text-to-Speech)">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+                <div class="soundwave-container" id="soundWaves">
+                    <div class="soundwave-bar"></div>
+                    <div class="soundwave-bar"></div>
+                    <div class="soundwave-bar"></div>
+                    <div class="soundwave-bar"></div>
+                    <div class="soundwave-bar"></div>
+                </div>
+                <!-- Hands-Free Mode Toggle -->
+                <button id="handsFreeStatus" class="control-btn" title="Activar modo manos libres">
+                    <i class="fa-solid fa-microphone-slash"></i>
+                </button>
+                <button class="control-btn" id="clearChatBtn" title="Limpiar Conversación">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <!-- Settings Button -->
+                <button class="control-btn" id="settingsBtn" title="Configuración de Voz">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+                <div id="connectionStatus" class="control-btn" title="Estado de conexión">
+                    <i class="fa-solid fa-wifi"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Message Scrolling Container -->
+        <main class="chat-area" id="chatArea">
+            <!-- Bot Welcome Message -->
+            <div class="message-row bot">
+                <div class="message-content">
+                    <div style="font-weight: 700; margin-bottom: 0.25rem; font-family: 'Outfit'; color: var(--secondary);">
+                        <i class="fa-solid fa-sparkles"></i> Hermes AI
+                    </div>
+                    ¡Hola! Soy **Hermes v5**, tu copiloto de Inteligencia Artificial de NexaIA. 
+                    <br><br>
+                    He sido actualizado con los últimos **fixes de manos libres**. Ahora cuento con soporte premium de **Reconocimiento de Voz (STT)** y **Sintetizador de Voz (TTS)** directamente en tu navegador.
+                    <br><br>
+                    Presiona el ícono del micrófono <i class="fa-solid fa-microphone" style="color:#ef4444"></i> abajo para hablarme, o escribe tu consulta. ¡Hablemos!
+                    <div class="message-meta">
+                        <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
+                        Hermes AI &bull; Justo ahora
+                        <button class="msg-speak-btn" onclick="readMessageText(this.parentElement.parentElement)"><i class="fa-solid fa-volume-high"></i></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Premium Input Panel -->
+        <footer class="input-panel">
+            <!-- Category Badge Row -->
+            <div class="category-container">
+                <div class="category-badge active" data-category="general" tabindex="0"><i class="fa-solid fa-comments"></i> Chat General</div>
+                <div class="category-badge" data-category="coding" tabindex="0"><i class="fa-solid fa-code"></i> Programación</div>
+                <div class="category-badge" data-category="design" tabindex="0"><i class="fa-solid fa-wand-magic-sparkles"></i> Diseño & UI</div>
+                <div class="category-badge" data-category="voice" tabindex="0"><i class="fa-solid fa-waveform-lines"></i> Hands-Free Test</div>
+            </div>
+
+            <!-- Permission / Error Indicator Bar -->
+            <div class="warning-bar" id="warningBar">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="warningMsg"></span>
+            </div>
+
+            <!-- Main Input Row -->
+            <div class="input-row">
+                <div class="input-container">
+                    <button class="chat-tool-btn" id="micBtn" aria-label="Hablar por micrófono"><i class="fa-solid fa-microphone"></i></button>
+                    <textarea id="chatInput" placeholder="Pregúntale a Hermes... (Usa Shift+Enter para nueva línea)" aria-label="Entrada de chat" aria-describedby="chat-help" rows="1"></textarea>
+                    <button class="chat-tool-btn send-btn" id="sendBtn" aria-label="Enviar mensaje"><i class="fa-solid fa-paper-plane"></i></button>
+                    <div id="chat-help" class="sr-only">
+                        Presione Enter para enviar o use el botón de micrófono para entrada de voz
+                    </div>
+                    </button>
+                </div>
+                <!-- Send Button -->
+                <button class="send-btn" id="sendBtn">
+                    Enviar <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Script Implementation -->
+    <script>
+        const chatArea = document.getElementById('chatArea');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const micBtn = document.getElementById('micBtn');
+        const voiceToggle = document.getElementById('voiceToggle');
+        const clearChatBtn = document.getElementById('clearChatBtn');
+        const soundWaves = document.getElementById('soundWaves');
+        const warningBar = document.getElementById('warningBar');
+        const warningMsg = document.getElementById('warningMsg');
+        const categoryBadges = document.querySelectorAll('.category-badge');
+
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const voiceRate = document.getElementById('voiceRate');
+        const voicePitch = document.getElementById('voicePitch');
+        const voiceLang = document.getElementById('voiceLang');
+        const MAX_PERSISTED_MESSAGES = 50;
+        const rateVal = document.getElementById('rateVal');
+        const pitchVal = document.getElementById('pitchVal');
+
+        let isVoiceEnabled = true;
+        let isListening = false;
+        let isHandsFreeEnabled = false; // Nuevo: modo manos libres
+        let currentCategory = 'general';
+
+        // Nuevas variables para indicadores de manos libres
+        let handsFreeStatusEl = null;
+        let latencyValueEl = null;
+        let boosterValueEl = null;
+        let proximityOverlayEl = null;
+
+        // Web Speech API interfaces
+        let recognition = null;
+        let ttsSynth = window.speechSynthesis;
+        let currentUtterance = null;
+
+        let ttsRate = parseFloat(localStorage.getItem('nexa_tts_rate')) || 1.0;
+        let ttsPitch = parseFloat(localStorage.getItem('nexa_tts_pitch')) || 1.05;
+        let ttsLang = localStorage.getItem('nexa_tts_lang') || 'es-ES';
+
+        settingsBtn.addEventListener('click', () => {
+            voiceRate.value = ttsRate;
+            voicePitch.value = ttsPitch;
+            voiceLang.value = ttsLang;
+            rateVal.textContent = ttsRate;
+            pitchVal.textContent = ttsPitch;
+            settingsModal.classList.add('active');
+        });
+        closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('active'));
+
+        // Hands-Free Mode Toggle
+        const handsFreeStatus = document.getElementById('handsFreeStatus');
+        handsFreeStatus.addEventListener('click', () => {
+            isHandsFreeEnabled = !isHandsFreeEnabled;
+            updateHandsFreeUI();
+            // Mostrar mensaje de bienvenida al modo manos libres
+            if (isHandsFreeEnabled) {
+                showTypingAndRespond("Modo manos libres activado. Los sensores y optimizaciones de audio están listos.");
+            } else {
+                showTypingAndRespond("Modo manos libres desactivado.");
+            }
+        });
+
+        voiceRate.addEventListener('input', (e) => { ttsRate = parseFloat(e.target.value); rateVal.textContent = ttsRate; localStorage.setItem('nexa_tts_rate', ttsRate); });
+        voicePitch.addEventListener('input', (e) => { ttsPitch = parseFloat(e.target.value); pitchVal.textContent = ttsPitch; localStorage.setItem('nexa_tts_pitch', ttsPitch); });
+        voiceLang.addEventListener('change', (e) => { ttsLang = e.target.value; localStorage.setItem('nexa_tts_lang', ttsLang); });
+
+        let connectionStatus = 'disconnected';
+
+        function setConnectionStatus(status) {
+            connectionStatus = status;
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = 'control-btn';
+            statusEl.classList.add(status);
+
+            let icon = 'fa-wifi';
+            let title = 'Desconectado';
+
+            switch(status) {
+                case 'connected':
+                    icon = 'fa-wifi';
+                    title = 'Conectado';
+                    break;
+                case 'connecting':
+                    icon = 'fa-spinner fa-spin';
+                    title = 'Conectando...';
+                    break;
+                case 'disconnected':
+                    icon = 'fa-wifi-slash';
+                    title = 'Desconectado - Reintentando...';
+                    break;
+            }
+
+            statusEl.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+            statusEl.title = title;
+        }
+
+        setConnectionStatus('connecting');
+        setTimeout(() => setConnectionStatus('connected'), 500);
+
+        function loadChatHistory() {
+            const saved = localStorage.getItem('hermesChatHistory');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    // Handle both old format (string) and new format (object)
+                    if (typeof parsed === 'string') {
+                        chatArea.innerHTML = parsed;
+                    } else if (parsed && parsed.messages) {
+                        chatArea.innerHTML = parsed.messages;
+                    }
+                    // Trim excess messages if needed
+                    trimExcessMessages();
+                    scrollToBottom();
+                } catch (e) {
+                    console.error('Error loading chat history:', e);
+                    // If corrupted, start fresh
+                    localStorage.removeItem('hermesChatHistory');
+                }
+            }
+        }
+
+        let saveHistoryTimeout = null;
+        function saveChatHistory() {
+            if (saveHistoryTimeout) clearTimeout(saveHistoryTimeout);
+            saveHistoryTimeout = setTimeout(() => {
+                // Save as object with version and timestamp
+                const historyData = {
+                    version: '1.0',
+                    timestamp: Date.now(),
+                    messages: chatArea.innerHTML
+                };
+                localStorage.setItem('hermesChatHistory', JSON.stringify(historyData));
+                // Trim excess messages after saving
+                trimExcessMessages();
+            }, 500);
+        }
+
+        function trimExcessMessages() {
+            // Count message rows (both user and bot)
+            const messageRows = chatArea.querySelectorAll('.message-row');
+            if (messageRows.length > MAX_PERSISTED_MESSAGES) {
+                // Remove oldest messages, keeping the most recent ones
+                const excessCount = messageRows.length - MAX_PERSISTED_MESSAGES;
+                for (let i = 0; i < excessCount; i++) {
+                    if (messageRows[i]) {
+                        messageRows[i].remove();
+                    }
+                }
+                // Save the trimmed history
+                saveChatHistory();
+            }
+        }
+
+        // Custom Intelligent Responses based on Selected Category
+        const responses = {
+            general: [
+                "Entiendo perfectamente tu punto. Con los fixes de manos libres v5.0 implementados en la app, la liberación de recursos de audio (`stopVoiceAudioSession`) ahora es instantánea y no causa ningún corte de volumen en la música de fondo.",
+                "Excelente observación. La arquitectura híbrida de NexaIA está diseñada para equilibrar el procesamiento en la nube con modelos locales que corren directamente en tu NPU.",
+                "Eso tiene mucho sentido. La optimización del barge-in (interrupción) en modo voz ahora cuenta con un cooldown adaptativo de 3.5 segundos que filtra el eco del altavoz sin perder nada de responsividad.",
+                "Perfecto, voy a procesar esa información y te regreso con una propuesta detallada sobre cómo integrar estos componentes en tu flujo diario."
+            ],
+            coding: [
+                "Analizando el código. En Kotlin, la llamada de red o procesamiento continuo de `AudioRecord` debe hacerse en un hilo secundario con `android.os.Process.setThreadPriority(THREAD_PRIORITY_URGENT_AUDIO)` para evitar el jank de la UI.",
+                "Revisando los cambios. El error `NegativeArraySizeException` en Gradle/KSP es un problema clásico de corrupción de caché de Kotlin. Se resuelve ejecutando `./gradlew --stop` seguido de `./gradlew clean` para reconstruir la base de datos de símbolos.",
+                "Para optimizar la comunicación por Bluetooth SCO, es crucial registrar un `BroadcastReceiver` que escuche `AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED` antes de forzar el modo de comunicación. ¿Quieres ver un ejemplo?",
+                "Si estás programando en Jetpack Compose, recuerda usar `rememberUpdatedState` para los callbacks de voz en la UI, garantizando que el recomponer no pierda el estado de escucha."
+            ],
+            design: [
+                "Desde el punto de vista de diseño, la retroalimentación visual en modo voz es crítica. Un indicador de volumen (Waveform) reactivo con el valor de `onVolumeLevelChanged` (normalizado entre 0 y 1) le da vida a la interfaz.",
+                "¡Efectivamente! El Glassmorphism se ve increíble en el tema oscuro premium. Usar `backdrop-filter: blur(20px)` combinado con un borde semi-transparente de 1px añade una sensación de alta gama inmediata.",
+                "Para pantallas móviles en el chat, es mejor mantener un diseño limpio con un área de input flotante y badges redondeados tipo píldora que se desplacen horizontalmente.",
+                "Recomiendo usar animaciones `cubic-bezier(0.16, 1, 0.3, 1)` para la aparición de burbujas de chat. Se siente fluido, natural y sumamente moderno."
+            ],
+            voice: [
+                "Iniciando diagnóstico del hands-free. Los fixes de manos libres corrigen el acople acústico en Samsung, Xiaomi y OPPO modificando el orden de apagado: liberando primero el micrófono y apagando el SCO después.",
+                "Prueba de latencia: el tiempo de respuesta de interruptibilidad ha bajado de 2.5 segundos a tan solo 80ms gracias al ajuste fino de delays asíncronos en el `ViewModelScope`.",
+                "El sensor de proximidad está integrado: apaga la pantalla y enruta el audio del altavoz al auricular del oído automáticamente si el dispositivo detecta que está cerca de tu oreja.",
+                "¡Excelente! Hemos diagnosticado que el booster de volumen aumenta el volumen de 7 flujos de audio de forma progresiva, garantizando que escuches a Hermes incluso en ambientes con mucho ruido."
+            ]
+        };
+
+        // Initialize Speech Recognition (STT) if browser supports it
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'es-ES';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                chatInput.placeholder = "Escuchando... habla ahora";
+                hideWarning();
+            };
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                chatInput.value = speechResult;
+                handleSendMessage();
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                setConnectionStatus('disconnected');
+
+                if (event.error === 'no-speech' || event.error === 'audio-capture') {
+                    setTimeout(() => {
+                        if (isListening) recognition.start();
+                    }, 1000);
+                } else if (event.error === 'not-allowed') {
+                    showWarning("Permiso de micrófono denegado. Actívalo en tu navegador para hablar.");
+                } else if (event.error === 'not-supported') {
+                    showWarning("Reconocimiento de voz no soportado en este navegador.");
+                } else {
+                    showWarning("Error de voz: " + event.error);
+                }
+                stopListeningState();
+            };
+
+            recognition.onend = () => {
+                stopListeningState();
+            };
+        } else {
+            micBtn.style.opacity = '0.3';
+            micBtn.title = "Reconocimiento de voz no soportado en este navegador";
+            micBtn.addEventListener('click', () => {
+                showWarning("Tu navegador no soporta Reconocimiento de Voz (STT). Prueba en Google Chrome.");
+            });
+        }
+
+        function stopListeningState() {
+            isListening = false;
+            micBtn.classList.remove('listening');
+            chatInput.placeholder = "Pregúntale a Hermes...";
+        }
+
+        function showWarning(msg) {
+            warningMsg.textContent = msg;
+            warningBar.style.display = 'flex';
+        }
+
+        function hideWarning() {
+            warningBar.style.display = 'none';
+        }
+
+        // Toggle Voice Output (TTS)
+        voiceToggle.addEventListener('click', () => {
+            isVoiceEnabled = !isVoiceEnabled;
+            if (isVoiceEnabled) {
+                voiceToggle.classList.add('active');
+                voiceToggle.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+            } else {
+                voiceToggle.classList.remove('active');
+                voiceToggle.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+                // Stop speaking if active
+                if (ttsSynth) ttsSynth.cancel();
+                soundWaves.classList.remove('active');
+            }
+        });
+
+        // Category switching handler
+        categoryBadges.forEach(badge => {
+            badge.addEventListener('click', () => {
+                activateCategory(badge);
+            });
+            
+            // Keyboard accessibility
+            badge.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activateCategory(badge);
+                }
+            });
+        });
+        
+        // Handle left/right arrow keys for category container scroll
+        const categoryContainer = document.querySelector('.category-container');
+        categoryContainer.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                categoryContainer.scrollBy({ left: 100, behavior: 'smooth' });
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                categoryContainer.scrollBy({ left: -100, behavior: 'smooth' });
+            }
+        });
+        
+        function activateCategory(badge) {
+            categoryBadges.forEach(b => b.classList.remove('active'));
+            badge.classList.add('active');
+            currentCategory = badge.getAttribute('data-category');
+            
+            // Add a welcome response in category shift
+            const welcomeTexts = {
+                general: "Cambiado a Modo Chat General.",
+                coding: "Modo Programación activado. ¿Qué línea de código optimizamos hoy?",
+                design: "Modo Diseño UI activo. Creemos interfaces hermosas y futuristas.",
+                voice: "Modo Hands-Free Test activo. Probando la calibración y delays de audio."
+            };
+            
+            showTypingAndRespond(welcomeTexts[currentCategory]);
+        }
+
+        // Clear chat handler
+        clearChatBtn.addEventListener('click', () => {
+            if (ttsSynth) ttsSynth.cancel();
+            soundWaves.classList.remove('active');
+            
+            chatArea.innerHTML = `
+                <div class="message-row bot">
+                    <div class="message-content">
+                        <div style="font-weight: 700; margin-bottom: 0.25rem; font-family: 'Outfit'; color: var(--secondary);">
+                            <i class="fa-solid fa-sparkles"></i> Hermes AI
+                        </div>
+                        Historial de chat limpiado con éxito. ¿Qué deseas consultar ahora?
+                        <div class="message-meta">
+                            <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
+                            Hermes AI &bull; Justo ahora
+                            <button class="msg-speak-btn" onclick="readMessageText(this.parentElement.parentElement)"><i class="fa-solid fa-volume-high"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            speakText("Historial de chat limpiado");
+        });
+
+        // Handle micro button click
+        micBtn.addEventListener('click', (e) => {
+            if (!recognition) return; // unsupported logic handled above
+            
+            if (isListening) {
+                recognition.stop();
+            } else {
+                if (ttsSynth) ttsSynth.cancel(); // Stop talking before listening
+                soundWaves.classList.remove('active');
+                recognition.start();
+            }
+        });
+
+        // Input and Send handlers
+        sendBtn.addEventListener('click', handleSendMessage);
+
+        // Format Markdown-like text into HTML
+        function formatMarkdown(text) {
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`(.*?)`/g, '<code style="background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px; font-family:monospace; color:#f472b6;">$1</code>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // Send Message Implementation
+        function handleSendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            // Add user message bubble
+            addUserMessageBubble(text);
+            chatInput.value = '';
+
+            // Scroll to bottom
+            scrollToBottom();
+
+            // Send to Real Backend
+            fetchRealBotResponse(text);
+        }
+
+        function addUserMessageBubble(text) {
+            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const msgRow = document.createElement('div');
+            msgRow.classList.add('message-row', 'user');
+            
+            msgRow.innerHTML = `
+                <div class="message-content">
+                    ${formatMarkdown(text)}
+                    <div class="message-meta">
+                        Tú &bull; ${timeString}
+                    </div>
+                </div>
+            `;
+            chatArea.appendChild(msgRow);
+            saveChatHistory();
+        }
+
+        function createTypingIndicator() {
+            const typingBubble = document.createElement('div');
+            typingBubble.classList.add('typing-bubble');
+            typingBubble.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            `;
+            
+            const msgRow = document.createElement('div');
+            msgRow.classList.add('message-row', 'bot');
+            msgRow.id = 'typingIndicatorRow';
+            msgRow.appendChild(typingBubble);
+            
+            chatArea.appendChild(msgRow);
+            scrollToBottom();
+            return msgRow;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typingIndicatorRow');
+            if (indicator) indicator.remove();
+        }
+
+        async function fetchRealBotResponse(userMsg) {
+            setConnectionStatus('connecting');
+            const typingIndicator = createTypingIndicator();
+
+            try {
+                const res = await fetch('http://localhost:3001/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMsg })
+                });
+
+                removeTypingIndicator();
+
+                if (!res.ok) {
+                    setConnectionStatus('disconnected');
+                    addBotMessageBubble("Error de red: No pude conectarme con el cerebro de Hermes (servidor local). Asegúrate de correr 'node hermes-server.js'.");
+                    return;
+                }
+
+                const data = await res.json();
+                setConnectionStatus('connected');
+
+                if (data.error) {
+                    addBotMessageBubble("Ocurrió un error interno: " + data.error);
+                } else {
+                    addBotMessageBubble(data.response);
+                }
+
+            } catch (err) {
+                removeTypingIndicator();
+                setConnectionStatus('disconnected');
+                addBotMessageBubble("Error de conexión. Asegúrate de ejecutar `node hermes-server.js` en el servidor local. Detalles: " + err.message);
+            }
+        }
+
+        function showTypingAndRespond(responseMsg) {
+            const typingIndicator = createTypingIndicator();
+            setTimeout(() => {
+                removeTypingIndicator();
+                addBotMessageBubble(responseMsg);
+            }, 600);
+        }
+
+        function addBotMessageBubble(fullText) {
+            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const msgRow = document.createElement('div');
+            msgRow.classList.add('message-row', 'bot');
+            
+            const msgContent = document.createElement('div');
+            msgContent.classList.add('message-content');
+            
+            const titleDiv = document.createElement('div');
+            titleDiv.style.fontWeight = '700';
+            titleDiv.style.marginBottom = '0.25rem';
+            titleDiv.style.fontFamily = "'Outfit'";
+            titleDiv.style.color = 'var(--secondary)';
+            titleDiv.innerHTML = '<i class="fa-solid fa-sparkles"></i> Hermes AI';
+            msgContent.appendChild(titleDiv);
+
+            // Container for dynamic streaming text
+            const textSpan = document.createElement('span');
+            msgContent.appendChild(textSpan);
+
+            // Meta controls
+            const metaDiv = document.createElement('div');
+            metaDiv.classList.add('message-meta');
+            metaDiv.innerHTML = `
+                <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
+                Hermes AI &bull; ${timeString}
+                <button class="msg-speak-btn" aria-label="Leer mensaje en voz alta" onclick="readMessageText(this.parentElement.parentElement)"><i class="fa-solid fa-volume-high"></i></button>
+            `;
+            msgContent.appendChild(metaDiv);
+            msgRow.appendChild(msgContent);
+            chatArea.appendChild(msgRow);
+            scrollToBottom();
+
+            // Stream / type character-by-character for visual brilliance (ChatGPT style)
+            let index = 0;
+            const speed = 15; // ms per char
+            
+            // Clean text of markdown stars for rendering during stream (we will format it properly at end)
+            const cleanTextForStream = fullText;
+            
+            function typeChar() {
+                if (index < cleanTextForStream.length) {
+                    // Check if we are drawing HTML tags or just appending
+                    textSpan.innerHTML = formatMarkdown(cleanTextForStream.substring(0, index + 1));
+                    index++;
+                    scrollToBottom();
+                    setTimeout(typeChar, speed);
+                } else {
+                    // Finished typing.
+                    saveChatHistory();
+                    // Trigger TTS Voice if enabled
+                    speakText(fullText);
+                }
+            }
+
+            typeChar();
+        }
+
+        function scrollToBottom() {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // --- BROWSER TEXT-TO-SPEECH (TTS) IMPLEMENTATION ---
+        function speakText(text) {
+            if (!isVoiceEnabled || !ttsSynth) return;
+
+            // Cancel any current speaking
+            ttsSynth.cancel();
+            soundWaves.classList.remove('active');
+
+            // Strip markdown formatting characters for clean speech
+            const cleanText = text
+                .replace(/\*\*/g, '')
+                .replace(/`/g, '')
+                .replace(/<[^>]*>/g, '');
+
+            currentUtterance = new SpeechSynthesisUtterance(cleanText);
+            currentUtterance.lang = ttsLang;
+            currentUtterance.rate = ttsRate;
+            currentUtterance.pitch = ttsPitch;
+
+            currentUtterance.onstart = () => {
+                soundWaves.classList.add('active');
+            };
+
+            currentUtterance.onend = () => {
+                soundWaves.classList.remove('active');
+                chatInput.focus();
+            };
+
+            currentUtterance.onerror = () => {
+                soundWaves.classList.remove('active');
+                chatInput.focus();
+            };
+
+            // Speak
+            ttsSynth.speak(currentUtterance);
+        }
+
+        // Trigger read when message speaker button clicked
+        window.readMessageText = function(bubbleElement) {
+            // Find text span inside bubble
+            const textContent = bubbleElement.innerText.replace("Hermes AI\n", "");
+            speakText(textContent);
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && document.activeElement === chatInput) {
+                e.preventDefault();
+                handleSendMessage();
+            }
+            if (e.key === ' ' && e.ctrlKey) { 
+                e.preventDefault();
+                micBtn.click();
+            }
+            if (e.key === 'Escape') { 
+                chatInput.blur();
+            }
+        });
+
+        // Funciones para el modo manos libres
+        function updateHandsFreeUI() {
+            const handsFreeStatus = document.getElementById('handsFreeStatus');
+            if (isHandsFreeEnabled) {
+                handsFreeStatus.classList.add('active');
+                handsFreeStatus.title = 'Desactivar modo manos libres';
+                // Mostrar indicadores de sensores
+                showHandsFreeIndicators();
+            } else {
+                handsFreeStatus.classList.remove('active');
+                handsFreeStatus.title = 'Activar modo manos libres';
+                // Ocultar indicadores de sensores
+                hideHandsFreeIndicators();
+            }
+        }
+
+        function showHandsFreeIndicators() {
+            // Crear o actualizar indicador de latencia
+            if (!latencyValueEl) {
+                latencyValueEl = document.createElement('div');
+                latencyValueEl.className = 'control-btn latency-indicator';
+                latencyValueEl.title = 'Latencia de interrupción';
+                latencyValueEl.innerHTML = '<i class="fa-solid fa-stopwatch"></i><span>80ms</span>';
+                // Insertar después del indicador de conexión
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.parentNode.insertBefore(latencyValueEl, connectionStatus.nextSibling);
+            }
+            latencyValueEl.querySelector('span').textContent = '80ms';
+            
+            // Crear o actualizar indicador de booster
+            if (!boosterValueEl) {
+                boosterValueEl = document.createElement('div');
+                boosterValueEl.className = 'control-btn booster-indicator';
+                boosterValueEl.title = 'Booster de volumen';
+                boosterValueEl.innerHTML = '<i class="fa-solid fa-volume-up"></i><span>+7 flujos</span>';
+                // Insertar después del indicador de latencia
+                if (latencyValueEl && latencyValueEl.parentNode) {
+                    latencyValueEl.parentNode.insertBefore(boosterValueEl, latencyValueEl.nextSibling);
+                }
+            }
+            boosterValueEl.querySelector('span').textContent = '+7 flujos';
+            
+            // Crear overlay de proximidad (simulado)
+            if (!proximityOverlayEl) {
+                proximityOverlayEl = document.createElement('div');
+                proximityOverlayEl.className = 'proximity-overlay';
+                proximityOverlayEl.innerHTML = '<div class="proximity-content"><i class="fa-solid fa-ear"></i><span>Orejo detectado</span></div>';
+                document.body.appendChild(proximityOverlayEl);
+            }
+            // Simular detección de proximidad cada 5 segundos cuando está activo
+            if (isHandsFreeEnabled) {
+                simulateProximityDetection();
+            }
+        }
+
+        function hideHandsFreeIndicators() {
+            // Ocultar indicadores (pero mantenerlos en DOM para rendimiento)
+            if (latencyValueEl) latencyValueEl.style.display = 'none';
+            if (boosterValueEl) boosterValueEl.style.display = 'none';
+            if (proximityOverlayEl) proximityOverlayEl.style.display = 'none';
+        }
+
+        function simulateProximityDetection() {
+            if (!isHandsFreeEnabled || !proximityOverlayEl) return;
+            
+            // Alternar visibilidad del overlay cada 3-5 segundos para simular detección
+            setTimeout(() => {
+                if (isHandsFreeEnabled) {
+                    proximityOverlayEl.style.opacity = proximityOverlayEl.style.opacity === '0' ? '1' : '0';
+                    simulateProximityDetection();
+                }
+            }, 4000);
+        }
+
+        loadChatHistory();
+
+        // Autofocus chat input
+        chatInput.focus();
+    </script>
+</body>
+</html>

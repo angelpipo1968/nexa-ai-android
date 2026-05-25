@@ -1,0 +1,8 @@
+node_modules
+.next
+.vercel
+.git
+.github
+android
+*.md
+!README.md
