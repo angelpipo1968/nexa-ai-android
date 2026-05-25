@@ -1185,35 +1185,30 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
                 shouldAdapt = true,
                 speechStyle = "clear_slow",
                 responseLength = "very_brief",
-                handsFree = true,
                 message = "Conduciendo a alta velocidad. Modo manos libres activado."
             )
             "high" -> DrivingModeRecommendation(
                 shouldAdapt = true,
                 speechStyle = "clear",
                 responseLength = "brief",
-                handsFree = true,
                 message = "Conduciendo. Usar respuestas breves y claras."
             )
             "medium" -> DrivingModeRecommendation(
                 shouldAdapt = true,
                 speechStyle = "normal",
                 responseLength = "brief",
-                handsFree = false,
                 message = "Posiblemente conduciendo. Mantener respuestas concisas."
             )
             "low" -> DrivingModeRecommendation(
                 shouldAdapt = false,
                 speechStyle = "normal",
                 responseLength = "normal",
-                handsFree = false,
                 message = "Baja probabilidad de conducción."
             )
             else -> DrivingModeRecommendation(
                 shouldAdapt = false,
                 speechStyle = "normal",
                 responseLength = "normal",
-                handsFree = false,
                 message = ""
             )
         }
@@ -1223,7 +1218,6 @@ class NexaSensorManager(private val application: Application) : SensorEventListe
         val shouldAdapt: Boolean,
         val speechStyle: String,
         val responseLength: String,
-        val handsFree: Boolean,
         val message: String
     )
 

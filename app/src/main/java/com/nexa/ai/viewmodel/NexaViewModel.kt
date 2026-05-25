@@ -1030,9 +1030,9 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 }
                 return
             }
-            if (cmd.contains("detener manos libres") || cmd.contains("stop hands free") || cmd.contains("salir modo voz") || cmd.contains("exit voice mode")) {
+            if (cmd.contains("salir modo voz") || cmd.contains("exit voice mode")) {
                 stopVoiceMode()
-                speak(if (lang == AppLanguage.SPANISH) "Modo manos libres desactivado" else "Hands free mode off")
+                speak(if (lang == AppLanguage.SPANISH) "Modo voz desactivado" else "Voice mode off")
                 return
             }
             // New voice commands: change language
@@ -1083,9 +1083,9 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             if (cmd.contains("ayuda") || cmd.contains("comandos") || cmd.contains("help") || cmd.contains("commands") || cmd.contains("qué puedes hacer") || cmd.contains("what can you do")) {
                 _uiState.update { it.copy(showVoiceCommandsHelp = true) }
                 val helpText = if (lang == AppLanguage.SPANISH) {
-                    "Puedes decir: limpiar chat, nuevo chat, exportar PDF, repetir, voz masculina, voz femenina, habla inglés, habla español, detener manos libres, o cállate."
+                    "Puedes decir: limpiar chat, nuevo chat, exportar PDF, repetir, voz masculina, voz femenina, habla inglés, habla español, o cállate."
                 } else {
-                    "You can say: clear chat, new chat, export PDF, repeat, male voice, female voice, speak English, speak Spanish, stop hands free, or shut up."
+                    "You can say: clear chat, new chat, export PDF, repeat, male voice, female voice, speak English, speak Spanish, or shut up."
                 }
                 speak(helpText)
                 return

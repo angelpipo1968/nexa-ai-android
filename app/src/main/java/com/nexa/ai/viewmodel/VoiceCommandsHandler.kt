@@ -80,11 +80,9 @@ class VoiceCommandsHandler(
             return VoiceCommandResult.Handled(s("voice_cmd_exporting"))
         }
 
-        // Stop hands-free mode
-        if (c.contains("detener manos libres") || c.contains("stop hands free") ||
-            c.contains("salir modo voz") || c.contains("exit voice mode")) {
+        if (c.contains("salir modo voz") || c.contains("exit voice mode")) {
             onStopVoiceMode()
-            return VoiceCommandResult.Handled(s("voice_cmd_hands_free_off"))
+            return VoiceCommandResult.Handled(s("voice_cmd_voice_mode_off"))
         }
 
         // Change language

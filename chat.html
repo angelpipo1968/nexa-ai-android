@@ -730,10 +730,7 @@
                     <div class="soundwave-bar"></div>
                     <div class="soundwave-bar"></div>
                 </div>
-                <!-- Hands-Free Mode Toggle -->
-                <button id="handsFreeStatus" class="control-btn" title="Activar modo manos libres">
-                    <i class="fa-solid fa-microphone-slash"></i>
-                </button>
+                <!-- Hands-Free Mode Toggle Removed -->
                 <button class="control-btn" id="clearChatBtn" title="Limpiar Conversación">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
@@ -756,8 +753,7 @@
                         <i class="fa-solid fa-sparkles"></i> Hermes AI
                     </div>
                     ¡Hola! Soy **Hermes v5**, tu copiloto de Inteligencia Artificial de NexaIA. 
-                    <br><br>
-                    He sido actualizado con los últimos **fixes de manos libres**. Ahora cuento con soporte premium de **Reconocimiento de Voz (STT)** y **Sintetizador de Voz (TTS)** directamente en tu navegador.
+                    He sido actualizado. Ahora cuento con soporte premium de **Reconocimiento de Voz (STT)** y **Sintetizador de Voz (TTS)** directamente en tu navegador.
                     <br><br>
                     Presiona el ícono del micrófono <i class="fa-solid fa-microphone" style="color:#ef4444"></i> abajo para hablarme, o escribe tu consulta. ¡Hablemos!
                     <div class="message-meta">
@@ -829,14 +825,7 @@
 
         let isVoiceEnabled = true;
         let isListening = false;
-        let isHandsFreeEnabled = false; // Nuevo: modo manos libres
         let currentCategory = 'general';
-
-        // Nuevas variables para indicadores de manos libres
-        let handsFreeStatusEl = null;
-        let latencyValueEl = null;
-        let boosterValueEl = null;
-        let proximityOverlayEl = null;
 
         // Web Speech API interfaces
         let recognition = null;
@@ -857,18 +846,6 @@
         });
         closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('active'));
 
-        // Hands-Free Mode Toggle
-        const handsFreeStatus = document.getElementById('handsFreeStatus');
-        handsFreeStatus.addEventListener('click', () => {
-            isHandsFreeEnabled = !isHandsFreeEnabled;
-            updateHandsFreeUI();
-            // Mostrar mensaje de bienvenida al modo manos libres
-            if (isHandsFreeEnabled) {
-                showTypingAndRespond("Modo manos libres activado. Los sensores y optimizaciones de audio están listos.");
-            } else {
-                showTypingAndRespond("Modo manos libres desactivado.");
-            }
-        });
 
         voiceRate.addEventListener('input', (e) => { ttsRate = parseFloat(e.target.value); rateVal.textContent = ttsRate; localStorage.setItem('nexa_tts_rate', ttsRate); });
         voicePitch.addEventListener('input', (e) => { ttsPitch = parseFloat(e.target.value); pitchVal.textContent = ttsPitch; localStorage.setItem('nexa_tts_pitch', ttsPitch); });
@@ -1380,79 +1357,6 @@
             }
         });
 
-        // Funciones para el modo manos libres
-        function updateHandsFreeUI() {
-            const handsFreeStatus = document.getElementById('handsFreeStatus');
-            if (isHandsFreeEnabled) {
-                handsFreeStatus.classList.add('active');
-                handsFreeStatus.title = 'Desactivar modo manos libres';
-                // Mostrar indicadores de sensores
-                showHandsFreeIndicators();
-            } else {
-                handsFreeStatus.classList.remove('active');
-                handsFreeStatus.title = 'Activar modo manos libres';
-                // Ocultar indicadores de sensores
-                hideHandsFreeIndicators();
-            }
-        }
-
-        function showHandsFreeIndicators() {
-            // Crear o actualizar indicador de latencia
-            if (!latencyValueEl) {
-                latencyValueEl = document.createElement('div');
-                latencyValueEl.className = 'control-btn latency-indicator';
-                latencyValueEl.title = 'Latencia de interrupción';
-                latencyValueEl.innerHTML = '<i class="fa-solid fa-stopwatch"></i><span>80ms</span>';
-                // Insertar después del indicador de conexión
-                const connectionStatus = document.getElementById('connectionStatus');
-                connectionStatus.parentNode.insertBefore(latencyValueEl, connectionStatus.nextSibling);
-            }
-            latencyValueEl.querySelector('span').textContent = '80ms';
-            
-            // Crear o actualizar indicador de booster
-            if (!boosterValueEl) {
-                boosterValueEl = document.createElement('div');
-                boosterValueEl.className = 'control-btn booster-indicator';
-                boosterValueEl.title = 'Booster de volumen';
-                boosterValueEl.innerHTML = '<i class="fa-solid fa-volume-up"></i><span>+7 flujos</span>';
-                // Insertar después del indicador de latencia
-                if (latencyValueEl && latencyValueEl.parentNode) {
-                    latencyValueEl.parentNode.insertBefore(boosterValueEl, latencyValueEl.nextSibling);
-                }
-            }
-            boosterValueEl.querySelector('span').textContent = '+7 flujos';
-            
-            // Crear overlay de proximidad (simulado)
-            if (!proximityOverlayEl) {
-                proximityOverlayEl = document.createElement('div');
-                proximityOverlayEl.className = 'proximity-overlay';
-                proximityOverlayEl.innerHTML = '<div class="proximity-content"><i class="fa-solid fa-ear"></i><span>Orejo detectado</span></div>';
-                document.body.appendChild(proximityOverlayEl);
-            }
-            // Simular detección de proximidad cada 5 segundos cuando está activo
-            if (isHandsFreeEnabled) {
-                simulateProximityDetection();
-            }
-        }
-
-        function hideHandsFreeIndicators() {
-            // Ocultar indicadores (pero mantenerlos en DOM para rendimiento)
-            if (latencyValueEl) latencyValueEl.style.display = 'none';
-            if (boosterValueEl) boosterValueEl.style.display = 'none';
-            if (proximityOverlayEl) proximityOverlayEl.style.display = 'none';
-        }
-
-        function simulateProximityDetection() {
-            if (!isHandsFreeEnabled || !proximityOverlayEl) return;
-            
-            // Alternar visibilidad del overlay cada 3-5 segundos para simular detección
-            setTimeout(() => {
-                if (isHandsFreeEnabled) {
-                    proximityOverlayEl.style.opacity = proximityOverlayEl.style.opacity === '0' ? '1' : '0';
-                    simulateProximityDetection();
-                }
-            }, 4000);
-        }
 
         loadChatHistory();
 
