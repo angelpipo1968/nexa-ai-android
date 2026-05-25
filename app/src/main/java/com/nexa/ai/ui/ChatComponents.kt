@@ -80,7 +80,6 @@ fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLang
     LazyColumn(modifier = modifier.fillMaxWidth(), state = listState,
         contentPadding = chatContentPadding(),
         verticalArrangement = Arrangement.spacedBy(NexaSpacing.itemSpacing())) {
-        if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode, onQuickAction) }
         items(messages, key = { it.id }) { msg ->
             val isLast = msg == messages.lastOrNull()
             val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
@@ -184,49 +183,7 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickA
             lineHeight = 22.sp
         )
 
-        // Voice activation hint (below welcome text)
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 12.dp).clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                .clickable { onActivateVoiceMode() }
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-        ) {
-            // Mic icon with pulse
-            val pulseTransition = rememberInfiniteTransition(label = "micPulse")
-            val micScale by pulseTransition.animateFloat(
-                initialValue = 0.95f, targetValue = 1.05f,
-                animationSpec = infiniteRepeatable(tween(2500, easing = EaseInOut), RepeatMode.Reverse),
-                label = "micScale"
-            )
-            val micGlow by pulseTransition.animateFloat(
-                initialValue = 0.08f, targetValue = 0.18f,
-                animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
-                label = "micGlow"
-            )
-            Box(
-                modifier = Modifier
-                    .size((36 * micScale).dp)
-                    .clip(CircleShape)
-                    .background(NexaAccent.copy(alpha = micGlow)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = NexaAccent.copy(alpha = 0.9f)
-                )
-            }
-            Text(
-                NexaStrings.get("activate_voice", lang),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                letterSpacing = 0.5.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+
 
         // ── Quick Actions ──
         Column(

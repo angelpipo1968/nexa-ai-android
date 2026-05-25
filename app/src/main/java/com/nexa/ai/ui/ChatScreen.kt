@@ -1,5 +1,9 @@
 package com.nexa.ai.ui
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.scale
+import androidx.compose.animation.core.*
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -385,453 +389,124 @@ fun ChatContentPane(
 fun VoiceModeOverlay(
     uiState: NexaUiState,
     onStopVoiceMode: () -> Unit,
-    onInterrupt: () -> Unit = {},
-    onDismissHelp: () -> Unit = {}
+    onInterrupt: () -> Unit,
+    onDismissHelp: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "voiceMode")
-    val haptic = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
+    val transition = updateTransition(
+        targetState = when {
+            uiState.isSpeaking -> "Speaking"
+            uiState.isListening -> "Listening"
+            uiState.isThinking -> "Thinking"
+            else -> "Idle"
+        },
+        label = "OrbState"
+    )
 
-    var prevState by remember { mutableStateOf("") }
-    val currentState = when {
-        uiState.isListening -> "listening"
-        uiState.isThinking -> "thinking"
-        uiState.isSpeaking -> "speaking"
-        else -> "idle"
-    }
-    LaunchedEffect(currentState) {
-        if (prevState != currentState && prevState.isNotEmpty()) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    // A separate infinite transition for the pulsing effect while speaking or listening
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
+    val baseScale by transition.animateFloat(
+        transitionSpec = { tween(500) },
+        label = "scale"
+    ) { state ->
+        when (state) {
+            "Speaking" -> 1.3f + (uiState.voiceVolumeLevel * 0.5f)
+            "Listening" -> 1.1f
+            "Thinking" -> 1.0f
+            else -> 0.9f
         }
-        prevState = currentState
     }
 
-    val ring1Scale by infiniteTransition.animateFloat(
-        initialValue = 0.9f, targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = EaseInOut), RepeatMode.Reverse),
-        label = "r1"
-    )
-    val ring2Scale by infiniteTransition.animateFloat(
-        initialValue = 0.95f, targetValue = 1.18f,
-        animationSpec = infiniteRepeatable(tween(2800, easing = EaseInOut), RepeatMode.Reverse),
-        label = "r2"
-    )
-    val ring3Scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f, targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(tween(3400, easing = EaseInOut), RepeatMode.Reverse),
-        label = "r3"
-    )
-    val coreGlow by infiniteTransition.animateFloat(
-        initialValue = 0.15f, targetValue = 0.45f,
-        animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse),
-        label = "coreGlow"
-    )
-    val coreScale by infiniteTransition.animateFloat(
-        initialValue = 0.97f, targetValue = 1.03f,
-        animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
-        label = "coreScale"
-    )
+    val finalScale = if (uiState.isSpeaking || uiState.isListening) baseScale * pulseScale else baseScale
 
-    val wavePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2f * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing)),
-        label = "wavePhase"
-    )
-    val waveAmplitude by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOut), RepeatMode.Reverse),
-        label = "waveAmp"
-    )
-
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
-        label = "rotation"
-    )
-
-    var swipeOffset by remember { mutableStateOf(0f) }
-    val animatedSwipe by animateFloatAsState(
-        targetValue = swipeOffset,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "swipe"
-    )
-
-    val isListening = uiState.isListening
-    val isThinking = uiState.isThinking
-    val isSpeaking = uiState.isSpeaking
-
-    val accentColor = when {
-        isListening -> NexaAccent
-        isThinking -> Color(0xFF7C6AFF)
-        isSpeaking -> Color(0xFF00E5D0)
-        else -> NexaAccent
+    val orbColor by transition.animateColor(
+        transitionSpec = { tween(500) },
+        label = "color"
+    ) { state ->
+        when (state) {
+            "Speaking" -> Color(0xFF00E5FF)
+            "Listening" -> Color(0xFFAA00FF)
+            "Thinking" -> Color(0xFF555555)
+            else -> Color(0xFF7B1FA2)
+        }
     }
-    val accentDim = accentColor.copy(alpha = 0.15f)
-    val accentMid = accentColor.copy(alpha = 0.35f)
-
-    val stateLabel = when {
-        isListening -> NexaStrings.get("voice_mode_listening", uiState.language)
-        isThinking -> NexaStrings.get("voice_mode_thinking", uiState.language)
-        isSpeaking -> NexaStrings.get("voice_mode_speaking", uiState.language)
-        else -> NexaStrings.get("voice_mode_hint", uiState.language)
-    }
-
-    val recentMessages = uiState.messages.takeLast(3)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0F))
-            .clickable {
-                if (isSpeaking) {
-                    onInterrupt()
-                }
-            }
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        if (swipeOffset > 200f) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onStopVoiceMode()
-                        }
-                        swipeOffset = 0f
-                    },
-                    onDragCancel = { swipeOffset = 0f },
-                    onVerticalDrag = { _, dragAmount ->
-                        if (dragAmount > 0) {
-                            swipeOffset = (swipeOffset + dragAmount).coerceAtMost(400f)
-                        }
-                    }
-                )
-            }
-            .graphicsLayer { translationY = animatedSwipe * 0.3f; alpha = 1f - (swipeOffset / 600f) },
+            .background(Color(0xE60A0A0A))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                if (uiState.isSpeaking) onInterrupt()
+            },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val gridColor = Color.White.copy(alpha = 0.015f)
-            val step = 40f
-            var x = 0f
-            while (x < w) {
-                drawLine(gridColor, Offset(x, 0f), Offset(x, h), strokeWidth = 0.5f)
-                x += step
-            }
-            var y = 0f
-            while (y < h) {
-                drawLine(gridColor, Offset(0f, y), Offset(w, y), strokeWidth = 0.5f)
-                y += step
-            }
-        }
-
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize()
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.weight(0.8f))
-
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(220.dp)
-                        .graphicsLayer {
-                            rotationZ = rotation
-                            alpha = 0.12f
-                        }
-                        .drawBehind {
-                            val stroke = 1.5.dp.toPx()
-                            val dashLen = 12.dp.toPx()
-                            val gapLen = 8.dp.toPx()
-                            val r = size.minDimension / 2f
-                            val paint = android.graphics.Paint().apply {
-                                color = accentColor.copy(alpha = 0.12f).toArgb()
-                                strokeWidth = stroke
-                                style = android.graphics.Paint.Style.STROKE
-                                pathEffect = android.graphics.DashPathEffect(floatArrayOf(dashLen, gapLen), 0f)
-                                isAntiAlias = true
-                            }
-                            drawContext.canvas.nativeCanvas.drawCircle(
-                                size.width / 2f, size.height / 2f, r, paint
-                            )
-                        }
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size((170 * ring3Scale).dp)
-                        .graphicsLayer { alpha = 0.08f }
-                        .clip(CircleShape)
-                        .background(accentDim)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size((140 * ring2Scale).dp)
-                        .graphicsLayer { alpha = 0.12f }
-                        .clip(CircleShape)
-                        .background(accentMid)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size((110 * ring1Scale).dp)
-                        .graphicsLayer { alpha = 0.18f }
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.2f))
-                )
-
-                Canvas(
-                    modifier = Modifier
-                        .size(160.dp)
-                        .graphicsLayer { alpha = if (isListening || isSpeaking) 0.6f else 0.15f }
-                ) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    val baseRadius = size.minDimension / 2f - 10.dp.toPx()
-                    val segments = 60
-                    val amp = 12.dp.toPx() * waveAmplitude * if (isListening) 1f else if (isSpeaking) 0.7f else 0.2f
-
-                    for (i in 0 until segments) {
-                        val angle1 = (2f * Math.PI.toFloat() * i / segments)
-                        val angle2 = (2f * Math.PI.toFloat() * (i + 1) / segments)
-                        val wave1 = baseRadius + amp * kotlin.math.sin(wavePhase * 3 + i * 0.4f)
-                        val wave2 = baseRadius + amp * kotlin.math.sin(wavePhase * 3 + (i + 1) * 0.4f)
-                        val x1 = cx + wave1 * kotlin.math.cos(angle1)
-                        val y1 = cy + wave1 * kotlin.math.sin(angle1)
-                        val x2 = cx + wave2 * kotlin.math.cos(angle2)
-                        val y2 = cy + wave2 * kotlin.math.sin(angle2)
-                        drawLine(
-                            color = accentColor.copy(alpha = 0.4f + 0.3f * kotlin.math.sin(wavePhase + i * 0.2f)),
-                            start = Offset(x1, y1),
-                            end = Offset(x2, y2),
-                            strokeWidth = 2.dp.toPx()
+            Box(
+                modifier = Modifier
+                    .size(150.dp)
+                    .scale(finalScale)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(orbColor.copy(alpha = 0.8f), orbColor.copy(alpha = 0.2f), Color.Transparent)
                         )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size((80 * coreScale).dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    accentColor.copy(alpha = coreGlow),
-                                    accentColor.copy(alpha = coreGlow * 0.4f),
-                                    Color.Transparent
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = when {
-                            isListening -> Icons.Default.Mic
-                            isThinking -> Icons.Default.AutoAwesome
-                            isSpeaking -> Icons.AutoMirrored.Filled.VolumeUp
-                            else -> Icons.Default.Mic
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp),
-                        tint = accentColor
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            AnimatedContent(
-                targetState = stateLabel,
-                transitionSpec = {
-                    fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 4 } togetherWith
-                    fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 4 }
-                },
-                label = "stateLabel"
-            ) { label ->
-                Text(
-                    label,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Light,
-                    color = accentColor.copy(alpha = 0.9f),
-                    letterSpacing = 2.sp
-                )
-            }
-
-            // Real-time transcription display while listening
-            if (isListening && uiState.inputText.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White.copy(alpha = 0.04f),
-                    border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.12f)),
-                    modifier = Modifier.fillMaxWidth(0.8f)
-                ) {
-                    Text(
-                        uiState.inputText,
-                        fontSize = 13.sp,
-                        color = accentColor.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        maxLines = 3,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-
-            val msgCount = uiState.messages.size
-            if (msgCount > 0) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    "$msgCount ${NexaStrings.get("messages_count", uiState.language)}",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.12f),
-                    letterSpacing = 2.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Real-time volume level indicator — visual feedback for mic input
-            if (isListening || isSpeaking) {
-                val volumeLevel = uiState.voiceVolumeLevel
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth(0.6f)
-                        .height(24.dp)
-                ) {
-                    val barWidth = size.width
-                    val barHeight = size.height
-                    val barY = barHeight / 2f
-
-                    // Background bar
-                    drawRoundRect(
-                        color = accentColor.copy(alpha = 0.08f),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
-                    )
-
-                    // Volume fill bar
-                    val fillWidth = barWidth * volumeLevel.coerceIn(0f, 1f)
-                    if (fillWidth > 0) {
-                        drawRoundRect(
-                            color = accentColor.copy(alpha = 0.4f + volumeLevel * 0.4f),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
-                            size = androidx.compose.ui.geometry.Size(fillWidth, barHeight)
-                        )
-                    }
-
-                    // Segments markers
-                    for (i in 1..4) {
-                        val markerX = barWidth * i / 5f
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.06f),
-                            start = Offset(markerX, 2.dp.toPx()),
-                            end = Offset(markerX, barHeight - 2.dp.toPx()),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (recentMessages.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    recentMessages.forEach { msg ->
-                        val isUser = msg.role == "user"
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
-                        ) {
-                            Text(
-                                text = msg.content.take(80) + if (msg.content.length > 80) "…" else "",
-                                fontSize = 11.sp,
-                                fontWeight = if (isUser) FontWeight.Medium else FontWeight.Normal,
-                                color = if (isUser) Color.White.copy(alpha = 0.18f)
-                                else NexaAccent.copy(alpha = 0.15f),
-                                lineHeight = 16.sp,
-                                modifier = Modifier.widthIn(max = 260.dp),
-                                maxLines = 2
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 50.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (swipeOffset < 10f) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isListening) NexaAccent
-                                    else if (isSpeaking) Color(0xFF00E5D0)
-                                    else Color(0xFF7C6AFF)
-                                )
-                        )
-                        Text(
-                            NexaStrings.get("tap_to_stop", uiState.language),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.25f),
-                            letterSpacing = 1.5.sp
-                        )
-                    }
-                }
-
-                Surface(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onStopVoiceMode()
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.04f),
-                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = Color.White.copy(alpha = 0.3f)
-                        )
-                        Text(
-                            NexaStrings.get("stop", uiState.language),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.35f),
-                            letterSpacing = 1.5.sp
-                        )
-                    }
-                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(0.6f)
+                        .align(Alignment.Center)
+                        .clip(CircleShape)
+                        .background(orbColor)
+                )
             }
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Text(
+                text = when {
+                    uiState.isSpeaking -> "Hablando..."
+                    uiState.isThinking -> "Procesando..."
+                    uiState.isListening -> "Escuchando..."
+                    else -> "Esperando..."
+                },
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        IconButton(
+            onClick = onStopVoiceMode,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(24.dp)
+                .size(48.dp)
+                .background(Color.White.copy(alpha = 0.1f), CircleShape)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Cerrar Modo Voz",
+                tint = Color.White
+            )
         }
     }
 }
-
-// ═══════════════════════════════════════
-//  VOICE COMMANDS HELP OVERLAY
-// ═══════════════════════════════════════
 
 @Composable
 fun VoiceCommandsHelpOverlay(

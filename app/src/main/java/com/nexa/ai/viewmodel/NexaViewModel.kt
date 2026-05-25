@@ -300,7 +300,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             } else {
                 // Activate voice mode on wake word
                 _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
-                speechManager.startVoiceAudioSession()
+                
                 speechManager.startListening()
             }
         }
@@ -421,12 +421,12 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                     viewModelScope.launch {
                         kotlinx.coroutines.delay(150) // Quick settle, then monitor
                         if (_uiState.value.voiceMode && _uiState.value.isSpeaking) {
-                            speechManager.startBargeInMonitor()
+                            
                         }
                     }
                 } else {
                     // AI stopped speaking (finished or interrupted)
-                    speechManager.stopBargeInMonitor()
+                    
                     // Start actual speech recognition if not already listening
                     if (!_uiState.value.isListening && !_uiState.value.isThinking) {
                         viewModelScope.launch {
@@ -446,23 +446,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             }
         }
         
-        // Barge-in: AudioRecord detected user voice while AI was speaking
-        speechManager.onBargeInDetected = {
-            if (_uiState.value.voiceMode) {
-                speechManager.stopBargeInMonitor()
-                speechManager.stopSpeaking()
-                // Update UI to show barge-in state
-                _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
-                // Start actual speech recognition now
-                viewModelScope.launch {
-                    // more time to stabilize after stopping TTS output
-                    kotlinx.coroutines.delay(80)
-                    if (_uiState.value.voiceMode && !_uiState.value.isListening) {
-                        speechManager.startListening()
-                    }
-                }
-            }
-        }
+        
         
         speechManager.onSpeechResult = { text ->
             if (_uiState.value.voiceMode) {
@@ -1642,26 +1626,26 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
-            speechManager.startVoiceAudioSession()
+            
             speechManager.startListening()
         } else {
-            speechManager.stopBargeInMonitor()
+            
             speechManager.stopListening()
             speechManager.stopSpeaking()
-            speechManager.stopVoiceAudioSession()
+            
         }
     }
 
     fun stopVoiceMode() {
         _uiState.value = _uiState.value.copy(voiceMode = false)
-        speechManager.stopBargeInMonitor()
+        
         speechManager.stopListening()
         speechManager.stopSpeaking()
-        speechManager.stopVoiceAudioSession()
+        
     }
 
     fun interruptVoice() {
-        speechManager.stopBargeInMonitor()
+        
         speechManager.stopSpeaking()
         // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening
     }

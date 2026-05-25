@@ -56,7 +56,7 @@
     <string name="confirm_password">Confirm password</string>
 
     <!-- Errors -->
-    <string name="mic_permission_denied">Microphone permission denied. Hands-free mode cannot start.</string>
+    <string name="mic_permission_denied">Microphone permission denied. Voice mode cannot start.</string>
     <string name="mic_init_error">Microphone initialization error: %s</string>
     <string name="connection_error">Connection error</string>
     <string name="coordinates">Coordinates</string>
@@ -266,8 +266,8 @@
     <string name="voice_cmd_female">Switched to female voice</string>
     <string name="voice_cmd_generating_image">Generating image</string>
     <string name="voice_cmd_generating_video">Generating video: %s</string>
-    <string name="voice_cmd_hands_free_off">Hands free mode off</string>
-    <string name="voice_cmd_help_text">You can say: clear chat, new chat, export PDF, repeat, male voice, female voice, speak English, speak Spanish, stop hands free, or shut up.</string>
+    <string name="voice_cmd_hands_free_off">Voice mode off</string>
+    <string name="voice_cmd_help_text">You can say: clear chat, new chat, export PDF, repeat, male voice, female voice, speak English, speak Spanish, or shut up.</string>
     <string name="voice_cmd_image_default">Generate a creative and impressive image</string>
     <string name="voice_cmd_image_prompt">Generate an image of: %s</string>
     <string name="voice_cmd_lang_en">Language switched to English</string>
@@ -292,7 +292,7 @@
     <string name="voice_help_code">Code/Program</string>
     <string name="voice_help_dark">Dark mode</string>
     <string name="voice_help_english">Speak English</string>
-    <string name="voice_help_exit">Stop hands free</string>
+    <string name="voice_help_exit">Exit voice mode</string>
     <string name="voice_help_female">Female voice</string>
     <string name="voice_help_help">Help / Commands</string>
     <string name="voice_help_image">Create image/logo</string>
@@ -320,7 +320,7 @@
 
     <!-- Volume -->
     <string name="volume_boost">Volume boost</string>
-    <string name="volume_boost_desc">Louder hands-free volume</string>
+    <string name="volume_boost_desc">Louder voice mode volume</string>
 
     <!-- Welcome -->
     <string name="welcome_msg">Tap the mic and speak,\nor type your message.</string>
