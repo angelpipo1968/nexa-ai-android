@@ -23,6 +23,17 @@ jobs:
     - name: Build Next.js static export
       run: npm run build
 
+    - name: Verify export output
+      run: |
+        echo "Contents of out/ directory:"
+        ls -la out/ || echo "out/ directory does not exist!"
+        echo "---"
+        if [ ! -f out/index.html ]; then
+          echo "WARNING: index.html not found in out/. Copying 404.html as fallback..."
+          cp out/404.html out/index.html 2>/dev/null || echo "No 404.html either. Checking for other HTML files..."
+          find out/ -name "*.html" | head -10
+        fi
+
     - name: Sync Capacitor
       run: npx cap sync android
 
