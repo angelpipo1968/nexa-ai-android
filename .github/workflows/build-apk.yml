@@ -24,43 +24,14 @@ jobs:
       run: npm run build
 
     - name: Ensure index.html exists for Capacitor
+      shell: bash
       run: |
-        echo "=== Contents of out/ ==="
-        ls -laR out/ 2>/dev/null || echo "out/ directory missing!"
-        echo "=== HTML files ==="
-        find out/ -name "*.html" 2>/dev/null || echo "No HTML files found"
         if [ ! -f out/index.html ]; then
-          echo "index.html missing — creating shell that loads the app"
+          echo "index.html missing, creating fallback..."
           mkdir -p out
-          cat > out/index.html << 'HTMLEOF'
-          <!DOCTYPE html>
-          <html lang="es">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-            <title>NEXA AI</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              html, body, #root { width: 100%; height: 100%; overflow: hidden; background: #000; }
-              #loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #00e5a0; font-family: system-ui; }
-            </style>
-          </head>
-          <body>
-            <div id="root"><div id="loading">Cargando NEXA AI...</div></div>
-            <script>
-              // Try loading from Next.js chunks, fallback to redirect
-              try {
-                var chunks = performance.getEntriesByType('resource').filter(function(r){ return r.name.indexOf('_next') > -1; });
-              } catch(e) {}
-              // Redirect to chat page which has the full app
-              window.location.replace('/chat');
-            </script>
-          </body>
-          </html>
-          HTMLEOF
+          printf '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEXA AI</title><style>*{margin:0;padding:0}html,body{width:100%%;height:100%%;background:#000}#loading{display:flex;align-items:center;justify-content:center;height:100%%;color:#00e5a0;font-family:system-ui}</style></head><body><div id="loading">Cargando NEXA AI...</div><script>window.location.replace("/chat")</script></body></html>' > out/index.html
           echo "Created fallback index.html"
         fi
-        echo "=== Verifying ==="
         ls -la out/index.html
 
     - name: Sync Capacitor
