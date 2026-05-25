@@ -962,8 +962,8 @@
             // Scroll to bottom
             scrollToBottom();
 
-            // Simulate Thinking and Bot streaming Response
-            simulateBotResponse(text);
+            // Send to Real Backend
+            fetchRealBotResponse(text);
         }
 
         function addUserMessageBubble(text) {
@@ -1007,32 +1007,35 @@
             if (indicator) indicator.remove();
         }
 
-        function simulateBotResponse(userMsg) {
+        async function fetchRealBotResponse(userMsg) {
             const typingIndicator = createTypingIndicator();
 
-            // Settle thinking time (1.2 to 2 seconds)
-            const thinkingTime = 1000 + Math.random() * 800;
-
-            setTimeout(() => {
+            try {
+                const res = await fetch('http://localhost:3001/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMsg })
+                });
+                
                 removeTypingIndicator();
 
-                // Select context-aware responses or a default
-                const categoryList = responses[currentCategory];
-                let responseText = categoryList[Math.floor(Math.random() * categoryList.length)];
-                
-                // Special easter eggs for user queries
-                const userLower = userMsg.toLowerCase();
-                if (userLower.includes("hora")) {
-                    responseText = `La hora local en tu sistema es **${new Date().toLocaleTimeString()}**. Con el fix v5.0 de SpeechManager, puedes consultar y reproducir la hora infinitas veces sin cortes ni congelamiento del hilo principal de audio.`;
-                } else if (userLower.includes("error") || userLower.includes("gradle")) {
-                    responseText = "Para solucionar el error de compilación de Gradle KSP, recuerda ejecutar `./gradlew clean` para vaciar el incremental de la base de datos de símbolos. Luego recompila con `./gradlew assembleDebug` y funcionará a la perfección.";
-                } else if (userLower.includes("hola") || userLower.includes("hey")) {
-                    responseText = "¡Hola! Un placer conversar contigo. Estoy listo para probar el rendimiento del manos libres o conversar sobre desarrollo Android.";
+                if (!res.ok) {
+                    addBotMessageBubble("Error de red: No pude conectarme con el cerebro de Hermes (servidor local). Asegúrate de correr 'node hermes-server.js'.");
+                    return;
                 }
 
-                // Add bot bubble and stream typing
-                addBotMessageBubble(responseText);
-            }, thinkingTime);
+                const data = await res.json();
+                
+                if (data.error) {
+                    addBotMessageBubble("Ocurrió un error interno: " + data.error);
+                } else {
+                    addBotMessageBubble(data.response);
+                }
+
+            } catch (err) {
+                removeTypingIndicator();
+                addBotMessageBubble("Error de conexión. Asegúrate de ejecutar `node hermes-server.js` en el servidor local. Detalles: " + err.message);
+            }
         }
 
         function showTypingAndRespond(responseMsg) {
