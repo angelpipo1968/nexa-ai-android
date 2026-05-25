@@ -50,7 +50,7 @@
     <string name="cmd_female_voice">Voz femenina</string>
     <string name="cmd_male_voice">Voz masculina</string>
     <string name="cmd_new_chat">Nuevo chat</string>
-    <string name="cmd_stop">Detener manos libres</string>
+    <string name="cmd_stop"></string>
     <string name="cmd_switch_en">Habla inglés</string>
     <string name="cmd_switch_es">Habla español</string>
     <string name="confirm_password">Confirmar contraseña</string>
@@ -266,7 +266,7 @@
     <string name="voice_cmd_female">Cambiado a voz femenina</string>
     <string name="voice_cmd_generating_image">Generando imagen</string>
     <string name="voice_cmd_generating_video">Generando video: %s</string>
-    <string name="voice_cmd_hands_free_off">Modo manos libres desactivado</string>
+    <string name="voice_cmd_hands_free_off"></string>
     <string name="voice_cmd_help_text">Puedes decir: limpiar chat, nuevo chat, exportar PDF, repetir, voz masculina, voz femenina, habla inglés, habla español, detener manos libres, o cállate.</string>
     <string name="voice_cmd_image_default">Genera una imagen creativa e impresionante</string>
     <string name="voice_cmd_image_prompt">Genera una imagen de: %s</string>
@@ -292,7 +292,7 @@
     <string name="voice_help_code">Codificar/Programar</string>
     <string name="voice_help_dark">Modo oscuro</string>
     <string name="voice_help_english">Habla inglés</string>
-    <string name="voice_help_exit">Detener manos libres</string>
+    <string name="voice_help_exit"></string>
     <string name="voice_help_female">Voz femenina</string>
     <string name="voice_help_help">Ayuda / Comandos</string>
     <string name="voice_help_image">Crear imagen/logo</string>

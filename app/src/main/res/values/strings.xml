@@ -50,7 +50,7 @@
     <string name="cmd_female_voice">Female voice</string>
     <string name="cmd_male_voice">Male voice</string>
     <string name="cmd_new_chat">New chat</string>
-    <string name="cmd_stop">Stop hands free</string>
+    <string name="cmd_stop"></string>
     <string name="cmd_switch_en">Speak English</string>
     <string name="cmd_switch_es">Speak Spanish</string>
     <string name="confirm_password">Confirm password</string>

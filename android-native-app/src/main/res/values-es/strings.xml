@@ -34,7 +34,7 @@
     <string name="cmd_female_voice">Voz femenina</string>
     <string name="cmd_male_voice">Voz masculina</string>
     <string name="cmd_new_chat">Nuevo chat</string>
-    <string name="cmd_stop">Detener manos libres</string>
+    <string name="cmd_stop"></string>
     <string name="cmd_switch_en">Habla inglés</string>
     <string name="cmd_switch_es">Habla español</string>
     <string name="confirm_password">Confirmar contraseña</string>
