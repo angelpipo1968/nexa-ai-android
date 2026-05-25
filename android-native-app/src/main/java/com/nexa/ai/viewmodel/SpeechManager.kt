@@ -1221,17 +1221,26 @@ class SpeechManager(private val application: Application) {
 
     fun stopVoiceAudioSession() {
         audioSessionActive = false
+
+        // PRIMERO: Detener monitoreo y grabación (liberar recursos de audio)
         stopBargeInMonitor()
         releaseContinuousAudioRecord()
         disableProximitySensor()
 
+        // SEGUNDO: Detener TTS y Bluetooth SCO
+        stopSpeaking()
+        stopBluetoothSco()
+
+        // TERCERO: Restaurar configuración de audio (DESPUÉS de liberar recursos)
         try {
+            // Restaurar modo de audio ANTES de abandonar foco
             audioManager.mode = AudioManager.MODE_NORMAL
-            setSpeakerphoneOn(false)
-            stopBluetoothSco()
+            setSpeakerphoneOn(true)
+
+            // Finalmente abandonar foco de audio
             abandonAudioFocus()
 
-            // ── RESTORE original volumes ──
+            // Restaurar volúmenes originales
             try {
                 if (savedMusicVolume >= 0) {
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, savedMusicVolume, 0)
@@ -1243,10 +1252,10 @@ class SpeechManager(private val application: Application) {
                 }
             } catch (_: Exception) {}
         } catch (e: Exception) {
-            android.util.Log.e("SpeechManager", "AudioManager restore error: ${e.message}", e)
+            android.util.Log.e("SpeechManager", "Error stopping voice session: ${e.message}", e)
         }
 
-        // Reset adaptive threshold calibration for next session
+        // Resetear calibración para próxima sesión
         noiseFloorDb = 45.0
         adaptiveThresholdDb = 62.0
         calibrationFrames = 0

@@ -455,10 +455,8 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
                 // Start actual speech recognition now
                 viewModelScope.launch {
-                    // ═══ v5.1 FIX ═══
-                    // Increased from 80ms to 200ms — gives audio system
                     // more time to stabilize after stopping TTS output
-                    kotlinx.coroutines.delay(200)
+                    kotlinx.coroutines.delay(80)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening) {
                         speechManager.startListening()
                     }
@@ -1258,11 +1256,146 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
                     if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
                         speak(if (lang == AppLanguage.SPANISH) "He generado tu imagen." else "I've generated your image.", assistantId)
-                    }
-                    return@launch
                 }
+                return@launch
+            }
 
-                // ─── Smart Router: Decide online vs on-device ───
+            // ─── NEW: WEB SEARCH INTEGRATION ───
+            // Check if this query would benefit from web search
+            val needsWebSearch = shouldPerformWebSearch(content)
+            if (needsWebSearch) {
+                android.util.Log.d("NexaVM", "Web search triggered for: $content")
+                val webResult = performWebSearch(content)
+                // Augment the prompt with web search results
+                val augmentedPrompt = """
+                User Query: $content
+                
+                Current Information from Web Search:
+                Summary: ${webResult.summary}
+                Key Points: ${webResult.keyPoints.joinToString("; ")}
+                Sources: ${webResult.sources.joinToString(", ")}
+                
+                Please provide an accurate and up-to-date response based on both your knowledge and the current web information above.
+                """.trimIndent()
+                
+                // Use the augmented prompt for AI inference
+                val groqKey = _uiState.value.groqApiKey
+                val loc = _uiState.value.locationData
+                val messageFlow = if (groqKey.isNotBlank()) {
+                    repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code, systemPrompt = augmentedPrompt)
+                } else {
+                    repository.sendMessageFree(allMessages, language = _uiState.value.language.code, systemPrompt = augmentedPrompt)
+                }
+                
+                messageFlow.collect { event ->
+                    when (event) {
+                        is StreamEvent.Text -> {
+                            fullResponse += event.text
+                            updateActiveSession { s ->
+                                val updated = s.messages.toMutableList()
+                                val idx = updated.indexOfFirst { it.id == assistantId }
+                                if (idx >= 0) {
+                                    updated[idx] = updated[idx].copy(content = fullResponse, isStreaming = true)
+                                } else {
+                                    updated.add(Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = true))
+                                }
+                                s.copy(messages = updated)
+                            }
+                            _uiState.value = _uiState.value.copy(isThinking = false)
+                        }
+                        is StreamEvent.Provider -> {
+                            _uiState.value = _uiState.value.copy(currentProvider = event.name)
+                        }
+                        is StreamEvent.Error -> {
+                            val lang = _uiState.value.language
+                            val translatedError = when {
+                                event.message == "rate_limit" -> NexaStrings.get("rate_limit", lang)
+                                event.message.startsWith("connection_error:") -> "${NexaStrings.get("connection_error", lang)}: ${event.message.removePrefix("connection_error:")}"
+                                event.message.startsWith("server_error:") -> "${NexaStrings.get("server_error", lang)} (${event.message.removePrefix("server_error:")})"
+                                else -> event.message
+                            }
+                            _uiState.value = _uiState.value.copy(error = translatedError, isThinking = false)
+                        }
+                        is StreamEvent.AuthExpired -> {
+                            _uiState.value = _uiState.value.copy(
+                                error = NexaStrings.get("session_expired", _uiState.value.language),
+                                isThinking = false
+                            )
+                            logout()
+                            navigateToLogin()
+                        }
+                        is StreamEvent.Done -> {
+                            updateActiveSession { s ->
+                                val updated = s.messages.toMutableList()
+                                val idx = updated.indexOfFirst { it.id == assistantId }
+                                if (idx >= 0) {
+                                    updated[idx] = updated[idx].copy(isStreaming = false)
+                                }
+                                s.copy(messages = updated, updatedAt = System.currentTimeMillis())
+                            }
+                            _uiState.value = _uiState.value.copy(isThinking = false)
+                            
+                            // ML Learning: learn from this interaction
+                            if (fullResponse.isNotBlank()) {
+                                viewModelScope.launch {
+                                    try {
+                                        val voiceEmotion = voiceEnhancer.voiceState.value.voiceEmotion
+                                        mlEngine.learnFromInteraction(
+                                            userMessage = content,
+                                            aiResponse = fullResponse,
+                                            emotionDetected = voiceEmotion
+                                        )
+                                        // Update conversation context
+                                        conversationEngine.updateContext(
+                                            userMessage = content,
+                                            aiResponse = fullResponse,
+                                            emotion = voiceEmotion
+                                        )
+                                        
+                                        // ─── NEW: Store episodic memory ───
+                                        try {
+                                            val sessionId = _uiState.value.activeSessionId ?: ""
+                                            val emotionProfile = enhancedEmotionAnalyzer.analyzeEmotion(content)
+                                            episodicMemoryManager.storeMemory(
+                                                sessionId = sessionId,
+                                                type = com.nexa.ai.memory.MemoryType.CONTEXT,
+                                                content = "User: $content\nAI: ${fullResponse.take(200)}",
+                                                summary = "${content.take(80)} → ${fullResponse.take(80)}",
+                                                importance = if (emotionProfile.confidence > 0.3f) 0.7f else 0.4f,
+                                                emotion = emotionProfile.primaryEmotion.name.lowercase()
+                                            )
+                                        } catch (_: Exception) {}
+                                        
+                                        // ─── NEW: Update user profile ───
+                                        try {
+                                            userProfileManager.recordInteraction(
+                                                message = content,
+                                                topic = extractTopic(content),
+                                                isVoiceMode = _uiState.value.voiceMode
+                                            )
+                                        } catch (_: Exception) {}
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                            
+                            if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
+                                // Add a tiny "breathing" delay before speaking in voice mode
+                                if (_uiState.value.voiceMode) {
+                                    viewModelScope.launch {
+                                        kotlinx.coroutines.delay(500)
+                                        speak(fullResponse, assistantId)
+                                    }
+                                } else {
+                                    speak(fullResponse, assistantId)
+                                }
+                            }
+                        }
+                    }
+                }
+                return@launch
+            }
+
+            // ─── Smart Router: Decide online vs on-device ───
                 val routingDecision = smartRouter.routeChat(content)
                 _uiState.update { it.copy(isOnDeviceActive = routingDecision.useOnDevice, routingReason = routingDecision.reason) }
 
@@ -2161,9 +2294,34 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         episodicMemoryManager.setConsent(false)
     }
 
-    /** Check if memory is enabled. */
-    fun isMemoryEnabled(): Boolean = episodicMemoryManager.hasConsent()
+    /** 
+     * Determine if a query would benefit from web search based on question patterns.
+     * Returns true for questions likely needing current/factual information.
+     */
+    private fun shouldPerformWebSearch(query: String): Boolean {
+        val lowerQuery = query.lowercase()
+        
+        // Patterns that suggest need for current information
+        val currentInfoPatterns = listOf(
+            "qué es", "qué son", "cómo", "cuándo", "dónde", "por qué",
+            "who", "what", "when", "where", "why", "how",
+            "actualizado", "reciente", "hoy", "ayer", "últimas", "latest", "recent", "today",
+            "precio", "cotización", "bolsa", "stock", "price", "market",
+            "clima", "tiempo", "temperatura", "weather", "forecast",
+            "noticia", "noticias", "news", "headline", "breaking",
+            "fecha", "date", "día", "day",
+            "presidente", "presidente", "gobernador", "elección", "election", "president", "governor",
+            "partido", "score", "resultado", "result", "ganó", "won", "perdió", "lost",
+            "lanzó", "launched", "anunció", "announced", "nuevo", "new", "actualización", "update"
+        )
+        
+        // Check if any pattern matches
+        return currentInfoPatterns.any { lowerQuery.contains(it) }
+    }
 
+    // ═══════════════════════════════════════
+    //  NEW: MEMORY & PROFILE HELPERS
+    // ═══════════════════════════════════════
     /** Get memory statistics. */
     fun getMemoryStats(): com.nexa.ai.memory.MemoryStats = episodicMemoryManager.getStats()
 
