@@ -420,6 +420,19 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
         }
     }
     val haptic = LocalHapticFeedback.current
+
+    // Premium cubic-bezier entry animation
+    val entryProgress = remember { Animatable(0f) }
+    LaunchedEffect(message.id) {
+        entryProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(
+                durationMillis = 500,
+                easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+            )
+        )
+    }
+
     // Swipe gesture state
     var swipeOffset by remember { mutableStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(
@@ -431,7 +444,17 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     val swipeThreshold = 120f
     var swipeTriggered by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = entryProgress.value
+                scaleX = 0.92f + 0.08f * entryProgress.value
+                scaleY = 0.92f + 0.08f * entryProgress.value
+                translationY = 40f * (1f - entryProgress.value)
+            },
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+    ) {
         val bubbleMaxWidth = NexaSizes.messageBubbleMaxWidth()
         Box(
             modifier = Modifier
