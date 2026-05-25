@@ -466,6 +466,19 @@ export function NexaApp() {
             setMsgs(prev => [...prev, { id: aid, role: 'assistant', content: '', ts: Date.now(), streaming: true }]);
         }, 400);
 
+        // FIX: Retry logic with AbortController timeout to prevent connection abort
+        const MAX_RETRIES = 2;
+        let lastError: any = null;
+        
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (attempt > 0) {
+                // Exponential backoff: 2s, 4s
+                await new Promise(r => setTimeout(r, 2000 * attempt));
+            }
+            
+            const controller = new AbortController();
+            const fetchTimeout = setTimeout(() => controller.abort(), 55000); // < 60s server limit
+            
         try {
             await sb.from('messages').insert({ conversation_id: currentCid, role: 'user', content: finalContent });
             
@@ -476,6 +489,7 @@ export function NexaApp() {
                     messages: [...msgs, userMsg].map(m => ({ role: m.role, content: m.content })),
                     stream: true 
                 }),
+                signal: controller.signal,
             });
 
             if (!res.ok) {
@@ -533,19 +547,45 @@ export function NexaApp() {
                 try { await sb.from('messages').insert({ conversation_id: currentCid, role: 'assistant', content: full }); } catch {}
             }
 
+            clearTimeout(fetchTimeout);
+            lastError = null;
+            break; // Success, exit retry loop
+            
         } catch (e: any) {
+            clearTimeout(fetchTimeout);
+            lastError = e;
+            const isAbort = e.name === 'AbortError';
+            const isNetworkError = e.message?.includes('connection') || e.message?.includes('network') || e.message?.includes('abort') || e.message?.includes('fetch');
+            
+            // Only retry on network/connection errors, not on server logic errors
+            if (!isNetworkError || attempt >= MAX_RETRIES) {
+                break;
+            }
+            // Continue to next retry attempt
+            continue;
+        } finally {
+            clearTimeout(fetchTimeout);
+        }
+        } // end retry loop
+        
+        // Handle error after all retries exhausted
+        if (lastError) {
             clearTimeout(thinkingTimeout);
+            const isTimeout = lastError.name === 'AbortError';
+            const errorMsg = isTimeout
+                ? '⚠️ La respuesta tardó demasiado. Intenta de nuevo.'
+                : '⚠️ Error de conexión. Verifica tu internet e intenta de nuevo.';
             setMsgs(p => {
                 if (p.some(m => m.id === aid)) {
-                    return p.map(m => m.id === aid ? { ...m, content: `❌ Error: ${e.message}`, streaming: false } : m);
+                    return p.map(m => m.id === aid ? { ...m, content: errorMsg, streaming: false } : m);
                 }
-                return [...p, { id: `e-${Date.now()}`, role: 'assistant', content: `❌ Error: ${e.message}`, ts: Date.now() }];
+                return [...p, { id: `e-${Date.now()}`, role: 'assistant', content: errorMsg, ts: Date.now() }];
             });
-        } finally {
-            setSending(false);
-            setThinking(false);
-            setStreaming(false);
         }
+        
+        setSending(false);
+        setThinking(false);
+        setStreaming(false);
     };
 
     // ═══════════════════════════════════════════

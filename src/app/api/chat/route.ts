@@ -35,7 +35,7 @@ import {
     extractKnowledge, getRelatedKnowledge, analyzeMessageAdvanced
 } from '@/lib/nexa-core/machine-learning';
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 export const runtime = 'nodejs';
 
 const corsHeaders = {
@@ -152,9 +152,22 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                 try {
                     logger.info(`Attempting chat with ${providerKey}`, 'chat', { requestId });
                     
+        // FIX: Timeout helper to prevent slow providers from blocking all fallbacks
+        const fetchWithTimeout = (url: string, options: any, timeoutMs = 20000) => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            return Promise.race([
+                fetch(url, { ...options, signal: controller.signal }),
+                new Promise((_, reject) => setTimeout(() => {
+                    clearTimeout(timeout);
+                    reject(new Error(`Timeout: ${timeoutMs}ms`));
+                }, timeoutMs))
+            ]).finally(() => clearTimeout(timeout));
+        };
+
                     // OpenAI Compatible (Groq, DeepSeek, OpenAI, Z.ai, OpenRouter)
                     if (['groq', 'deepseek', 'openai', 'zai', 'openrouter'].includes(providerKey)) {
-                        const res = await fetch(config.url, {
+                        const res = await fetchWithTimeout(config.url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
                             body: JSON.stringify({ model: config.model, messages, stream: true, temperature: 0.7, max_tokens: 4096 }),
@@ -187,10 +200,10 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                     else if (providerKey === 'anthropic') {
                         const systemMessage = messages.find(m => m.role === 'system')?.content;
                         const userMessages = messages.filter(m => m.role !== 'system');
-                        const res = await fetch(config.url, {
+                        const res = await fetchWithTimeout(config.url, {
                             method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json', 
+                            headers: {
+                                'Content-Type': 'application/json',
                                 'x-api-key': key,
                                 'anthropic-version': '2023-06-01'
                             },
@@ -243,7 +256,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                             return { role: m.role === 'assistant' ? 'model' : 'user', parts };
                         });
 
-                        const res = await fetch(config.url(config.model, key), {
+                        const res = await fetchWithTimeout(config.url(config.model, key), {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ contents }),
@@ -321,11 +334,13 @@ export async function POST(req: NextRequest) {
         let userLat = latitude;
         let userLon = longitude;
         
+        // Get client IP for geolocation and user identification
+        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || req.headers.get('x-real-ip')
+            || undefined;
+        
         // If client didn't send GPS data, fall back to IP geolocation
         if (!userLat || !userLon) {
-            const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-                || req.headers.get('x-real-ip')
-                || undefined;
             const ipLocation = await getUserLocation(clientIp);
             if (ipLocation) {
                 if (!userCity) userCity = ipLocation.city;
@@ -356,11 +371,7 @@ Hora Local: ${timeStr}
 
         // --- NEXA ML ENGINE V1 (Machine Learning) ---
         // Derive userId from client IP or custom header (no auth system yet).
-        // When auth is implemented, replace this with the authenticated user ID.
-        const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-            || req.headers.get('x-real-ip')
-            || 'anonymous';
-        const userId = body?.userId || clientIp;
+        const userId = getIdentifier(clientIp);
         
         // 1. Emotion Analysis
         const emotion = analyzeEmotion(userQuery);
