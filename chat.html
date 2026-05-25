@@ -592,6 +592,18 @@
             margin-top: 0.5rem;
             animation: slideIn 0.3s ease-out;
         }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
     </style>
 </head>
 <body>
@@ -629,6 +641,9 @@
                 <button class="control-btn" id="clearChatBtn" title="Limpiar Conversación">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
+                <div id="connectionStatus" class="control-btn" title="Estado de conexión">
+                    <i class="fa-solid fa-wifi"></i>
+                </div>
             </div>
         </header>
 
@@ -673,7 +688,10 @@
             <!-- Main Input Row -->
             <div class="input-row">
                 <div class="input-container">
-                    <input type="text" id="chatInput" placeholder="Pregúntale a Hermes..." autocomplete="off">
+                    <input type="text" id="chatInput" placeholder="Pregúntale a Hermes..." autocomplete="off" aria-label="Entrada de chat" aria-describedby="chat-help">
+                    <div id="chat-help" class="sr-only">
+                        Presione Enter para enviar o use el botón de micrófono para entrada de voz
+                    </div>
                     <!-- Microphone STT button -->
                     <button class="mic-btn" id="micBtn" title="Hablar (Reconocimiento de Voz)">
                         <i class="fa-solid fa-microphone"></i>
@@ -708,6 +726,51 @@
         let recognition = null;
         let ttsSynth = window.speechSynthesis;
         let currentUtterance = null;
+
+        let connectionStatus = 'disconnected';
+
+        function setConnectionStatus(status) {
+            connectionStatus = status;
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = 'control-btn';
+            statusEl.classList.add(status);
+
+            let icon = 'fa-wifi';
+            let title = 'Desconectado';
+
+            switch(status) {
+                case 'connected':
+                    icon = 'fa-wifi';
+                    title = 'Conectado';
+                    break;
+                case 'connecting':
+                    icon = 'fa-spinner fa-spin';
+                    title = 'Conectando...';
+                    break;
+                case 'disconnected':
+                    icon = 'fa-wifi-slash';
+                    title = 'Desconectado - Reintentando...';
+                    break;
+            }
+
+            statusEl.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+            statusEl.title = title;
+        }
+
+        setConnectionStatus('connecting');
+        setTimeout(() => setConnectionStatus('connected'), 500);
+
+        function loadChatHistory() {
+            const saved = localStorage.getItem('hermesChatHistory');
+            if (saved) {
+                chatArea.innerHTML = saved;
+                scrollToBottom();
+            }
+        }
+
+        function saveChatHistory() {
+            localStorage.setItem('hermesChatHistory', chatArea.innerHTML);
+        }
 
         // Custom Intelligent Responses based on Selected Category
         const responses = {
@@ -761,10 +824,16 @@
 
             recognition.onerror = (event) => {
                 console.error("Speech recognition error:", event.error);
-                if (event.error === 'not-allowed') {
+                setConnectionStatus('disconnected');
+
+                if (event.error === 'no-speech' || event.error === 'audio-capture') {
+                    setTimeout(() => {
+                        if (isListening) recognition.start();
+                    }, 1000);
+                } else if (event.error === 'not-allowed') {
                     showWarning("Permiso de micrófono denegado. Actívalo en tu navegador para hablar.");
-                } else if (event.error === 'no-speech') {
-                    chatInput.placeholder = "Pregúntale a Hermes...";
+                } else if (event.error === 'not-supported') {
+                    showWarning("Reconocimiento de voz no soportado en este navegador.");
                 } else {
                     showWarning("Error de voz: " + event.error);
                 }
@@ -911,6 +980,7 @@
                 </div>
             `;
             chatArea.appendChild(msgRow);
+            saveChatHistory();
         }
 
         function createTypingIndicator() {
@@ -1005,6 +1075,7 @@
             msgRow.appendChild(msgContent);
             chatArea.appendChild(msgRow);
             scrollToBottom();
+            saveChatHistory();
 
             // Stream / type character-by-character for visual brilliance (ChatGPT style)
             let index = 0;
@@ -1058,10 +1129,12 @@
 
             currentUtterance.onend = () => {
                 soundWaves.classList.remove('active');
+                chatInput.focus();
             };
 
             currentUtterance.onerror = () => {
                 soundWaves.classList.remove('active');
+                chatInput.focus();
             };
 
             // Speak
@@ -1074,6 +1147,22 @@
             const textContent = bubbleElement.innerText.replace("Hermes AI\n", "");
             speakText(textContent);
         };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && document.activeElement === chatInput) {
+                e.preventDefault();
+                handleSendMessage();
+            }
+            if (e.key === ' ' && e.ctrlKey) { 
+                e.preventDefault();
+                micBtn.click();
+            }
+            if (e.key === 'Escape') { 
+                chatInput.blur();
+            }
+        });
+
+        loadChatHistory();
 
         // Autofocus chat input
         chatInput.focus();
