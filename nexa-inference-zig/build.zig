@@ -29,6 +29,20 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(static_lib);
 
+    // Build the standalone native benchmark/test executable
+    const test_exe_module = b.createModule(.{
+        .root_source_file = b.path("src/test_run.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = "test_nexa_engine",
+        .root_module = test_exe_module,
+    });
+    b.installArtifact(exe);
+
     // Add unit tests
     const main_tests = b.addTest(.{
         .name = "nexa_inference_tests",
@@ -39,3 +53,4 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_main_tests.step);
 }
+
