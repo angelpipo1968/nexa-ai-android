@@ -45,7 +45,9 @@ jobs:
         cache: gradle
 
     - name: Build Release APK (16KB aligned, non-debuggable)
-      run: ./gradlew assembleRelease --stacktrace
+      run: |
+        chmod +x gradlew
+        ./gradlew assembleRelease --stacktrace
       working-directory: android
 
     - name: Upload APK
