@@ -827,6 +827,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.stopListening()
     }
 
+    fun refreshBluetoothState() {
+        speechManager.refreshBluetoothState()
+    }
+
     // ═══════════════════════════════════════
     //  SURPRISE ME
     // ═══════════════════════════════════════
@@ -927,10 +931,77 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             speechManager.stopSpeaking()
         }
 
-        // --- VOICE COMMAND DETECTION ---
+        // --- VOICE & CONVERSATIONAL COMMAND DETECTION ---
         if (_uiState.value.voiceMode || true) { // Detection also in text mode
             val cmd = content.lowercase().trim()
             val lang = _uiState.value.language
+
+            // Conversational Memory Auto-Save: "recuerda que..." / "remember that..."
+            if (cmd.startsWith("recuerda que") || cmd.startsWith("remember that") ||
+                cmd.startsWith("guarda en tu memoria que") || cmd.startsWith("guarda en memoria que") ||
+                cmd.startsWith("recuerda") || cmd.startsWith("remember")) {
+                
+                val fact = content.replace(Regex("(?i)^(recuerda\\s+que\\s*|guardar\\s+en\\s+memoria\\s+que\\s*|remember\\s+that\\s*|guarda\\s+en\\s+tu\\s+memoria\\s+que\\s*|guarda\\s+en\\s+memoria\\s+que\\s*|recuerda\\s*|remember\\s*)"), "").trim()
+                if (fact.isNotBlank()) {
+                    try {
+                        episodicMemoryManager.setConsent(true)
+                        episodicMemoryManager.storeMemory(
+                            sessionId = _uiState.value.activeSessionId ?: "",
+                            type = com.nexa.ai.memory.MemoryType.FACT,
+                            content = fact,
+                            summary = fact,
+                            importance = 0.9f
+                        )
+                        val reply = if (lang == AppLanguage.SPANISH) {
+                            "De acuerdo, he guardado en mi memoria: \"$fact\"."
+                        } else {
+                            "Alright, I've saved to my memory: \"$fact\"."
+                        }
+                        speak(reply)
+                        val assistantMsg = Message(role = "assistant", content = reply)
+                        updateActiveSession { s -> s.copy(messages = s.messages + assistantMsg) }
+                        _uiState.update { it.copy(isThinking = false) }
+                        return
+                    } catch (_: Exception) {}
+                }
+            }
+
+            // Conversational Volume Settings: "activa el volumen" / "boost volume"
+            if (cmd.contains("activa el volumen") || cmd.contains("volumen alto") || cmd.contains("boost volume") || cmd.contains("subir volumen")) {
+                speechManager.setVolumeBoost(true)
+                _uiState.update { it.copy(volumeBoostEnabled = true) }
+                speak(if (lang == AppLanguage.SPANISH) "Volumen amplificado activado" else "Volume boost activated")
+                return
+            }
+            if (cmd.contains("desactiva el volumen") || cmd.contains("bajar volumen") || cmd.contains("normal volume") || cmd.contains("volumen normal")) {
+                speechManager.setVolumeBoost(false)
+                _uiState.update { it.copy(volumeBoostEnabled = false) }
+                speak(if (lang == AppLanguage.SPANISH) "Volumen amplificado desactivado" else "Volume boost deactivated")
+                return
+            }
+
+            // Conversational Speech Rate Settings: "habla más rápido" / "speak faster"
+            if (cmd.contains("habla más rápido") || cmd.contains("habla rápido") || cmd.contains("speak faster") || cmd.contains("habla mas rapido")) {
+                val newRate = 1.3f
+                speechManager.setSpeechRate(newRate)
+                _uiState.update { it.copy(speechRate = newRate) }
+                speak(if (lang == AppLanguage.SPANISH) "De acuerdo, hablaré más rápido" else "Alright, I will speak faster")
+                return
+            }
+            if (cmd.contains("habla más despacio") || cmd.contains("habla lento") || cmd.contains("speak slower") || cmd.contains("habla mas despacio")) {
+                val newRate = 0.75f
+                speechManager.setSpeechRate(newRate)
+                _uiState.update { it.copy(speechRate = newRate) }
+                speak(if (lang == AppLanguage.SPANISH) "De acuerdo, hablaré más despacio" else "Alright, I will speak slower")
+                return
+            }
+            if (cmd.contains("habla normal") || cmd.contains("velocidad normal") || cmd.contains("speak normal") || cmd.contains("velocidad de voz normal")) {
+                val newRate = 1.0f
+                speechManager.setSpeechRate(newRate)
+                _uiState.update { it.copy(speechRate = newRate) }
+                speak(if (lang == AppLanguage.SPANISH) "Velocidad de voz restablecida a lo normal" else "Speech rate reset to normal")
+                return
+            }
 
             // Intent: Where am I?
             if (Regex("(dónde estoy|mi ubicación|ciudad actual|where am i|my location|current city)", RegexOption.IGNORE_CASE).containsMatchIn(cmd)) {
@@ -942,13 +1013,11 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 searchFlightsFromCurrentCity()
                 return
             }
-            
-            // Voice command: clear chat
+
+            // Voice/Text command: clear chat (always runs, removed voiceMode-only restriction)
             if (cmd.contains("limpiar chat") || cmd.contains("clear chat") || cmd.contains("borrar chat") || cmd.contains("borra chat")) {
-                if (_uiState.value.voiceMode) {
-                    clearChat()
-                    speak(if (lang == AppLanguage.SPANISH) "Chat borrado" else "Chat cleared")
-                }
+                clearChat()
+                speak(if (lang == AppLanguage.SPANISH) "Chat borrado" else "Chat cleared")
                 return
             }
             if (cmd.contains("exportar pdf") || cmd.contains("p d f") || cmd.contains("export pdf")) {

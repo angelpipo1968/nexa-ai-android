@@ -1234,24 +1234,7 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
             }
         },
-        actions = {
-            IconButton(onClick = onToggleSettings) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = NexaStrings.get("settings", uiState.language),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            IconButton(onClick = onClearChat) {
-                Icon(
-                    imageVector = Icons.Default.DeleteSweep,
-                    contentDescription = NexaStrings.get("clear_chat", uiState.language),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        },
+        actions = {},
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )
 }

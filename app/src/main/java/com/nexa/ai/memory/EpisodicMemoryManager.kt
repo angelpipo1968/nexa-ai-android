@@ -66,7 +66,7 @@ class EpisodicMemoryManager {
 
     private val memories = mutableListOf<MemoryEntry>()
     private val sessionMemories = mutableMapOf<String, MutableList<String>>() // sessionId -> memoryIds
-    private var isConsentGiven = false
+    private var isConsentGiven = true
 
     fun setConsent(consent: Boolean) {
         isConsentGiven = consent

@@ -44,6 +44,12 @@
             android:exported="false"
             android:theme="@style/Theme.NexaAI" />
 
+        <activity
+            android:name=".tutorial.ui.TutorialMainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.NexaAI"
+            android:label="Tutorial OpenAI Chat" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.nexa.ai.fileprovider"

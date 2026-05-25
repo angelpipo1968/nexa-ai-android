@@ -512,6 +512,15 @@ class SpeechManager(private val application: Application) {
         }
     }
 
+    fun refreshBluetoothState() {
+        detectBluetoothSco()
+        if (isBluetoothScoConnected && audioSessionActive && !scoConnected && !isStartingSco) {
+            android.util.Log.d("SpeechManager", "Bluetooth Connect permission verified: starting SCO routing")
+            startBluetoothSco()
+            setSpeakerphoneOn(false)
+        }
+    }
+
     private fun startBluetoothSco() {
         if (!isBluetoothScoConnected || isStartingSco || scoConnected) return
         isStartingSco = true

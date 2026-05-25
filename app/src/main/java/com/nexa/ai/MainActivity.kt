@@ -40,6 +40,14 @@ class MainActivity : ComponentActivity() {
         // Permission result handled — notifications will work if granted
     }
 
+    private val requestBluetoothPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.refreshBluetoothState()
+        }
+    }
+
     private val requestLocationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -94,6 +102,15 @@ class MainActivity : ComponentActivity() {
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Request Bluetooth Connect permission (Android 12+) for hands-free routing
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
             }
         }
 
@@ -167,12 +184,19 @@ class MainActivity : ComponentActivity() {
                         onClearAttachment = { viewModel.clearPendingAttachment() },
                         onInterruptVoice = { viewModel.interruptVoice() },
                         onToggleVoiceMode = {
-                            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                                == PackageManager.PERMISSION_GRANTED
-                            ) {
-                                viewModel.toggleVoiceMode()
+                            val audioGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                            val btGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
                             } else {
+                                true
+                            }
+
+                            if (audioGranted && btGranted) {
+                                viewModel.toggleVoiceMode()
+                            } else if (!audioGranted) {
                                 requestPermission.launch(Manifest.permission.RECORD_AUDIO)
+                            } else {
+                                requestBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
                             }
                         },
                         onStopVoiceMode = { viewModel.stopVoiceMode() },

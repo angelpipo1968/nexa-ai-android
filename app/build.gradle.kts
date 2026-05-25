@@ -19,6 +19,10 @@ android {
         versionName = "5.1"
 
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
+        
+        // Read property from local.properties securely
+        val apiKey = (project.findProperty("API_KEY") as? String) ?: ""
+        buildConfigField("String", "API_KEY", "\"$apiKey\"")
     }
 
     signingConfigs {
@@ -101,6 +105,12 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
+
+    // Retrofit & Lifecycle LiveData for OpenAI Tutorial
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.7")
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
