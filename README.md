@@ -635,6 +635,19 @@ cd nexa-ai-android
 ./gradlew installDebug
 ```
 
+### Generating a Signed APK
+
+To build a production-ready version of the app:
+
+1. Open Android Studio → **Build** → **Generate Signed Bundle / APK...**
+2. Select **APK** → **Next**.
+3. The keystore is already configured. Select the file: `android/nexa-release.keystore`.
+4. Enter the credentials:
+   - **Key store password**: `NexaAI2024!Release`
+   - **Key alias**: `nexa`
+   - **Key password**: `NexaAI2024!Release`
+5. Select **release** → **Finish**.
+
 ### Free Mode (No API Key Required)
 
 NEXA PRO works out of the box using **Pollinations AI** — a free AI provider that requires no API key. Simply build and run.
