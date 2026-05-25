@@ -1433,11 +1433,16 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 android.util.Log.d("NexaVM", "Routing to ONLINE: ${routingDecision.reason}")
                 val groqKey = _uiState.value.groqApiKey
                 val loc = _uiState.value.locationData
-                val messageFlow = if (groqKey.isNotBlank()) {
-                    repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code, systemPrompt = dynamicSystemPrompt)
-                } else {
-                    repository.sendMessageFree(allMessages, language = _uiState.value.language.code, systemPrompt = dynamicSystemPrompt)
-                }
+                val messageFlow = repository.sendMessage(
+                    messages = allMessages,
+                    baseUrl = BuildConfig.API_BASE_URL,
+                    language = _uiState.value.language.code,
+                    systemPrompt = dynamicSystemPrompt,
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    city = loc.city,
+                    country = loc.country
+                )
 
                 messageFlow.collect { event ->
                     when (event) {
