@@ -10,8 +10,14 @@ comptime {
     _ = c_api.nexa_init;
     _ = c_api.nexa_free;
     _ = c_api.nexa_infer;
+    _ = c_api.nexa_load_gguf;
+    _ = c_api.Java_com_nexa_ai_NexaInference_nexaInit;
+    _ = c_api.Java_com_nexa_ai_NexaInference_nexaFree;
+    _ = c_api.Java_com_nexa_ai_NexaInference_nexaLoadGguf;
+    _ = c_api.Java_com_nexa_ai_NexaInference_nexaInfer;
 }
 
 test "Inclusión de tests" {
     std.testing.refAllDecls(@This());
 }
+
