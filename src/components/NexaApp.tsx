@@ -128,7 +128,14 @@ function TypingIndicator({ accent }: { accent: string }) {
 
 export function NexaApp() {
     const [mounted, setMounted] = useState(false);
-    useEffect(() => { setMounted(true); }, []);
+    useEffect(() => {
+        setMounted(true);
+        // Hide Capacitor splash screen once the app is mounted
+        try {
+            const SplashScreen = (window as any).Capacitor?.Plugins?.SplashScreen;
+            if (SplashScreen?.hide) SplashScreen.hide();
+        } catch {}
+    }, []);
     // ─── States ───
     const [msgs, setMsgs] = useState<Msg[]>([]);
     const [convs, setConvs] = useState<Conv[]>([]);
