@@ -1620,6 +1620,32 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         if (!_uiState.value.autoSpeak) speechManager.stopSpeaking()
     }
 
+    fun toggleHandsFree() {
+        val activating = !_uiState.value.handsFreeEnabled
+        _uiState.value = _uiState.value.copy(handsFreeEnabled = activating)
+        
+        if (activating) {
+            // Enable voice mode and auto-speak for hands-free operation
+            _uiState.value = _uiState.value.copy(voiceMode = true, autoSpeak = true)
+            speechManager.startListening()
+            
+            // Provide feedback
+            addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH) 
+                "Modo manos libres activado. Los sensores y optimizaciones de audio están listos."
+            else 
+                "Hands-free mode activated. Sensors and audio optimizations are ready.")
+        } else {
+            // Disable voice mode but keep listening for potential reactivation
+            speechManager.stopSpeaking()
+            
+            // Provide feedback
+            addSystemMessage(if (_uiState.value.language == AppLanguage.SPANISH) 
+                "Modo manos libres desactivado."
+            else 
+                "Hands-free mode deactivated.")
+        }
+    }
+
     fun toggleVoiceMode() {
         val activating = !_uiState.value.voiceMode
         _uiState.value = _uiState.value.copy(voiceMode = activating, voiceVolumeLevel = 0f)
@@ -1641,9 +1667,9 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         
         speechManager.stopListening()
         speechManager.stopSpeaking()
-        
     }
 
+    fun interruptVoice() {
     fun interruptVoice() {
         
         speechManager.stopSpeaking()

@@ -92,12 +92,13 @@ fun ChatMainScreen(
     onCloneSession: (String) -> Unit = {},
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
-    onDownloadSession: (String) -> Unit = {},
+    onDownloadSession: () -> Unit = {},
     onRegenerate: () -> Unit = {},
     onShareMessage: (String) -> Unit = {},
     onQuickAction: (String) -> Unit = {},
     onCaptureImage: () -> Unit = {},
-    onDismissPreview: () -> Unit = {}
+    onDismissPreview: () -> Unit = {},
+    onToggleHandsFree: () -> Unit = {}
 ) {
     val adaptiveInfo = rememberAdaptiveInfo()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -149,7 +150,8 @@ fun ChatMainScreen(
                 onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
                 onRegenerate = onRegenerate, onShareMessage = onShareMessage,
                 onQuickAction = onQuickAction, onCaptureImage = onCaptureImage,
-                onDismissPreview = onDismissPreview
+                onDismissPreview = onDismissPreview,
+                onToggleHandsFree = onToggleHandsFree
             )
         }
     } else {
@@ -187,7 +189,8 @@ fun ChatMainScreen(
                 onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
                 onRegenerate = onRegenerate, onShareMessage = onShareMessage,
                 onQuickAction = onQuickAction, onCaptureImage = onCaptureImage,
-                onDismissPreview = onDismissPreview
+                onDismissPreview = onDismissPreview,
+                onToggleHandsFree = onToggleHandsFree
             )
         }
     }

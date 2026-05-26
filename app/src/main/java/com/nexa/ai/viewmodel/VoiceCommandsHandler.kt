@@ -60,7 +60,8 @@ class VoiceCommandsHandler(
         onSendMessage: (String) -> Unit,
         onShareLast: () -> Unit,
         onCameraCapture: () -> Unit,
-        onGenerateVideo: (String, VideoGenerator.VideoStyle) -> Unit
+        onGenerateVideo: (String, VideoGenerator.VideoStyle) -> Unit,
+        onToggleHandsFree: () -> Unit
     ): VoiceCommandResult {
         val c = cmd.lowercase().trim()
 
@@ -106,6 +107,18 @@ class VoiceCommandsHandler(
         if (c.contains("voz femenina") || c.contains("female voice") || c.contains("voz de mujer")) {
             onSetVoiceType(VoiceType.FEMALE_1)
             return VoiceCommandResult.Handled(s("voice_cmd_female"))
+        }
+
+        // Hands-free mode
+        if (c.contains("activar modo manos libres") || c.contains("activar manos libres") || 
+            c.contains("hands free on") || c.contains("enable hands free")) {
+            onToggleHandsFree()
+            return VoiceCommandResult.Handled(s("voice_cmd_hands_free_on"))
+        }
+        if (c.contains("desactivar modo manos libres") || c.contains("desactivar manos libres") || 
+            c.contains("hands free off") || c.contains("disable hands free")) {
+            onToggleHandsFree()
+            return VoiceCommandResult.Handled(s("voice_cmd_hands_free_off"))
         }
 
         // New chat
