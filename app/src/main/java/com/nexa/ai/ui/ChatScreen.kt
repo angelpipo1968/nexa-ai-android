@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.theme.LocalAccentColor
 import com.nexa.ai.viewmodel.*
 import kotlinx.coroutines.launch
 
@@ -435,9 +436,10 @@ fun VoiceModeOverlay(
         transitionSpec = { tween(500) },
         label = "color"
     ) { state ->
+        val accent = LocalAccentColor.current
         when (state) {
-            "Speaking" -> Color(0xFF00E5FF)
-            "Listening" -> Color(0xFFAA00FF)
+            "Speaking" -> accent
+            "Listening" -> accent.copy(alpha = 0.7f)
             "Thinking" -> Color(0xFF555555)
             else -> Color(0xFF7B1FA2)
         }

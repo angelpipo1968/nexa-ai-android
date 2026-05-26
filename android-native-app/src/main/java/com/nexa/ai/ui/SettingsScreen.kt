@@ -40,11 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.BuildConfig
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.theme.LocalAccentColor
 import com.nexa.ai.ui.theme.dynamicPrimaryColor
 import com.nexa.ai.viewmodel.*
-
-/** CompositionLocal providing the effective accent color for the current theme. */
-val LocalAccentColor = compositionLocalOf { NexaAccent }
 
 // ═══════════════════════════════════════════════════════════════
 //  SETTINGS SCREEN — Clean Minimalist Redesign
@@ -71,16 +69,13 @@ fun SettingsScreen(
     onPreviewVoice: () -> Unit = {},
     onSetAccentColor: (Color) -> Unit = {},
     onExportSettings: () -> Unit = {},
-    onImportSettings: () -> Unit = {},
-    onSetTinyfishApiKey: (String) -> Unit = {}
+    onImportSettings: () -> Unit = {}
 ) {
     // Standardized spacing measurement for uniformity — using adaptive system
     val sectionSpacing = AdaptiveDimens.sectionSpacing()
     val internalSpacing = AdaptiveDimens.spacingMd()
 
-    val effectiveAccent = if (uiState.accentColor != 0L) Color(uiState.accentColor) else if (uiState.themeMode == ThemeMode.SYSTEM) dynamicPrimaryColor() else NexaAccent
-
-    CompositionLocalProvider(LocalAccentColor provides effectiveAccent) {
+    val effectiveAccent = LocalAccentColor.current
 
     val infiniteTransition = rememberInfiniteTransition(label = "ambient")
     val glowAlpha by infiniteTransition.animateFloat(
@@ -110,11 +105,7 @@ fun SettingsScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(18.dp))
                         }
                     },
-                    actions = {
-                        MinimalIconButton(onClick = { /* Info */ }) {
-                            Icon(Icons.Default.Settings, null, modifier = Modifier.size(16.dp))
-                        }
-                    },
+
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             },
@@ -132,15 +123,31 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(sectionSpacing)
             ) {
 
-                // ── Brand ──
+                // ── Profile Card ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(effectiveAccent, effectiveAccent.copy(alpha = 0.7f)))), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.FlashOn, null, modifier = Modifier.size(18.dp), tint = Color.Black)
-                        }
-                        Text("NEXA", fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp, color = effectiveAccent)
-                        Surface(shape = RoundedCornerShape(6.dp), color = effectiveAccent.copy(alpha = 0.12f)) {
-                            Text("PRO", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = effectiveAccent)
+                    FuturisticCard {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Avatar
+                            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(listOf(effectiveAccent, effectiveAccent.copy(alpha = 0.6f)))), contentAlignment = Alignment.Center) {
+                                if (uiState.user.isLoggedIn) {
+                                    Text(uiState.user.name.take(1).uppercase(), fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                } else {
+                                    Icon(Icons.Default.Person, null, modifier = Modifier.size(22.dp), tint = Color.Black)
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("NEXA PRO", fontSize = 16.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = effectiveAccent)
+                                if (uiState.user.isLoggedIn) {
+                                    Text(uiState.user.email, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                } else {
+                                    Surface(onClick = onNavigateToLogin, shape = RoundedCornerShape(8.dp), color = effectiveAccent.copy(alpha = 0.08f)) {
+                                        Text(NexaStrings.get("login", uiState.language), modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = effectiveAccent)
+                                    }
+                                }
+                            }
+                            Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(effectiveAccent.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.FlashOn, null, modifier = Modifier.size(16.dp), tint = effectiveAccent)
+                            }
                         }
                     }
                 }
@@ -210,47 +217,37 @@ fun SettingsScreen(
                     }
                 }
 
-                // ── Theme ──
+                // ── Appearance (Theme + Accent Color) ──
                 StaggeredFadeIn(visible = sectionsVisible, index = 3) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("theme", uiState.language).uppercase())
                         FuturisticCard {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                                ThemeOption(label = NexaStrings.get("dark", uiState.language), emoji = "🌙", previewTop = Color(0xFF1A1A24), previewBottom = Color(0xFF0D0D12), selected = uiState.themeMode == ThemeMode.DARK, onClick = { onSetThemeMode(ThemeMode.DARK) }, modifier = Modifier.weight(1f))
-                                ThemeOption(label = NexaStrings.get("light", uiState.language), emoji = "☀️", previewTop = Color(0xFFF8F9FC), previewBottom = Color(0xFFFFFFFF), selected = uiState.themeMode == ThemeMode.LIGHT, onClick = { onSetThemeMode(ThemeMode.LIGHT) }, modifier = Modifier.weight(1f))
-                                ThemeOption(label = NexaStrings.get("system", uiState.language), emoji = "⚙️", previewTop = Color(0xFF1A1A24), previewBottom = Color(0xFFF8F9FC), selected = uiState.themeMode == ThemeMode.SYSTEM, onClick = { onSetThemeMode(ThemeMode.SYSTEM) }, isSystem = true, modifier = Modifier.weight(1f))
+                                ThemeOption(label = NexaStrings.get("dark", uiState.language), emoji = "\uD83C\uDF19", previewTop = Color(0xFF1A1A24), previewBottom = Color(0xFF0D0D12), selected = uiState.themeMode == ThemeMode.DARK, onClick = { onSetThemeMode(ThemeMode.DARK) }, modifier = Modifier.weight(1f))
+                                ThemeOption(label = NexaStrings.get("light", uiState.language), emoji = "\u2600\uFE0F", previewTop = Color(0xFFF8F9FC), previewBottom = Color(0xFFFFFFFF), selected = uiState.themeMode == ThemeMode.LIGHT, onClick = { onSetThemeMode(ThemeMode.LIGHT) }, modifier = Modifier.weight(1f))
+                                ThemeOption(label = NexaStrings.get("system", uiState.language), emoji = "\u2699\uFE0F", previewTop = Color(0xFF1A1A24), previewBottom = Color(0xFFF8F9FC), selected = uiState.themeMode == ThemeMode.SYSTEM, onClick = { onSetThemeMode(ThemeMode.SYSTEM) }, isSystem = true, modifier = Modifier.weight(1f))
                             }
-                        }
-                    }
-                }
-
-                // ── Accent Color ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 4) {
-                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
-                        SectionLabel(NexaStrings.get("accent_color", uiState.language).uppercase())
-                        FuturisticCard {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                listOf(
-                                    Color(0xFF00F5A0) to "Emerald",
-                                    Color(0xFF00B4D8) to "Ocean",
-                                    Color(0xFF7C6AFF) to "Violet",
-                                    Color(0xFFFF6B6B) to "Coral",
-                                    Color(0xFFFFB800) to "Amber",
-                                    Color(0xFFFF00E5) to "Magenta",
-                                    Color(0xFF00E5FF) to "Cyan",
-                                    Color(0xFF8B5CF6) to "Purple"
-                                ).forEach { (color, name) ->
-                                    val selected = effectiveAccent == color
-                                    Surface(
-                                        onClick = { onSetAccentColor(color) },
-                                        shape = CircleShape,
-                                        color = color.copy(alpha = if (selected) 1f else 0.5f),
-                                        border = if (selected) BorderStroke(2.dp, Color.White.copy(alpha = 0.8f)) else null,
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        if (selected) {
-                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp), tint = Color.Black)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(NexaStrings.get("accent_color", uiState.language).uppercase(), fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, color = effectiveAccent.copy(alpha = 0.4f))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val accentRow1 = listOf(Color(0xFF00F5A0) to "Emerald", Color(0xFF00B4D8) to "Ocean", Color(0xFF7C6AFF) to "Violet", Color(0xFFFF6B6B) to "Coral")
+                                val accentRow2 = listOf(Color(0xFFFFB800) to "Amber", Color(0xFFFF00E5) to "Magenta", Color(0xFF00E5FF) to "Cyan", Color(0xFF8B5CF6) to "Purple")
+                                listOf(accentRow1, accentRow2).forEach { row ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                        row.forEach { (color, name) ->
+                                            val selected = effectiveAccent == color
+                                            Surface(
+                                                onClick = { onSetAccentColor(color) },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = color.copy(alpha = if (selected) 1f else 0.2f),
+                                                border = if (selected) BorderStroke(1.5.dp, Color.White.copy(alpha = 0.7f)) else BorderStroke(0.5.dp, color.copy(alpha = 0.3f)),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
+                                                    Text(name, fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                                }
                                             }
                                         }
                                     }
@@ -300,30 +297,6 @@ fun SettingsScreen(
                                 }
                                 FuturisticSwitch(checked = uiState.notificationsEnabled, onCheckedChange = { onToggleNotifications() })
                             }
-                        }
-                    }
-                }
-
-                // ── API Keys ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 6) {
-                    Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
-                        SectionLabel("API KEYS")
-                        FuturisticCard {
-                            Text("TinyFish API Key", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = effectiveAccent.copy(alpha = 0.8f))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = uiState.tinyfishApiKey,
-                                onValueChange = { onSetTinyfishApiKey(it) },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("sk-tinyfish-...") },
-                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = effectiveAccent,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                ),
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp)
-                            )
                         }
                     }
                 }
@@ -518,23 +491,14 @@ fun SettingsScreen(
                 }
 
                 // ── Danger Zone ──
-                StaggeredFadeIn(visible = sectionsVisible, index = 12) {
+                StaggeredFadeIn(visible = sectionsVisible, index = 10) {
                     Column(verticalArrangement = Arrangement.spacedBy(internalSpacing)) {
                         SectionLabel(NexaStrings.get("danger_zone", uiState.language).uppercase(), color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                         FuturisticCard {
                             DangerButton(icon = Icons.Default.Delete, label = NexaStrings.get("clear_chat", uiState.language), onClick = onClearChat)
-                            Spacer(modifier = Modifier.height(12.dp))
                             if (uiState.user.isLoggedIn) {
+                                Spacer(modifier = Modifier.height(12.dp))
                                 DangerButton(icon = Icons.AutoMirrored.Filled.ExitToApp, label = NexaStrings.get("logout", uiState.language), subtitle = uiState.user.email, onClick = onLogout)
-                            } else {
-                                Surface(onClick = onNavigateToLogin, shape = RoundedCornerShape(14.dp), color = effectiveAccent.copy(alpha = 0.08f), border = BorderStroke(1.dp, effectiveAccent.copy(alpha = 0.2f)), modifier = Modifier.fillMaxWidth()) {
-                                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(effectiveAccent.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp), tint = effectiveAccent)
-                                        }
-                                        Text(NexaStrings.get("login", uiState.language), color = effectiveAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                                    }
-                                }
                             }
                         }
                     }
@@ -551,7 +515,6 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
-    }
     }
 }
 

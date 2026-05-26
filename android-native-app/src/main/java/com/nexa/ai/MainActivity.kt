@@ -11,12 +11,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.nexa.ai.ui.NexaChatScreen
 import com.nexa.ai.ui.ProvideWindowAdaptiveInfo
+import com.nexa.ai.ui.theme.LocalAccentColor
+import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.ui.theme.NexaTheme
 import com.nexa.ai.viewmodel.NexaViewModel
 import androidx.compose.ui.graphics.Color
@@ -112,7 +115,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            NexaTheme(themeMode = uiState.themeMode) {
+            val effectiveAccent = if (uiState.accentColor != 0L) Color(uiState.accentColor) else NexaAccent
+            CompositionLocalProvider(LocalAccentColor provides effectiveAccent) {
+            NexaTheme(themeMode = uiState.themeMode, accentColor = effectiveAccent) {
                 ProvideWindowAdaptiveInfo {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         NexaChatScreen(
@@ -236,6 +241,7 @@ class MainActivity : ComponentActivity() {
                     )
                     }
                 }
+            }
             }
         }
     }

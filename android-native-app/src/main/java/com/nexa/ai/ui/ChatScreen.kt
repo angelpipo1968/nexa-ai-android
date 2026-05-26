@@ -673,11 +673,13 @@ fun VoiceModeOverlay(
     val isThinking = uiState.isThinking
     val isSpeaking = uiState.isSpeaking
 
+    // Use the user-selected accent color, or fall back to NexaAccent
+    val userAccent = if (uiState.accentColor != 0L) Color(uiState.accentColor) else NexaAccent
     val accentColor = when {
-        isListening -> NexaAccent
+        isListening -> userAccent
         isThinking -> Color(0xFF7C6AFF)
         isSpeaking -> Color(0xFF00E5D0)
-        else -> NexaAccent
+        else -> userAccent
     }
     val accentDim = accentColor.copy(alpha = 0.15f)
     val accentMid = accentColor.copy(alpha = 0.35f)

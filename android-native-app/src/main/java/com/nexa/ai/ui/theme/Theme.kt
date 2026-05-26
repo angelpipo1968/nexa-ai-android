@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.compose.runtime.compositionLocalOf
 import com.nexa.ai.viewmodel.ThemeMode
 
 // ── Futuristic Accent: Emerald-Teal (Custom themes) ──
@@ -28,6 +29,9 @@ val NexaAccent = Color(0xFF00F5A0)       // Primary neon green
 val NexaAccentLight = Color(0xFF66FFD0)  // Lighter variant
 val NexaAccentDark = Color(0xFF00C896)   // Darker variant
 val NexaGlow = Color(0xFF00F5A0)         // Glow color
+
+/** CompositionLocal providing the effective accent color for the entire app. */
+val LocalAccentColor = compositionLocalOf { NexaAccent }
 
 // ── Custom Dark Theme ──
 private val DarkColorScheme = darkColorScheme(
@@ -141,6 +145,7 @@ object NexaTextScale {
 @Composable
 fun NexaTheme(
     themeMode: ThemeMode = ThemeMode.DARK,
+    accentColor: Color = NexaAccent,
     content: @Composable () -> Unit
 ) {
     val isSystemDark = isSystemInDarkTheme()
@@ -150,7 +155,17 @@ fun NexaTheme(
         ThemeMode.SYSTEM -> isSystemDark
     }
 
-    val colorScheme = when (themeMode) {
+    // Determine the effective primary accent to use
+    val effectivePrimary = if (darkTheme) {
+        accentColor
+    } else {
+        // For light theme, darken the accent for better contrast
+        accentColor.copy(red = (accentColor.red * 0.55f), green = (accentColor.green * 0.55f), blue = (accentColor.blue * 0.55f))
+    }
+    // Determine onPrimary: white on dark backgrounds, black on light accent colors
+    val effectiveOnPrimary = if (darkTheme) Color.Black else Color.White
+
+    val baseScheme = when (themeMode) {
         // ── Custom neon themes: always use our fixed palettes ──
         ThemeMode.DARK -> DarkColorScheme
         ThemeMode.LIGHT -> LightColorScheme
@@ -165,6 +180,15 @@ fun NexaTheme(
             }
         }
     }
+
+    // Override primary colors with the user-selected accent color
+    val colorScheme = baseScheme.copy(
+        primary = effectivePrimary,
+        onPrimary = effectiveOnPrimary,
+        secondary = effectivePrimary.copy(alpha = 0.8f),
+        tertiary = effectivePrimary,
+        inversePrimary = effectivePrimary.copy(alpha = 0.7f)
+    )
 
     // Animated theme transition
     val animatedColorScheme = colorScheme.copy(

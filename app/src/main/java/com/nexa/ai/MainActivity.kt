@@ -17,8 +17,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.nexa.ai.ui.NexaChatScreen
+import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.ui.theme.NexaTheme
+import com.nexa.ai.ui.theme.LocalAccentColor
+import com.nexa.ai.ui.theme.dynamicPrimaryColor
 import com.nexa.ai.viewmodel.NexaViewModel
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 import java.io.ByteArrayOutputStream
 
 @AndroidEntryPoint
@@ -129,7 +134,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            NexaTheme(themeMode = uiState.themeMode) {
+            val effectiveAccent = if (uiState.accentColor != 0L) Color(uiState.accentColor)
+                else if (uiState.themeMode == com.nexa.ai.viewmodel.ThemeMode.SYSTEM) dynamicPrimaryColor()
+                else NexaAccent
+
+            NexaTheme(themeMode = uiState.themeMode, accentColor = effectiveAccent) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     NexaChatScreen(
                         uiState = uiState,
@@ -256,8 +265,7 @@ class MainActivity : ComponentActivity() {
                         onSetAccentColor = { viewModel.setAccentColor(it) },
                         onExportSettings = { viewModel.exportSettings() },
                         onImportSettings = { viewModel.importSettings() },
-                        onSetGroqApiKey = { viewModel.setGroqApiKey(it) },
-                        onDeleteGroqApiKey = { viewModel.deleteGroqApiKey() },
+
                         onPinSession = { viewModel.pinSession(it) },
                         onRenameSession = { viewModel.renameSession(it, "") },  // Note: rename dialog would be in UI
                         onCloneSession = { viewModel.cloneSession(it) },
@@ -265,8 +273,7 @@ class MainActivity : ComponentActivity() {
                         onShareSession = { viewModel.shareSession(it) },
                         onDownloadSession = { viewModel.downloadSession(it) },
                         onRegenerate = { viewModel.regenerateLast() },
-                        onSetTinyfishApiKey = { viewModel.setTinyfishApiKey(it) },
-                        onDeleteTinyfishApiKey = { viewModel.deleteTinyfishApiKey() }
+
                     )
                 }
             }

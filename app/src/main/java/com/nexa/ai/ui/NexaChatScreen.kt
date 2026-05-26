@@ -77,11 +77,7 @@ fun NexaChatScreen(
     onPreviewVoice: () -> Unit = {},
     onSetAccentColor: (Color) -> Unit = {},
     onExportSettings: () -> Unit = {},
-    onImportSettings: () -> Unit = {},
-    onSetGroqApiKey: (String) -> Unit = {},
-    onDeleteGroqApiKey: () -> Unit = {},
-    onSetTinyfishApiKey: (String) -> Unit = {},
-    onDeleteTinyfishApiKey: () -> Unit = {}
+    onImportSettings: () -> Unit = {}
 ) {
     // Update dialog
     if (uiState.showUpdateDialog && uiState.updateInfo != null) {
@@ -154,11 +150,7 @@ fun NexaChatScreen(
             onPreviewVoice = onPreviewVoice,
             onSetAccentColor = onSetAccentColor,
             onExportSettings = onExportSettings,
-            onImportSettings = onImportSettings,
-            onSetGroqApiKey = onSetGroqApiKey,
-            onDeleteGroqApiKey = onDeleteGroqApiKey,
-            onSetTinyfishApiKey = onSetTinyfishApiKey,
-            onDeleteTinyfishApiKey = onDeleteTinyfishApiKey
+            onImportSettings = onImportSettings
         )
         Screen.TRANSLATOR -> TranslatorScreen(
             onBack = onNavigateToChat
