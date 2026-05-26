@@ -1670,7 +1670,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     fun interruptVoice() {
-    fun interruptVoice() {
         
         speechManager.stopSpeaking()
         // stopSpeaking triggers onSpeakingStateChanged(false) which starts listening

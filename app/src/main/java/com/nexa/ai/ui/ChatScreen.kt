@@ -93,7 +93,7 @@ fun ChatMainScreen(
     onCloneSession: (String) -> Unit = {},
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
-    onDownloadSession: () -> Unit = {},
+    onDownloadSession: (String) -> Unit = {},
     onRegenerate: () -> Unit = {},
     onShareMessage: (String) -> Unit = {},
     onQuickAction: (String) -> Unit = {},
@@ -229,7 +229,8 @@ fun ChatContentPane(
     onShareMessage: (String) -> Unit,
     onQuickAction: (String) -> Unit,
     onCaptureImage: () -> Unit,
-    onDismissPreview: () -> Unit
+    onDismissPreview: () -> Unit,
+    onToggleHandsFree: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
