@@ -10,7 +10,7 @@ import {
     MoreVertical, Moon, Sun,
     Copy, ThumbsUp, ThumbsDown, RotateCcw, Edit,
     FolderInput, File,
-    Sparkles, Pin, ChevronDown, Palette, Search, Code2
+    Sparkles, Pin, ChevronDown, Search, Code2
 } from 'lucide-react';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -163,7 +163,7 @@ export function NexaApp() {
     const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('female');
     const [voiceIndex, setVoiceIndex] = useState(0);
     const [lang, setLang] = useState('es');
-    const [showThemePicker, setShowThemePicker] = useState(false);
+
 
     // System
     const [conn, setConn] = useState<'ok' | 'err' | 'check'>('check');
@@ -290,22 +290,6 @@ export function NexaApp() {
         }
         setResolvedTheme(themeName as any);
     }, [themeName]);
-
-    const cycleTheme = () => {
-        const next = resolvedTheme === 'dark' ? 'light' : resolvedTheme === 'light' ? 'ultra' : 'dark';
-        setThemeName(next as any);
-        localStorage.setItem('nexa_theme', next);
-    };
-
-    const cycleAccent = () => {
-        const keys = Object.keys(THEME_PRESETS) as ThemePreset[];
-        const idx = keys.indexOf(themePreset);
-        const next = keys[(idx + 1) % keys.length];
-        setThemePreset(next);
-        setAccent(THEME_PRESETS[next].accent as any);
-        localStorage.setItem('nexa_preset', next);
-        localStorage.setItem('nexa_accent', THEME_PRESETS[next].accent);
-    };
 
     // ═══════════════════════════════════════════
     //  PERSISTENCE
@@ -870,7 +854,7 @@ export function NexaApp() {
 
     return (
         <div role="application" aria-label="NEXA AI Chat Interface" suppressHydrationWarning
-            className={showThemePicker ? 'theme-transition' : ''}
+            className=""
             style={{ position: 'fixed', inset: 0, background: T.bg, color: T.text, fontFamily: "'Inter',sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'background-color 0.4s ease' }}>
 
             {/* Skip link */}
@@ -1011,54 +995,12 @@ export function NexaApp() {
                                 }}>
                                 {speaking ? <VolumeX size={18} /> : <Volume2 size={18} />}
                             </button>
-                            {/* Theme color picker */}
-                            <button aria-label="Cambiar color del tema" onClick={cycleAccent} style={{ ...ibtn, width: 32, height: 32, position: 'relative' }}>
-                                <Palette size={18} />
-                                <div style={{ position: 'absolute', bottom: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: accent, border: `2px solid ${T.bg}` }} />
-                            </button>
                             {/* New chat */}
                             <button aria-label="Nuevo Chat" onClick={() => createConv()} style={{ ...ibtn, width: 32, height: 32 }}>
                                 <Plus size={22} />
                             </button>
                         </div>
                     </header>
-
-                    {/* ─── Theme Picker Dropdown ─── */}
-                    <AnimatePresence>
-                        {showThemePicker && (
-                            <>
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 45 }} />
-                                <motion.div initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                    style={{ position: 'fixed', top: 56, right: 12, zIndex: 50, background: T.surf, border: `1px solid ${T.border}`, borderRadius: 16, padding: 12, minWidth: 200, boxShadow: `0 16px 48px rgba(0,0,0,0.4)` }}>
-                                    <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, padding: '0 4px' }}>Color de acento</div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                                        {Object.entries(THEME_PRESETS).map(([key, p]) => (
-                                            <button key={key} onClick={() => { setThemePreset(key as ThemePreset); setAccent(p.accent as any); setShowThemePicker(false); }}
-                                                style={{ width: 40, height: 40, borderRadius: 10, background: `${p.accent}18`, border: themePreset === key ? `2px solid ${p.accent}` : `1px solid ${T.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.2s' }}
-                                                title={p.name}>
-                                                {p.emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div style={{ height: 1, background: T.border, margin: '10px 0' }} />
-                                    <div style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8, padding: '0 4px' }}>Modo</div>
-                                    <div style={{ display: 'flex', gap: 4 }}>
-                                        {[
-                                            { id: 'dark' as const, icon: Moon, label: 'Oscuro' },
-                                            { id: 'light' as const, icon: Sun, label: 'Claro' },
-                                            { id: 'ultra' as const, icon: Zap, label: 'Ultra' },
-                                        ].map(m => (
-                                            <button key={m.id} onClick={() => { setThemeName(m.id as any); setShowThemePicker(false); }}
-                                                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 4px', borderRadius: 8, background: resolvedTheme === m.id ? `${accent}12` : 'transparent', border: resolvedTheme === m.id ? `1px solid ${accent}25` : '1px solid transparent', color: resolvedTheme === m.id ? accent : T.muted, cursor: 'pointer', fontSize: 9, fontWeight: 600, transition: 'all 0.2s' }}>
-                                                <m.icon size={14} />
-                                                {m.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            </>
-                        )}
-                    </AnimatePresence>
 
                     {/* ─── Messages ─── */}
                     <div ref={chatContainerRef} role="log" aria-label="Mensajes del chat" aria-live="polite"
