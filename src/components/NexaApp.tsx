@@ -13,6 +13,7 @@ import {
     Sparkles, Pin, ChevronDown, Search, Code2
 } from 'lucide-react';
 import { SettingsPanel } from './SettingsPanel';
+import { CanvasMode } from './CanvasMode';
 
 // ═══════════════════════════════════════════
 //  THEME PRESETS — Multiple color schemes
@@ -150,6 +151,8 @@ export function NexaApp() {
     const [activeConvMenu, setActiveConvMenu] = useState<string | null>(null);
     const [activeMsgMenu, setActiveMsgMenu] = useState<string | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [showCanvas, setShowCanvas] = useState(false);
+    const [canvasInitialCode, setCanvasInitialCode] = useState<string | undefined>(undefined);
     const [analyzingImage, setAnalyzingImage] = useState(false);
     const [activeProvider, setActiveProvider] = useState<string>('groq');
 
@@ -813,7 +816,12 @@ export function NexaApp() {
                         <div key={i} style={{ margin: '12px 0', borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.border}` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px', background: T.surf, borderBottom: `1px solid ${T.border}` }}>
                                 <span style={{ fontSize: 12, color: accent, fontWeight: 600, textTransform: 'uppercase', fontFamily: "'JetBrains Mono', monospace" }}>{lang}</span>
-                                <button onClick={() => navigator.clipboard.writeText(code)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>📋 Copiar</button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {(lang === 'html' || lang === 'htm') && (
+                                        <button onClick={() => { setCanvasInitialCode(code); setShowCanvas(true); }} style={{ background: 'none', border: 'none', color: accent, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>▶ Canvas</button>
+                                    )}
+                                    <button onClick={() => navigator.clipboard.writeText(code)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>📋 Copiar</button>
+                                </div>
                             </div>
                             <pre style={{ padding: '14px', background: resolvedTheme === 'light' ? '#f6f8fa' : '#0d1117', overflow: 'auto', maxHeight: 400, margin: 0, WebkitOverflowScrolling: 'touch' as any }}>
                                 <code style={{ fontSize: 13, lineHeight: 1.6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace", color: T.text }}>{code}</code>
@@ -994,6 +1002,10 @@ export function NexaApp() {
                                     animation: speaking ? 'pulse 1.5s ease-in-out infinite' : 'none',
                                 }}>
                                 {speaking ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                            </button>
+                            {/* Canvas */}
+                            <button aria-label="Canvas" onClick={() => { setCanvasInitialCode(undefined); setShowCanvas(true); }} style={{ ...ibtn, width: 32, height: 32 }}>
+                                <Code2 size={18} />
                             </button>
                             {/* New chat */}
                             <button aria-label="Nuevo Chat" onClick={() => createConv()} style={{ ...ibtn, width: 32, height: 32 }}>
@@ -1232,6 +1244,19 @@ export function NexaApp() {
                         </div>
                     </div>
                 </main>
+
+            <AnimatePresence>
+                {showCanvas && (
+                    <CanvasMode
+                        onClose={() => { setShowCanvas(false); setCanvasInitialCode(undefined); }}
+                        onSendMessage={send}
+                        accent={accent}
+                        T={T}
+                        resolvedTheme={resolvedTheme}
+                        initialCode={canvasInitialCode}
+                    />
+                )}
+            </AnimatePresence>
 
             <SettingsPanel 
                 isOpen={showSettings} 

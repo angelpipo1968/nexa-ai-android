@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
-  Play,
   Code2,
   Eye,
   Download,
@@ -14,58 +13,52 @@ import {
   Sparkles,
   SplitSquareHorizontal,
   Columns2,
-  Square,
   RotateCcw,
   Maximize2,
   Minimize2,
   FileCode,
   FileText,
   Palette,
-  Type,
-  AlignLeft,
   Hash,
   Terminal,
   ChevronDown,
   Zap,
-  MessageSquare,
-  Send,
-  Moon,
-  Sun,
-  Monitor,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface CanvasModeProps {
   onClose: () => void;
   onSendMessage?: (text: string) => Promise<void>;
-  theme?: string;
+  accent: string;
+  T: { bg: string; surf: string; border: string; text: string; sec: string; muted: string; inputBg: string };
+  resolvedTheme: string;
+  initialCode?: string;
 }
 
 type SplitMode = 'code' | 'preview' | 'split';
-type FileType = 'html' | 'css' | 'javascript' | 'typescript' | 'json' | 'markdown' | 'python';
+type CanvasFileType = 'html' | 'css' | 'javascript' | 'typescript' | 'json' | 'markdown' | 'python';
 
 interface CanvasFile {
   name: string;
   content: string;
-  language: FileType;
+  language: CanvasFileType;
   modified: boolean;
 }
 
-const LANG_CONFIG: Record<FileType, { color: string; icon: React.ReactNode; label: string }> = {
-  html: { color: '#E34F26', icon: <FileCode className="w-3.5 h-3.5" />, label: 'HTML' },
-  css: { color: '#1572B6', icon: <Palette className="w-3.5 h-3.5" />, label: 'CSS' },
-  javascript: { color: '#F7DF1E', icon: <Terminal className="w-3.5 h-3.5" />, label: 'JS' },
-  typescript: { color: '#3178C6', icon: <Terminal className="w-3.5 h-3.5" />, label: 'TS' },
-  json: { color: '#8B5CF6', icon: <Hash className="w-3.5 h-3.5" />, label: 'JSON' },
-  markdown: { color: '#06B6D4', icon: <AlignLeft className="w-3.5 h-3.5" />, label: 'MD' },
-  python: { color: '#3776AB', icon: <Terminal className="w-3.5 h-3.5" />, label: 'PY' },
+const LANG_CONFIG: Record<CanvasFileType, { color: string; label: string }> = {
+  html: { color: '#E34F26', label: 'HTML' },
+  css: { color: '#1572B6', label: 'CSS' },
+  javascript: { color: '#F7DF1E', label: 'JS' },
+  typescript: { color: '#3178C6', label: 'TS' },
+  json: { color: '#8B5CF6', label: 'JSON' },
+  markdown: { color: '#06B6D4', label: 'MD' },
+  python: { color: '#3776AB', label: 'PY' },
 };
 
 const TEMPLATES: { name: string; desc: string; icon: React.ReactNode; files: CanvasFile[] }[] = [
   {
     name: 'Landing Page',
-    desc: 'Modern landing page with animations',
-    icon: <Sparkles className="w-5 h-5" />,
+    desc: 'Pagina moderna con animaciones',
+    icon: <Sparkles size={20} />,
     files: [
       {
         name: 'index.html',
@@ -126,8 +119,8 @@ const TEMPLATES: { name: string; desc: string; icon: React.ReactNode; files: Can
   },
   {
     name: 'Calculator',
-    desc: 'Functional calculator app',
-    icon: <Hash className="w-5 h-5" />,
+    desc: 'Calculadora funcional',
+    icon: <Hash size={20} />,
     files: [
       {
         name: 'index.html',
@@ -206,8 +199,8 @@ const TEMPLATES: { name: string; desc: string; icon: React.ReactNode; files: Can
   },
   {
     name: 'Blank',
-    desc: 'Start from scratch',
-    icon: <FileText className="w-5 h-5" />,
+    desc: 'Empezar desde cero',
+    icon: <FileText size={20} />,
     files: [
       {
         name: 'index.html',
@@ -234,7 +227,11 @@ const TEMPLATES: { name: string; desc: string; icon: React.ReactNode; files: Can
   },
 ];
 
-export function CanvasMode({ onClose, onSendMessage, theme = 'dark' }: CanvasModeProps) {
+// ═══════════════════════════════════════════
+//  CANVAS MODE COMPONENT
+// ═══════════════════════════════════════════
+
+export function CanvasMode({ onClose, onSendMessage, accent, T, resolvedTheme, initialCode }: CanvasModeProps) {
   const [files, setFiles] = useState<CanvasFile[]>([]);
   const [activeFile, setActiveFile] = useState<string>('index.html');
   const [splitMode, setSplitMode] = useState<SplitMode>('split');
@@ -253,65 +250,53 @@ export function CanvasMode({ onClose, onSendMessage, theme = 'dark' }: CanvasMod
 
   const currentFile = files.find((f) => f.name === activeFile);
 
+  // Handle initial code prop
+  useEffect(() => {
+    if (initialCode && initialCode.trim()) {
+      setFiles([{ name: 'index.html', language: 'html', content: initialCode, modified: false }]);
+      setActiveFile('index.html');
+      setShowTemplates(false);
+    }
+  }, [initialCode]);
+
   // Combine all files into a single HTML document for preview
   const getPreviewContent = useCallback(() => {
     const htmlFile = files.find((f) => f.name.endsWith('.html'));
     if (!htmlFile) {
-      // If no HTML file, create a basic one
       const cssFiles = files.filter((f) => f.name.endsWith('.css'));
       const jsFiles = files.filter((f) => f.name.endsWith('.js') || f.name.endsWith('.ts'));
-
-      let html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NEXA Canvas</title>`;
-      cssFiles.forEach((f) => {
-        html += `\n  <style>\n${f.content}\n  </style>`;
-      });
-      html += `\n</head>\n<body>`;
-      html += `\n<div id="app"></div>`;
-      jsFiles.forEach((f) => {
-        html += `\n  <script>\n${f.content}\n  </script>`;
-      });
+      let html = `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>NEXA Canvas</title>`;
+      cssFiles.forEach((f) => { html += `\n  <style>\n${f.content}\n  </style>`; });
+      html += `\n</head>\n<body>\n<div id="app"></div>`;
+      jsFiles.forEach((f) => { html += `\n  <script>\n${f.content}\n  </script>`; });
       html += `\n</body>\n</html>`;
       return html;
     }
 
     let content = htmlFile.content;
-
-    // Inject CSS files
     const cssFiles = files.filter((f) => f.name.endsWith('.css'));
     cssFiles.forEach((f) => {
       if (!content.includes(f.content)) {
         content = content.replace('</head>', `  <style>\n${f.content}\n  </style>\n</head>`);
       }
     });
-
-    // Inject JS files
     const jsFiles = files.filter((f) => f.name.endsWith('.js') && f.name !== 'index.html');
     jsFiles.forEach((f) => {
       if (!content.includes(f.content)) {
         content = content.replace('</body>', `  <script>\n${f.content}\n  </script>\n</body>`);
       }
     });
-
     return content;
   }, [files]);
 
   // Auto-refresh preview on code changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setPreviewKey((k) => k + 1);
-    }, 300);
+    const timer = setTimeout(() => { setPreviewKey((k) => k + 1); }, 300);
     return () => clearTimeout(timer);
   }, [files]);
 
   const handleCodeChange = (value: string) => {
-    setFiles((prev) =>
-      prev.map((f) => (f.name === activeFile ? { ...f, content: value, modified: true } : f))
-    );
+    setFiles((prev) => prev.map((f) => (f.name === activeFile ? { ...f, content: value, modified: true } : f)));
   };
 
   const handleTemplateSelect = (template: typeof TEMPLATES[number]) => {
@@ -323,16 +308,14 @@ export function CanvasMode({ onClose, onSendMessage, theme = 'dark' }: CanvasMod
   const handleAiGenerate = async () => {
     if (!aiPrompt.trim() || isGenerating) return;
     setIsGenerating(true);
-
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            {
-              role: 'user',
-              content: `You are a web developer. Generate a complete, self-contained HTML page based on this description: "${aiPrompt}"
+          messages: [{
+            role: 'user',
+            content: `You are a web developer. Generate a complete, self-contained HTML page based on this description: "${aiPrompt}"
 
 IMPORTANT RULES:
 1. Respond with ONLY the HTML code. No explanations, no markdown, no code blocks.
@@ -343,8 +326,7 @@ IMPORTANT RULES:
 6. Use system fonts (-apple-system, system-ui, sans-serif).
 7. The page must be fully functional and self-contained.
 8. Do NOT use any external CDNs or frameworks.`,
-            },
-          ],
+          }],
         }),
       });
 
@@ -366,23 +348,15 @@ IMPORTANT RULES:
                 const data = JSON.parse(line.slice(6));
                 if (data.text) {
                   fullText += data.text;
-                  // Live update the code as it streams in
                   setFiles((prev) => {
                     const existing = prev.find((f) => f.name === 'index.html');
                     if (existing) {
-                      return prev.map((f) =>
-                        f.name === 'index.html' ? { ...f, content: fullText, modified: true } : f
-                      );
+                      return prev.map((f) => f.name === 'index.html' ? { ...f, content: fullText, modified: true } : f);
                     }
-                    return [
-                      { name: 'index.html', language: 'html', content: fullText, modified: true },
-                      ...prev,
-                    ];
+                    return [{ name: 'index.html', language: 'html', content: fullText, modified: true }, ...prev];
                   });
                 }
-              } catch {
-                // skip
-              }
+              } catch { /* skip */ }
             }
           }
         }
@@ -390,24 +364,14 @@ IMPORTANT RULES:
 
       // Clean up: remove markdown code blocks if AI added them
       let cleaned = fullText.trim();
-      if (cleaned.startsWith('```html')) {
-        cleaned = cleaned.slice(7);
-      } else if (cleaned.startsWith('```')) {
-        cleaned = cleaned.slice(3);
-      }
-      if (cleaned.endsWith('```')) {
-        cleaned = cleaned.slice(0, -3);
-      }
+      if (cleaned.startsWith('```html')) { cleaned = cleaned.slice(7); }
+      else if (cleaned.startsWith('```')) { cleaned = cleaned.slice(3); }
+      if (cleaned.endsWith('```')) { cleaned = cleaned.slice(0, -3); }
       cleaned = cleaned.trim();
 
-      setFiles((prev) =>
-        prev.map((f) => (f.name === 'index.html' ? { ...f, content: cleaned, modified: false } : f))
-      );
+      setFiles((prev) => prev.map((f) => f.name === 'index.html' ? { ...f, content: cleaned, modified: false } : f));
       setAiPrompt('');
-      toast.success('Code generated!');
-    } catch (error: any) {
-      toast.error('Generation failed. Try again.');
-    } finally {
+    } catch { /* generation failed silently */ } finally {
       setIsGenerating(false);
     }
   };
@@ -417,7 +381,6 @@ IMPORTANT RULES:
     await navigator.clipboard.writeText(currentFile.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    toast.success('Code copied!');
   };
 
   const handleDownload = () => {
@@ -425,28 +388,19 @@ IMPORTANT RULES:
     const blob = new Blob([content], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'project.html';
-    a.click();
+    a.href = url; a.download = 'project.html'; a.click();
     URL.revokeObjectURL(url);
-    toast.success('Downloaded!');
   };
 
-  const handleAddFile = (name: string, language: FileType) => {
-    if (files.find((f) => f.name === name)) {
-      toast.error('File already exists');
-      return;
-    }
+  const handleAddFile = (name: string, language: CanvasFileType) => {
+    if (files.find((f) => f.name === name)) return;
     setFiles((prev) => [...prev, { name, content: '', language, modified: false }]);
     setActiveFile(name);
     setShowNewFileMenu(false);
   };
 
   const handleDeleteFile = (name: string) => {
-    if (files.length <= 1) {
-      toast.error('Cannot delete the last file');
-      return;
-    }
+    if (files.length <= 1) return;
     setFiles((prev) => prev.filter((f) => f.name !== name));
     if (activeFile === name) {
       setActiveFile(files.find((f) => f.name !== name)?.name || '');
@@ -454,11 +408,8 @@ IMPORTANT RULES:
   };
 
   const toggleFullscreen = () => {
-    if (!isFullscreen) {
-      containerRef.current?.requestFullscreen?.();
-    } else {
-      document.exitFullscreen?.();
-    }
+    if (!isFullscreen) { containerRef.current?.requestFullscreen?.(); }
+    else { document.exitFullscreen?.(); }
   };
 
   useEffect(() => {
@@ -475,50 +426,56 @@ IMPORTANT RULES:
     }
   }, [currentFile?.content, activeFile]);
 
-  // Template selection screen
+  // Common button style helper
+  const iconBtnStyle = (active?: boolean): React.CSSProperties => ({
+    padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: active ? `${accent}20` : 'transparent',
+    color: active ? accent : T.muted,
+    transition: 'all 0.15s',
+  });
+
+  // ─── Template Selection Screen ───
   if (showTemplates && files.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex flex-col bg-background"
+        style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', background: T.bg, color: T.text, fontFamily: "'Inter', sans-serif" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 h-14 border-b border-border/50 glass shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Code2 className="w-4 h-4 text-white" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 56, borderBottom: `1px solid ${T.border}`, background: `${T.surf}CC`, backdropFilter: 'blur(10px)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${accent}, ${accent}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Code2 size={16} color="#fff" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold gradient-text">NEXA Canvas</h2>
-              <p className="text-[10px] text-muted-foreground">Code + Live Preview</p>
+              <div style={{ fontSize: 14, fontWeight: 700, color: accent }}>NEXA Canvas</div>
+              <div style={{ fontSize: 10, color: T.muted }}>Code + Live Preview</div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-5 h-5" />
+          <button onClick={onClose} style={{ padding: 8, borderRadius: 8, border: 'none', background: 'transparent', color: T.muted, cursor: 'pointer', display: 'flex' }}>
+            <X size={20} />
           </button>
         </div>
 
         {/* Templates */}
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-lg w-full text-center">
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ maxWidth: 520, width: '100%', textAlign: 'center' }}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center relative">
-                <SplitSquareHorizontal className="w-10 h-10 text-primary" />
-                <div className="absolute inset-0 blur-xl bg-primary/20 rounded-2xl" />
+              <div style={{ width: 80, height: 80, margin: '0 auto 24px', borderRadius: 20, background: `${accent}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                <SplitSquareHorizontal size={40} color={accent} />
+                <div style={{ position: 'absolute', inset: 0, borderRadius: 20, background: `${accent}20`, filter: 'blur(20px)' }} />
               </div>
-              <h3 className="text-2xl font-bold text-foreground mb-2">
-                <span className="gradient-text">NEXA Canvas</span>
+              <h3 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 8px', color: accent }}>
+                NEXA Canvas
               </h3>
-              <p className="text-muted-foreground text-sm mb-8">
-                Write code with AI and see the result in real-time. Side by side.
+              <p style={{ color: T.muted, fontSize: 14, margin: '0 0 32px', lineHeight: 1.6 }}>
+                Escribe codigo con IA y ve el resultado en tiempo real. Lado a lado.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 32 }}>
                 {TEMPLATES.map((template, i) => (
                   <motion.button
                     key={i}
@@ -526,40 +483,46 @@ IMPORTANT RULES:
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 + i * 0.08 }}
                     onClick={() => handleTemplateSelect(template)}
-                    className="flex flex-col items-center gap-3 p-5 rounded-2xl bg-card border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all group"
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 20,
+                      borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`,
+                      color: T.text, cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${accent}50`; e.currentTarget.style.background = `${accent}08`; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.surf; }}
                   >
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: `${accent}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent }}>
                       {template.icon}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{template.name}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{template.desc}</p>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{template.name}</div>
+                      <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{template.desc}</div>
                     </div>
                   </motion.button>
                 ))}
               </div>
 
               {/* AI prompt */}
-              <div className="relative">
-                <div className="flex items-center gap-2 bg-card border border-border/50 rounded-2xl p-2 focus-within:border-primary/40 transition-colors">
-                  <Sparkles className="w-5 h-5 text-primary shrink-0 ml-2" />
-                  <input
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAiGenerate();
-                    }}
-                    placeholder="Or describe what you want to build..."
-                    className="flex-1 bg-transparent py-2 px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                  />
-                  <button
-                    onClick={handleAiGenerate}
-                    disabled={isGenerating || !aiPrompt.trim()}
-                    className="p-2.5 rounded-xl bg-primary/20 text-primary hover:bg-primary/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
-                  >
-                    {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-                  </button>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.surf, border: `1px solid ${T.border}`, borderRadius: 16, padding: 8, transition: 'border-color 0.2s' }}>
+                <Sparkles size={20} color={accent} style={{ flexShrink: 0, marginLeft: 8 }} />
+                <input
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAiGenerate(); }}
+                  placeholder="O describe que quieres construir..."
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, padding: '8px 4px', fontFamily: 'inherit' }}
+                />
+                <button
+                  onClick={handleAiGenerate}
+                  disabled={isGenerating || !aiPrompt.trim()}
+                  style={{
+                    padding: 10, borderRadius: 12, border: 'none', cursor: isGenerating || !aiPrompt.trim() ? 'not-allowed' : 'pointer',
+                    background: `${accent}20`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: isGenerating || !aiPrompt.trim() ? 0.3 : 1, flexShrink: 0, transition: 'all 0.2s',
+                  }}
+                >
+                  {isGenerating ? <Loader2 size={20} style={{ animation: 'nexa-spin 1s linear infinite' }} /> : <Zap size={20} />}
+                </button>
               </div>
             </motion.div>
           </div>
@@ -568,76 +531,91 @@ IMPORTANT RULES:
     );
   }
 
-  // Main Canvas Editor
+  // ─── Main Canvas Editor ───
   return (
     <motion.div
       ref={containerRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex flex-col bg-background"
+      style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', background: T.bg, color: T.text, fontFamily: "'Inter', sans-serif" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 h-12 border-b border-border/50 glass shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Code2 className="w-3.5 h-3.5 text-white" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', height: 48, borderBottom: `1px solid ${T.border}`, background: `${T.surf}CC`, backdropFilter: 'blur(10px)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, ${accent}, ${accent}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Code2 size={14} color="#fff" />
           </div>
-          <span className="text-sm font-semibold gradient-text">Canvas</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: accent }}>Canvas</span>
 
           {/* File tabs */}
-          <div className="flex items-center gap-0.5 ml-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 8 }}>
             {files.map((file) => {
               const config = LANG_CONFIG[file.language];
+              const isActive = activeFile === file.name;
               return (
                 <button
                   key={file.name}
                   onClick={() => setActiveFile(file.name)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                    activeFile === file.name
-                      ? 'bg-primary/15 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
-                  }`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px',
+                    borderRadius: 6, fontSize: 12, fontWeight: 500,
+                    background: isActive ? `${accent}15` : 'transparent',
+                    color: isActive ? accent : T.muted,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                    fontFamily: 'inherit',
+                  }}
+                  onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.color = T.text; e.currentTarget.style.background = `${T.surf}80`; } }}
+                  onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.color = T.muted; e.currentTarget.style.background = 'transparent'; } }}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config?.color || '#888' }} />
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: config?.color || '#888' }} />
                   {file.name}
-                  {file.modified && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  )}
+                  {file.modified && <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent }} />}
                 </button>
               );
             })}
 
             {/* Add file button */}
-            <div className="relative">
+            <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowNewFileMenu(!showNewFileMenu)}
-                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all ml-1"
+                style={{ padding: 4, borderRadius: 6, border: 'none', background: 'transparent', color: T.muted, cursor: 'pointer', display: 'flex', marginLeft: 4 }}
               >
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown size={14} />
               </button>
               <AnimatePresence>
                 {showNewFileMenu && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowNewFileMenu(false)} />
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowNewFileMenu(false)} />
                     <motion.div
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="absolute top-full left-0 mt-1 w-44 bg-card border border-border/50 rounded-xl shadow-xl z-50 overflow-hidden py-1"
+                      style={{
+                        position: 'absolute', top: '100%', left: 0, marginTop: 4, width: 176,
+                        background: T.surf, border: `1px solid ${T.border}`, borderRadius: 12,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.4)', zIndex: 50, overflow: 'hidden', padding: 4,
+                      }}
                     >
                       {[
-                        { name: 'style.css', lang: 'css' as FileType },
-                        { name: 'script.js', lang: 'javascript' as FileType },
-                        { name: 'app.ts', lang: 'typescript' as FileType },
-                        { name: 'data.json', lang: 'json' as FileType },
+                        { name: 'style.css', lang: 'css' as CanvasFileType },
+                        { name: 'script.js', lang: 'javascript' as CanvasFileType },
+                        { name: 'app.ts', lang: 'typescript' as CanvasFileType },
+                        { name: 'data.json', lang: 'json' as CanvasFileType },
                       ].map((item) => (
                         <button
                           key={item.name}
                           onClick={() => handleAddFile(item.name, item.lang)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '8px 12px', fontSize: 12, color: T.muted, background: 'none',
+                            border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: 6,
+                            fontFamily: 'inherit', transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = `${T.surf}80`; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = T.muted; e.currentTarget.style.background = 'none'; }}
                         >
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: LANG_CONFIG[item.lang]?.color }} />
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: LANG_CONFIG[item.lang]?.color }} />
                           {item.name}
                         </button>
                       ))}
@@ -649,105 +627,67 @@ IMPORTANT RULES:
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {/* Split mode toggles */}
-          <div className="flex items-center gap-0.5 bg-secondary/30 rounded-lg p-0.5 mr-2">
-            <button
-              onClick={() => setSplitMode('code')}
-              className={`p-1.5 rounded-md transition-all ${
-                splitMode === 'code' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title="Code only"
-            >
-              <Code2 className="w-3.5 h-3.5" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: `${T.surf}50`, borderRadius: 8, padding: 2, marginRight: 8 }}>
+            <button onClick={() => setSplitMode('code')} style={iconBtnStyle(splitMode === 'code')} title="Solo codigo">
+              <Code2 size={14} />
             </button>
-            <button
-              onClick={() => setSplitMode('split')}
-              className={`p-1.5 rounded-md transition-all ${
-                splitMode === 'split' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title="Split view"
-            >
-              <Columns2 className="w-3.5 h-3.5" />
+            <button onClick={() => setSplitMode('split')} style={iconBtnStyle(splitMode === 'split')} title="Vista dividida">
+              <Columns2 size={14} />
             </button>
-            <button
-              onClick={() => setSplitMode('preview')}
-              className={`p-1.5 rounded-md transition-all ${
-                splitMode === 'preview' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title="Preview only"
-            >
-              <Eye className="w-3.5 h-3.5" />
+            <button onClick={() => setSplitMode('preview')} style={iconBtnStyle(splitMode === 'preview')} title="Solo preview">
+              <Eye size={14} />
             </button>
           </div>
 
           {/* Actions */}
-          <button
-            onClick={handleCopyCode}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
-            title="Copy code"
-          >
-            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+          <button onClick={handleCopyCode} style={iconBtnStyle()} title="Copiar codigo">
+            {copied ? <Check size={16} color="#22c55e" /> : <Copy size={16} />}
           </button>
-          <button
-            onClick={handleDownload}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
-            title="Download"
-          >
-            <Download className="w-4 h-4" />
+          <button onClick={handleDownload} style={iconBtnStyle()} title="Descargar">
+            <Download size={16} />
           </button>
-          <button
-            onClick={() => setPreviewKey((k) => k + 1)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
-            title="Refresh preview"
-          >
-            <RotateCcw className="w-4 h-4" />
+          <button onClick={() => setPreviewKey((k) => k + 1)} style={iconBtnStyle()} title="Refrescar preview">
+            <RotateCcw size={16} />
           </button>
-          <button
-            onClick={toggleFullscreen}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
-            title="Fullscreen"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          <button onClick={toggleFullscreen} style={iconBtnStyle()} title="Pantalla completa">
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all"
-            title="Close"
-          >
-            <X className="w-4 h-4" />
+          <button onClick={onClose} style={iconBtnStyle()} title="Cerrar">
+            <X size={16} />
           </button>
         </div>
       </div>
 
-      {/* Main content - Split View */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* ─── Main content - Split View ─── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Code Editor */}
         {splitMode !== 'preview' && (
-          <div className={`${splitMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col min-w-0 border-r border-border/30`}>
+          <div style={{ width: splitMode === 'split' ? '50%' : '100%', display: 'flex', flexDirection: 'column', minWidth: 0, borderRight: `1px solid ${T.border}50` }}>
             {/* Editor header */}
-            <div className="flex items-center justify-between px-3 py-1.5 bg-card/50 border-b border-border/30">
-              <div className="flex items-center gap-2">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', background: `${T.surf}50`, borderBottom: `1px solid ${T.border}50` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {currentFile && LANG_CONFIG[currentFile.language] && (
                   <>
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: LANG_CONFIG[currentFile.language].color }} />
-                    <span className="text-xs font-medium text-muted-foreground">{currentFile.name}</span>
-                    <span className="text-[10px] text-muted-foreground/50">
-                      {LANG_CONFIG[currentFile.language].label}
-                    </span>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: LANG_CONFIG[currentFile.language].color }} />
+                    <span style={{ fontSize: 12, fontWeight: 500, color: T.muted }}>{currentFile.name}</span>
+                    <span style={{ fontSize: 10, color: `${T.muted}80` }}>{LANG_CONFIG[currentFile.language].label}</span>
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-1">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
                   onClick={() => setShowAiBar(!showAiBar)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
-                    showAiBar
-                      ? 'bg-primary/20 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
-                  }`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px',
+                    borderRadius: 6, fontSize: 12, fontWeight: 500, border: 'none',
+                    background: showAiBar ? `${accent}20` : 'transparent',
+                    color: showAiBar ? accent : T.muted, cursor: 'pointer', transition: 'all 0.15s',
+                    fontFamily: 'inherit',
+                  }}
                 >
-                  <Sparkles className="w-3 h-3" />
+                  <Sparkles size={12} />
                   AI Edit
                 </button>
               </div>
@@ -760,25 +700,29 @@ IMPORTANT RULES:
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden border-b border-border/30"
+                  style={{ overflow: 'hidden', borderBottom: `1px solid ${T.border}50` }}
                 >
-                  <div className="flex items-center gap-2 px-3 py-2 bg-primary/5">
-                    <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: `${accent}08` }}>
+                    <Sparkles size={16} color={accent} style={{ flexShrink: 0 }} />
                     <input
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAiGenerate();
-                      }}
-                      placeholder="Tell AI what to change or create..."
-                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAiGenerate(); }}
+                      placeholder="Dile a la IA que cambiar o crear..."
+                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit' }}
                     />
                     <button
                       onClick={handleAiGenerate}
                       disabled={isGenerating || !aiPrompt.trim()}
-                      className="px-3 py-1 rounded-lg bg-primary/20 text-primary text-xs font-medium hover:bg-primary/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      style={{
+                        padding: '4px 12px', borderRadius: 8, border: 'none',
+                        background: `${accent}20`, color: accent, fontSize: 12, fontWeight: 600,
+                        cursor: isGenerating || !aiPrompt.trim() ? 'not-allowed' : 'pointer',
+                        opacity: isGenerating || !aiPrompt.trim() ? 0.3 : 1,
+                        fontFamily: 'inherit', transition: 'all 0.2s',
+                      }}
                     >
-                      {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
+                      {isGenerating ? <Loader2 size={14} style={{ animation: 'nexa-spin 1s linear infinite' }} /> : 'Apply'}
                     </button>
                   </div>
                 </motion.div>
@@ -786,58 +730,64 @@ IMPORTANT RULES:
             </AnimatePresence>
 
             {/* Code textarea */}
-            <div className="flex-1 overflow-auto relative">
+            <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
               <textarea
                 ref={textareaRef}
                 value={currentFile?.content || ''}
                 onChange={(e) => handleCodeChange(e.target.value)}
-                className="w-full h-full bg-transparent text-foreground font-mono text-[13px] leading-6 p-4 resize-none focus:outline-none whitespace-pre overflow-x-auto"
                 spellCheck={false}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
+                style={{
+                  width: '100%', height: '100%', background: '#0d1117',
+                  color: '#e6edf3', fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  fontSize: 13, lineHeight: 1.6, padding: 16, resize: 'none',
+                  outline: 'none', border: 'none', whiteSpace: 'pre', overflowX: 'auto',
+                  tabSize: 2,
+                }}
               />
 
               {/* Line numbers overlay effect */}
-              <div className="absolute top-0 left-0 w-10 h-full bg-card/30 pointer-events-none border-r border-border/20" />
+              <div style={{ position: 'absolute', top: 0, left: 0, width: 40, height: '100%', background: `${T.surf}30`, pointerEvents: 'none', borderRight: `1px solid ${T.border}20` }} />
             </div>
           </div>
         )}
 
         {/* Preview */}
         {splitMode !== 'code' && (
-          <div className={`${splitMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col min-w-0`}>
+          <div style={{ width: splitMode === 'split' ? '50%' : '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             {/* Preview header */}
-            <div className="flex items-center justify-between px-3 py-1.5 bg-card/50 border-b border-border/30">
-              <div className="flex items-center gap-2">
-                <Eye className="w-3.5 h-3.5 text-primary" />
-                <span className="text-xs font-medium text-muted-foreground">Preview</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', background: `${T.surf}50`, borderBottom: `1px solid ${T.border}50` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Eye size={14} color={accent} />
+                <span style={{ fontSize: 12, fontWeight: 500, color: T.muted }}>Preview</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-0.5">
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <span className="text-[10px] text-muted-foreground">Live</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
+                  <span style={{ fontSize: 10, color: T.muted }}>Live</span>
                 </div>
               </div>
             </div>
 
             {/* Preview iframe */}
-            <div className="flex-1 bg-white relative">
+            <div style={{ flex: 1, background: '#fff', position: 'relative' }}>
               <iframe
                 ref={iframeRef}
                 key={previewKey}
                 srcDoc={getPreviewContent()}
-                className="w-full h-full border-0"
+                style={{ width: '100%', height: '100%', border: 0 }}
                 title="Live Preview"
                 sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"
               />
 
               {/* Generating overlay */}
               {isGenerating && (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                  <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-card border border-border/50 shadow-2xl">
-                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                    <span className="text-sm font-medium text-foreground">Generating...</span>
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderRadius: 16, background: T.surf, border: `1px solid ${T.border}`, boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
+                    <Loader2 size={20} color={accent} style={{ animation: 'nexa-spin 1s linear infinite' }} />
+                    <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>Generando...</span>
                   </div>
                 </div>
               )}
@@ -846,33 +796,39 @@ IMPORTANT RULES:
         )}
       </div>
 
-      {/* Bottom AI bar (always visible) */}
-      <div className="border-t border-border/50 px-3 py-2 glass shrink-0">
-        <div className="flex items-center gap-2 max-w-3xl mx-auto">
-          <Sparkles className="w-4 h-4 text-primary shrink-0" />
+      {/* Bottom AI bar */}
+      <div style={{ borderTop: `1px solid ${T.border}`, padding: '8px 12px', background: `${T.surf}CC`, backdropFilter: 'blur(10px)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 720, margin: '0 auto' }}>
+          <Sparkles size={16} color={accent} style={{ flexShrink: 0 }} />
           <input
             value={aiPrompt}
             onChange={(e) => setAiPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleAiGenerate();
-            }}
-            placeholder="Ask AI to edit, create, or fix anything..."
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAiGenerate(); }}
+            placeholder="Pide a la IA editar, crear o arreglar algo..."
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit' }}
           />
           <button
             onClick={handleAiGenerate}
             disabled={isGenerating || !aiPrompt.trim()}
-            className="px-4 py-1.5 rounded-xl bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
+            style={{
+              padding: '6px 16px', borderRadius: 12, border: 'none',
+              background: `${accent}20`, color: accent, fontSize: 12, fontWeight: 600,
+              cursor: isGenerating || !aiPrompt.trim() ? 'not-allowed' : 'pointer',
+              opacity: isGenerating || !aiPrompt.trim() ? 0.3 : 1,
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontFamily: 'inherit', transition: 'all 0.2s',
+            }}
           >
-            {isGenerating ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Zap className="w-3.5 h-3.5" />
-            )}
-            Generate
+            {isGenerating ? <Loader2 size={14} style={{ animation: 'nexa-spin 1s linear infinite' }} /> : <Zap size={14} />}
+            Generar
           </button>
         </div>
       </div>
+
+      {/* Spinner animation */}
+      <style>{`
+        @keyframes nexa-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </motion.div>
   );
 }
