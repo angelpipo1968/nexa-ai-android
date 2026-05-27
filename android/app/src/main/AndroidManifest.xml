@@ -1,15 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- ============================================================
+         NEXA AI - Android Manifest
+         Permisos optimizados para Google Play Store
+         ============================================================ -->
+
+    <!-- Permiso esencial: Conectividad a Internet para API de IA -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Cámara: Para escanear y enviar imágenes al modelo de visión IA -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Micrófono: Para entrada de voz/asistente de voz -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Notificaciones: Para respuestas de chat en segundo plano -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Vibración: Feedback háptico en la UI -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Servicio en primer plano: Para operaciones de IA en background -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Wake Lock: Mantener pantalla activa durante generación de IA -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- ============================================================
+         Declaración de hardware (soft requirement)
+         Google Play usa esto para filtrar dispositivos
+         android:required="false" = no bloquea instalación
+         ============================================================ -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
     <application
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:enableOnBackInvokedCallback="true">
 
+        <!-- Actividad Principal -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -45,7 +87,7 @@
                     android:host="open" />
             </intent-filter>
 
-            <!-- Deep Link para compartir texto a NEXA -->
+            <!-- Compartir texto a NEXA AI -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -53,6 +95,7 @@
             </intent-filter>
         </activity>
 
+        <!-- FileProvider para compartir archivos -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -60,9 +103,10 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
+                android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Firebase Cloud Messaging (Push Notifications) -->
         <service
             android:name=".NEXAFirebaseMessagingService"
             android:exported="false">
@@ -72,17 +116,4 @@
         </service>
     </application>
 
-    <!-- Permissions -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

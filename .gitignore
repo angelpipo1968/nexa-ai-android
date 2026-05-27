@@ -54,3 +54,11 @@ nexa-inference-zig/zig-out/
 *.dll
 *.lib
 
+
+# Signing credentials - NEVER commit these
+android/keystore.properties
+android/nexa-release.keystore
+android/app/nexa-release.keystore
+*.keystore
+src/app.orig/
+out/
