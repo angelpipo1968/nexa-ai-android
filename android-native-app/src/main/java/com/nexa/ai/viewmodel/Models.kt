@@ -62,6 +62,7 @@ data class NexaUiState(
     val speakingMessageId: String? = null,
     val autoSpeak: Boolean = true,
     val voiceMode: Boolean = false,
+    val handsFreeEnabled: Boolean = false,
     val voiceVolumeLevel: Float = 0f,  // 0f..1f real-time mic volume for visual feedback
     // Settings
     val language: AppLanguage = AppLanguage.SPANISH,

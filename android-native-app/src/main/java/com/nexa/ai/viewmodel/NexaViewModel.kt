@@ -44,6 +44,7 @@ class NexaViewModel(application: Application) : AndroidViewModel(application) {
     private val updateChecker = UpdateChecker()
     private val sessionStore = SessionStore(application)
     private val settingsStore = SettingsStore(application)
+    private val handsFree = com.nexa.ai.handsfree.NexaHandsFreeAllInOne(application)
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -157,6 +158,11 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         restoreState()
         // Auto-request location on startup
         requestLocation()
+
+        // Initialize Hands-Free
+        handsFree.initialize()
+        handsFree.onUserSaid = { text -> sendMessage(text) }
+        handsFree.onError = { error -> _uiState.update { it.copy(error = error) } }
     }
 
     // ═══════════════════════════════════════
@@ -1000,6 +1006,25 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.stopVoiceAudioSession()
     }
 
+    /** Alterna el modo manos libres */
+    fun toggleHandsFree() {
+        val activating = !_uiState.value.handsFreeEnabled
+        _uiState.update { it.copy(handsFreeEnabled = activating) }
+
+        if (activating) {
+            // AL ACTIVAR: Modo voz y auto-habla activados
+            _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
+            speechManager.startListening()
+            val lang = _uiState.value.language
+            speak(if (lang == AppLanguage.SPANISH) "Modo manos libres activado" else "Hands-free mode activated")
+        } else {
+            // AL DESACTIVAR: Detener habla pero mantener escucha
+            speechManager.stopSpeaking()
+            val lang = _uiState.value.language
+            speak(if (lang == AppLanguage.SPANISH) "Modo manos libres desactivado" else "Hands-free mode deactivated")
+        }
+    }
+
     fun interruptVoice() {
         speechManager.stopBargeInMonitor()
         speechManager.stopSpeaking()
@@ -1461,5 +1486,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     override fun onCleared() {
         super.onCleared()
         speechManager.destroy()
+        handsFree.release()
     }
 }
