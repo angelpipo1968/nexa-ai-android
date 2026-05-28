@@ -940,7 +940,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
                 // Send GPS location data to the API server so it can use
                 // real GPS coordinates instead of IP-based geolocation (which
-                // returns the CDN server location, not the user location)
+                // returns the CDN server location, not the user's location)
                 val loc = _uiState.value.locationData
                 val lat = if (loc.isAvailable) loc.latitude else null
                 val lon = if (loc.isAvailable) loc.longitude else null
@@ -1139,6 +1139,8 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 _uiState.update { it.copy(locationData = location, isLocating = false) }
                 if (location.isAvailable) {
                     android.util.Log.d("NexaVM", "Location obtained: ${location.city}, ${location.country} (${location.latitude}, ${location.longitude})")
+                } else {
+                    android.util.Log.w("NexaVM", "Location not available after request")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
