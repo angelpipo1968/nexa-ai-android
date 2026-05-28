@@ -14,11 +14,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,10 +26,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import com.nexa.ai.R
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -52,52 +48,95 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.data.UpdateInfo
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.theme.LocalAccentColor
 import com.nexa.ai.ui.theme.NexaUserBubbleDark
 import com.nexa.ai.ui.theme.NexaUserBubbleLight
 import com.nexa.ai.ui.theme.dynamicPrimaryColor
-import com.nexa.ai.ui.theme.supportsDynamicColors
 import com.nexa.ai.viewmodel.*
+import kotlinx.coroutines.launch
 
 // ═══════════════════════════════════════
 //  MESSAGES
 // ═══════════════════════════════════════
 
 @Composable
-fun ChatMessages(messages: List<Message>, isThinking: Boolean, language: AppLanguage,
-    speakingMessageId: String?, onSpeakMessage: (String, String) -> Unit,
-    onCopyMessage: (String) -> Unit, onExportMessage: (Message) -> Unit,
-    onRegenerate: () -> Unit = {}, isDarkTheme: Boolean = true,
-    themeMode: ThemeMode = ThemeMode.DARK, modifier: Modifier = Modifier,
-    onClearChat: () -> Unit = {}, onStopSpeaking: () -> Unit = {},
-    isSpeaking: Boolean = false, onActivateVoiceMode: () -> Unit = {},
+fun ChatMessages(
+    messages: List<Message>,
+    isThinking: Boolean,
+    language: AppLanguage,
+    speakingMessageId: String?,
+    onSpeakMessage: (String, String) -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onExportMessage: (Message) -> Unit,
+    modifier: Modifier = Modifier,
+    onRegenerate: () -> Unit = {},
+    isDarkTheme: Boolean = true,
+    themeMode: ThemeMode = ThemeMode.DARK,
+    onClearChat: () -> Unit = {},
+    onStopSpeaking: () -> Unit = {},
+    isSpeaking: Boolean = false,
+    onActivateVoiceMode: () -> Unit = {},
     onShareMessage: (String) -> Unit = {},
-    onQuickAction: (String) -> Unit = {}) {
+    onQuickAction: (String) -> Unit = {}
+) {
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val showScrollToBottom by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 5 }
+    }
+    val accentColor = LocalAccentColor.current
+
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
-    LazyColumn(modifier = modifier.fillMaxWidth(), state = listState,
-        contentPadding = chatContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(NexaSpacing.itemSpacing())) {
-        if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode, onQuickAction) }
-        items(messages, key = { it.id }) { msg ->
-            val isLast = msg == messages.lastOrNull()
-            val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
-            MessageBubble(message = msg, isSpeaking = speakingMessageId == msg.id, language = language,
-                isDarkTheme = isDarkTheme, themeMode = themeMode,
-                onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
-                onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null,
-                isLastAssistant = isLastAssistant, onClearChat = onClearChat,
-                onStopSpeaking = onStopSpeaking, isGloballySpeaking = isSpeaking,
-                onShare = { onShareMessage(msg.content) })
+
+    Box(modifier = modifier) {
+        LazyColumn(modifier = Modifier.fillMaxWidth(), state = listState,
+            contentPadding = chatContentPadding(),
+            verticalArrangement = Arrangement.spacedBy(NexaSpacing.itemSpacing())) {
+            if (messages.isEmpty()) item { EmptyState(language, onActivateVoiceMode, onQuickAction) }
+            items(messages, key = { it.id }) { msg ->
+                val isLast = msg == messages.lastOrNull()
+                val isLastAssistant = isLast && msg.role == "assistant" && !msg.isStreaming && msg.content.isNotEmpty()
+                MessageBubble(message = msg, isSpeaking = speakingMessageId == msg.id, language = language,
+                    isDarkTheme = isDarkTheme, themeMode = themeMode,
+                    onSpeak = { onSpeakMessage(msg.content, msg.id) }, onCopy = { onCopyMessage(msg.content) },
+                    onExport = { onExportMessage(msg) }, onRegenerate = if (isLastAssistant) onRegenerate else null,
+                    isLastAssistant = isLastAssistant, onClearChat = onClearChat,
+                    onStopSpeaking = onStopSpeaking, isGloballySpeaking = isSpeaking,
+                    onShare = { onShareMessage(msg.content) })
+            }
+            if (isThinking && messages.isEmpty()) item { ShimmerLoading(isDarkTheme = isDarkTheme) }
+            if (isThinking && messages.isNotEmpty()) item { ThinkingIndicator(language) }
         }
-        if (isThinking && messages.isEmpty()) item { ShimmerLoading(isDarkTheme = isDarkTheme) }
-        if (isThinking && messages.isNotEmpty()) item { ThinkingIndicator(language) }
+
+        // Scroll to bottom FAB
+        AnimatedVisibility(
+            visible = showScrollToBottom,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+        ) {
+            SmallFloatingActionButton(
+                onClick = {
+                    coroutineScope.launch {
+                        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = accentColor,
+                shape = CircleShape,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(Icons.Default.ArrowDownward, null, modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 
 @Composable
 fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickAction: (String) -> Unit = {}) {
+    val accentColor = LocalAccentColor.current
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = NexaSizes.emptyStateTopPadding(), bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -138,8 +177,8 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickA
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.radialGradient(listOf(
-                            NexaAccent.copy(alpha = 0.15f),
-                            NexaAccent.copy(alpha = 0.03f),
+                            accentColor.copy(alpha = 0.15f),
+                            accentColor.copy(alpha = 0.03f),
                             Color.Transparent
                         ))
                     )
@@ -150,8 +189,8 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickA
                     .size((56 * glowScale).dp)
                     .clip(RoundedCornerShape(18.dp))
                     .background(Brush.radialGradient(listOf(
-                        NexaAccent.copy(alpha = glowAlpha),
-                        NexaAccent.copy(alpha = 0.02f),
+                        accentColor.copy(alpha = glowAlpha),
+                        accentColor.copy(alpha = 0.02f),
                         Color.Transparent
                     ))),
                 contentAlignment = Alignment.Center
@@ -170,7 +209,7 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickA
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("NEXA", fontSize = adaptiveText(14.sp), fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface, letterSpacing = 6.sp)
-            Box(modifier = Modifier.width(30.dp).height(1.dp).background(NexaAccent.copy(alpha = 0.5f)))
+            Box(modifier = Modifier.width(30.dp).height(1.dp).background(accentColor.copy(alpha = 0.5f)))
         }
 
         // Welcome message
@@ -208,14 +247,14 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickA
                 modifier = Modifier
                     .size((36 * micScale).dp)
                     .clip(CircleShape)
-                    .background(NexaAccent.copy(alpha = micGlow)),
+                    .background(accentColor.copy(alpha = micGlow)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Mic,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = NexaAccent.copy(alpha = 0.9f)
+                    tint = accentColor.copy(alpha = 0.9f)
                 )
             }
             Text(
@@ -227,65 +266,18 @@ fun EmptyState(lang: AppLanguage, onActivateVoiceMode: () -> Unit = {}, onQuickA
             )
         }
 
-        // ── Quick Actions ──
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 8.dp)
-        ) {
-            Text(
-                NexaStrings.get("quick_actions", lang),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                letterSpacing = 2.sp
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) {
-                QuickActionChip(
-                    emoji = "🎨",
-                    label = NexaStrings.get("create_image", lang),
-                    onClick = { onQuickAction("image") }
-                )
-                QuickActionChip(
-                    emoji = "🌐",
-                    label = NexaStrings.get("create_web", lang),
-                    onClick = { onQuickAction("web") }
-                )
-                QuickActionChip(
-                    emoji = "⭐",
-                    label = NexaStrings.get("create_logo", lang),
-                    onClick = { onQuickAction("logo") }
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) {
-                QuickActionChip(
-                    emoji = "💻",
-                    label = NexaStrings.get("write_code", lang),
-                    onClick = { onQuickAction("code") }
-                )
-                QuickActionChip(
-                    emoji = "📷",
-                    label = NexaStrings.get("vision_camera", lang),
-                    onClick = { onQuickAction("vision") }
-                )
-            }
-        }
+
     }
 }
 
 @Composable
 private fun QuickActionChip(emoji: String, label: String, onClick: () -> Unit) {
+    val accentColor = LocalAccentColor.current
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.15f))
+        border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.15f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -381,10 +373,10 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
     }
 
     // Swipe gesture state
-    var swipeOffset by remember { mutableStateOf(0f) }
+    var swipeOffset by remember { mutableFloatStateOf(0f) }
     val animatedSwipeOffset by animateFloatAsState(
         targetValue = swipeOffset,
-        animationSpec = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "swipeOffset"
     )
     // Threshold to trigger action
@@ -444,17 +436,17 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
                     Row(modifier = Modifier.padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(NexaAccent.copy(alpha = 0.12f)),
+                        Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(3.dp)).background(LocalAccentColor.current.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center) { Text("⚡", fontSize = 6.sp) }
-                        Text("NEXA", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = NexaAccent.copy(alpha = 0.45f), letterSpacing = 1.5.sp)
+                        Text("NEXA", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = LocalAccentColor.current.copy(alpha = 0.45f), letterSpacing = 1.5.sp)
                     }
                 }
                 if (message.attachmentName != null && message.content.startsWith("📎")) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.15f), modifier = Modifier.size(28.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(14.dp), tint = NexaAccent) }
+                        Surface(shape = RoundedCornerShape(8.dp), color = LocalAccentColor.current.copy(alpha = 0.15f), modifier = Modifier.size(28.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(14.dp), tint = LocalAccentColor.current) }
                         }
-                        Text(message.attachmentName, fontSize = 12.sp, color = if (isUser) userTextColor else NexaAccent, fontWeight = FontWeight.Medium)
+                        Text(message.attachmentName, fontSize = 12.sp, color = if (isUser) userTextColor else LocalAccentColor.current, fontWeight = FontWeight.Medium)
                     }
                     if (message.content.length > message.attachmentName.length + 3) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -504,16 +496,17 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                 }
                 // Action buttons INSIDE the message bubble, after the text
                 if (!isUser && !message.isStreaming && message.content.isNotEmpty()) {
+                    val accentColor = LocalAccentColor.current
                     Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Speak button
                 Surface(onClick = onSpeak, shape = RoundedCornerShape(8.dp),
-                    color = if (isSpeaking) NexaAccent.copy(alpha = 0.12f) else Color.Transparent,
+                    color = if (isSpeaking) accentColor.copy(alpha = 0.12f) else Color.Transparent,
                     modifier = Modifier.size(32.dp)) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             if (isSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp, null,
                             modifier = Modifier.size(16.dp),
-                            tint = if (isSpeaking) NexaAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            tint = if (isSpeaking) accentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -560,7 +553,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                         if (onRegenerate != null) {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
                             DropdownMenuItem(
-                                text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = NexaAccent); Text(NexaStrings.get("regenerate", language)) } },
+                                text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = LocalAccentColor.current); Text(NexaStrings.get("regenerate", language)) } },
                                 onClick = { showMsgMenu = false; onRegenerate() }
                             )
                         }
@@ -597,6 +590,7 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
 
 @Composable
 fun ThinkingIndicator(lang: AppLanguage) {
+    val accentColor = LocalAccentColor.current
     // Neon sinusoidal wave indicator
     val infiniteTransition = rememberInfiniteTransition(label = "thinking")
     val phase by infiniteTransition.animateFloat(
@@ -641,7 +635,7 @@ fun ThinkingIndicator(lang: AppLanguage) {
                         val y1 = centerY + amplitude * kotlin.math.sin(phase + i * 0.5f)
                         val y2 = centerY + amplitude * kotlin.math.sin(phase + (i + 1) * 0.5f)
                         drawLine(
-                            color = NexaAccent.copy(alpha = glowAlpha * 0.15f),
+                            color = accentColor.copy(alpha = glowAlpha * 0.15f),
                             start = Offset(x1, y1),
                             end = Offset(x2, y2),
                             strokeWidth = 8.dp.toPx()
@@ -654,7 +648,7 @@ fun ThinkingIndicator(lang: AppLanguage) {
                         val y1 = centerY + amplitude * kotlin.math.sin(phase + i * 0.5f)
                         val y2 = centerY + amplitude * kotlin.math.sin(phase + (i + 1) * 0.5f)
                         drawLine(
-                            color = NexaAccent.copy(alpha = glowAlpha),
+                            color = accentColor.copy(alpha = glowAlpha),
                             start = Offset(x1, y1),
                             end = Offset(x2, y2),
                             strokeWidth = 2.dp.toPx()
@@ -665,7 +659,7 @@ fun ThinkingIndicator(lang: AppLanguage) {
         Text(
             NexaStrings.get("thinking", lang),
             fontSize = 12.sp,
-            color = NexaAccent.copy(alpha = glowAlpha * 0.5f),
+            color = accentColor.copy(alpha = glowAlpha * 0.5f),
             letterSpacing = 0.5.sp,
             fontWeight = FontWeight.Medium
         )
@@ -674,11 +668,12 @@ fun ThinkingIndicator(lang: AppLanguage) {
 
 @Composable
 fun DotsTyping() {
+    val accentColor = LocalAccentColor.current
     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         repeat(3) { index ->
             val infiniteTransition = rememberInfiniteTransition(label = "typing$index")
             val alpha by infiniteTransition.animateFloat(initialValue = 0.15f, targetValue = 0.7f, animationSpec = infiniteRepeatable(animation = tween(600, delayMillis = index * 150), repeatMode = RepeatMode.Reverse), label = "typingAlpha$index")
-            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent.copy(alpha = alpha)))
+            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(accentColor.copy(alpha = alpha)))
         }
     }
 }
@@ -776,27 +771,28 @@ fun ShimmerLoading(isDarkTheme: Boolean = true) {
 @Composable
 fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaking: Boolean,
     pendingAttachment: String?, onTextChange: (String) -> Unit, onSend: () -> Unit,
-    onStartListening: () -> Unit, onStopListening: () -> Unit, onStopSpeaking: () -> Unit,
-    onAttachFile: () -> Unit, onClearAttachment: () -> Unit) {
+    onStartListening: () -> Unit, onStopListening: () -> Unit,
+    onAttachFile: () -> Unit, onClearAttachment: () -> Unit, onInterrupt: () -> Unit = {},
+    onToggleVoiceMode: () -> Unit = {}) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var showMenu by remember { mutableStateOf(false) }
     val hPad = AdaptivePadding.horizontal()
     val vPad = AdaptivePadding.vertical()
-    val btnSize = AdaptivePadding.button()
+    val btnSize = 44.dp
 
-    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-        shadowElevation = 0.dp, border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.padding(horizontal = hPad, vertical = vPad)) {
             // Attachment preview
             AnimatedVisibility(visible = pendingAttachment != null) {
-                Surface(shape = RoundedCornerShape(12.dp), color = NexaAccent.copy(alpha = 0.08f),
+                val accentColor = LocalAccentColor.current
+                Surface(shape = RoundedCornerShape(12.dp), color = accentColor.copy(alpha = 0.08f),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                     Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = NexaAccent.copy(alpha = 0.15f), modifier = Modifier.size(32.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(16.dp), tint = NexaAccent) }
+                        Surface(shape = RoundedCornerShape(8.dp), color = accentColor.copy(alpha = 0.15f), modifier = Modifier.size(32.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Attachment, null, modifier = Modifier.size(16.dp), tint = accentColor) }
                         }
-                        Text(pendingAttachment ?: "", fontSize = 13.sp, color = NexaAccent, fontWeight = FontWeight.Medium,
+                        Text(pendingAttachment ?: "", fontSize = 13.sp, color = accentColor, fontWeight = FontWeight.Medium,
                             modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         IconButton(onClick = onClearAttachment, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -805,50 +801,102 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                 }
             }
 
-            // Main input row
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // Attach menu
-                Box {
-                    Surface(onClick = { showMenu = true }, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)), modifier = Modifier.size(btnSize)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(btnSize * 0.47f)) }
+            // ChatGPT Style Integrated Input Bar
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 1. Plus (+) button inside
+                    Box {
+                        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(btnSize)) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        }
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            val accentColor = LocalAccentColor.current
+                            DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = accentColor); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
+                            DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(20.dp), tint = accentColor); Text(NexaStrings.get("upload_pdf", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
+                        }
                     }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
-                        DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(20.dp), tint = NexaAccent); Text(NexaStrings.get("upload_pdf", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
-                    }
-                }
 
-                // Text input
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)), modifier = Modifier.weight(1f)) {
-                    Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextField(value = text, onValueChange = onTextChange,
-                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = btnSize),
-                            placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 14.sp, letterSpacing = 0.3.sp) },
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
-                            maxLines = 4, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp))
-                        Surface(onClick = { if (isListening) onStopListening() else onStartListening() }, shape = CircleShape,
-                            color = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else Color.Transparent, modifier = Modifier.size(btnSize * 0.89f)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(if (isListening) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = null, tint = if (isListening) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp)) }
+                    // 2. Text input
+                    TextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = btnSize),
+                        placeholder = { Text(if (isListening) NexaStrings.get("listening", language) else NexaStrings.get("input_hint", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 15.sp) },
+                        colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { onSend(); keyboardController?.hide() }),
+                        maxLines = 5,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
+                    )
+
+                    // 3. Microphone icon inside (STT)
+                    IconButton(
+                        onClick = { if (isListening) onStopListening() else onStartListening() },
+                        modifier = Modifier.size(btnSize)
+                    ) {
+                        Icon(
+                            if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = if (isListening) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // 4. Right Action Button (Waveform / Arrow / Stop)
+                    val isTyping = text.isNotBlank()
+                    val showStop = isSpeaking || isListening
+                    
+                    // Triple tap logic
+                    var tapCount by remember { mutableIntStateOf(0) }
+                    var lastTapTime by remember { mutableLongStateOf(0L) }
+                    
+                    Surface(
+                        onClick = {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapTime < 500) tapCount++ else tapCount = 1
+                            lastTapTime = now
+
+                            if (!isTyping && !showStop && tapCount >= 3) {
+                                tapCount = 0
+                                onToggleVoiceMode()
+                            } else {
+                                when {
+                                    showStop -> { if (isSpeaking) onInterrupt() else onStopListening() }
+                                    isTyping -> { onSend(); keyboardController?.hide() }
+                                    else -> { onStartListening() } // Waveform enters STT for Nexa
+                                }
+                            }
+                        },
+                        shape = CircleShape,
+                        color = Color.Black,
+                        modifier = Modifier.size(btnSize)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (showStop) {
+                                // Stop icon (square)
+                                Box(modifier = Modifier.size(14.dp).background(Color.White, RoundedCornerShape(2.dp)))
+                            } else if (isTyping) {
+                                // Arrow icon (Send)
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            } else {
+                                // Waveform icon (Rayitas)
+                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    repeat(3) { i ->
+                                        Box(modifier = Modifier.width(2.dp).height(if (i==1) 12.dp else 8.dp).background(Color.White, CircleShape))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-
-                // Send button
-                val canSend = text.isNotBlank() || pendingAttachment != null
-                Surface(onClick = { onSend(); keyboardController?.hide() }, enabled = canSend, shape = CircleShape,
-                    color = if (canSend) NexaAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    border = if (canSend) BorderStroke(1.dp, NexaAccent.copy(alpha = 0.3f)) else null, modifier = Modifier.size(btnSize)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = NexaStrings.get("send", language), tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(btnSize * 0.44f)) }
-                }
-            }
-
-            // Hint
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 3.dp), horizontalArrangement = Arrangement.Center) {
-                Text(NexaStrings.get("mic_hint", language), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f), letterSpacing = 0.8.sp)
             }
         }
     }
@@ -860,22 +908,23 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
 
 @Composable
 fun UpdateDialog(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdate: () -> Unit, language: AppLanguage = AppLanguage.SPANISH) {
+    val accentColor = LocalAccentColor.current
     AlertDialog(onDismissRequest = { if (!updateInfo.forceUpdate) onDismiss() }, containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(NexaAccent.copy(alpha = 0.1f)),
+                Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(accentColor.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center) { Text("🔄", fontSize = 14.sp) }
                 Text(NexaStrings.get("update_available", language), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp)
             }
         },
         text = {
             Column {
-                Text("v${updateInfo.versionName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NexaAccent.copy(alpha = 0.7f), letterSpacing = 0.5.sp)
+                Text("v${updateInfo.versionName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accentColor.copy(alpha = 0.7f), letterSpacing = 0.5.sp)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(updateInfo.changelog, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), lineHeight = 20.sp)
             }
         },
-        confirmButton = { Button(onClick = onUpdate, colors = ButtonDefaults.buttonColors(containerColor = NexaAccent), shape = RoundedCornerShape(12.dp)) { Text(NexaStrings.get("update_now", language), color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) } },
+        confirmButton = { Button(onClick = onUpdate, colors = ButtonDefaults.buttonColors(containerColor = accentColor), shape = RoundedCornerShape(12.dp)) { Text(NexaStrings.get("update_now", language), color = Color.Black, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) } },
         dismissButton = { if (!updateInfo.forceUpdate) TextButton(onClick = onDismiss) { Text(NexaStrings.get("later", language), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) } },
         shape = RoundedCornerShape(24.dp))
 }

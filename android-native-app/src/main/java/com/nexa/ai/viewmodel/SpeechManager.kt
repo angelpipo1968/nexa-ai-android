@@ -106,7 +106,7 @@ class SpeechManager(private val application: Application) {
     // ═══ v5.0 BUG 4 FIX ═══
     // Increased from 2.5s to 3.5s - 2.5s was too short and caused
     // false barge-in triggers from TTS mic bleed on some devices
-    private val bargeInCooldownMs = 3500L
+    private val bargeInCooldownMs = 2800L
     private var lastBargeInAt: Long = 0L  // Prevents rapid re-triggers
 
     // Adaptive barge-in threshold — calibrates to device noise floor
@@ -304,18 +304,17 @@ class SpeechManager(private val application: Application) {
     private fun requestAudioFocus() {
         if (hasAudioFocus) return
         try {
-            // v4.0: Choose audio attributes based on current routing
-            val attrs = if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
-                // Hands-free/speaker mode: use USAGE_MEDIA to force speaker output
-                // This prevents Android from routing to earpiece
+            // Use USAGE_VOICE_COMMUNICATION always during active voice sessions.
+            // This matches ChatGPT/WhatsApp approach: MODE_IN_COMMUNICATION + STREAM_VOICE_CALL
+            // + USAGE_VOICE_COMMUNICATION = consistent VoIP pipeline that Android won't duck.
+            val attrs = if (audioSessionActive) {
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             } else {
-                // Earpiece or Bluetooth mode: use voice communication attributes
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             }
@@ -368,10 +367,10 @@ class SpeechManager(private val application: Application) {
                 hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
             } else {
                 @Suppress("DEPRECATION")
-                val streamType = if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
-                    AudioManager.STREAM_MUSIC  // v4.0: Use STREAM_MUSIC for hands-free
+                val streamType = if (audioSessionActive) {
+                    AudioManager.STREAM_VOICE_CALL  // VoIP pipeline
                 } else {
-                    AudioManager.STREAM_VOICE_CALL
+                    AudioManager.STREAM_MUSIC
                 }
                 val result = audioManager.requestAudioFocus(
                     { focusChange ->
@@ -742,11 +741,9 @@ class SpeechManager(private val application: Application) {
             ttsStartedAt = System.currentTimeMillis()
             val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
 
-            // v4.0: Always use STREAM_MUSIC for hands-free mode
-            // STREAM_VOICE_CALL routes through earpiece even with speaker ON on most OEMs
-            val useStream = if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
-                AudioManager.STREAM_MUSIC  // Always MUSIC for speaker/hands-free
-            } else if (useVoiceCallStream) {
+            // Use STREAM_VOICE_CALL during active sessions to ensure proper Hardware AEC and VoIP routing.
+            // This prevents Samsung and other OEMs from ducking the volume to prevent echo.
+            val useStream = if (audioSessionActive) {
                 AudioManager.STREAM_VOICE_CALL
             } else {
                 AudioManager.STREAM_MUSIC
@@ -760,24 +757,23 @@ class SpeechManager(private val application: Application) {
             }
             val result = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             if (result == TextToSpeech.ERROR) {
-                // If STREAM_VOICE_CALL failed, try STREAM_MUSIC as fallback
-                if (useVoiceCallStream) {
-                    useVoiceCallStream = false
-                    android.util.Log.w("SpeechManager", "TTS with STREAM_VOICE_CALL failed, retrying with STREAM_MUSIC")
-                    val fallbackParams = Bundle().apply {
-                        putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-                        putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
-                    }
-                    val retryResult = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, fallbackParams, utteranceId)
-                    if (retryResult == TextToSpeech.ERROR) {
-                        android.util.Log.e("SpeechManager", "TTS speak returned ERROR on both streams")
-                        isTtsActive = false
-                        if (!audioSessionActive) abandonAudioFocus()
-                        onSpeakingStateChanged?.invoke(false, null)
-                    }
+                // If the chosen stream failed, try the other one as fallback
+                val fallbackStream = if (useStream == AudioManager.STREAM_VOICE_CALL) {
+                    AudioManager.STREAM_MUSIC
                 } else {
-                    android.util.Log.e("SpeechManager", "TTS speak returned ERROR")
+                    AudioManager.STREAM_VOICE_CALL
+                }
+                android.util.Log.w("SpeechManager", "TTS failed on stream $useStream, retrying with $fallbackStream")
+                val fallbackParams = Bundle().apply {
+                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, fallbackStream)
+                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                }
+                val retryResult = tts?.speak(cleaned, TextToSpeech.QUEUE_FLUSH, fallbackParams, utteranceId)
+                if (retryResult == TextToSpeech.ERROR) {
+                    android.util.Log.e("SpeechManager", "TTS speak returned ERROR on both streams")
                     isTtsActive = false
+                    isPreparingToSpeak = false
                     if (!audioSessionActive) abandonAudioFocus()
                     onSpeakingStateChanged?.invoke(false, null)
                 }
@@ -785,6 +781,7 @@ class SpeechManager(private val application: Application) {
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "TTS speak error: ${e.message}", e)
             isTtsActive = false
+            isPreparingToSpeak = false
             if (!audioSessionActive) abandonAudioFocus()
             onSpeakingStateChanged?.invoke(false, null)
         }
@@ -833,104 +830,24 @@ class SpeechManager(private val application: Application) {
     /**
      * Aggressively boosts all relevant audio streams to maximum volume
      * for hands-free/speaker mode. This is the key fix for "too low" volume.
-     *
-     * v4.0 improvements:
-     * - MODE_NORMAL maintained throughout hands-free session (not just before speaker switch)
-     * - STREAM_DTMF boost added (some devices route TTS through this in comm mode)
-     * - 5 re-apply cycles instead of 3 (some Samsung/Xiaomi devices need more)
-     * - Final verification at 1000ms with full re-boost if needed
-     * - Volume re-verification after each speaker re-apply cycle
-     * - MODE_NORMAL re-applied in every cycle (OEMs may reset it)
      */
     private fun boostVolumeForHandsFree() {
         try {
-            // ── STEP 1: Force audio mode to NORMAL for speaker output ──
-            // MODE_IN_COMMUNICATION on many OEMs (Samsung, Xiaomi, OPPO, Huawei)
-            // routes audio to earpiece even with speaker ON.
-            // Switching to MODE_NORMAL allows speaker to work at full volume.
+            // Force audio mode to IN_COMMUNICATION for speaker output to maintain VoIP AEC
             if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
-                try {
-                    audioManager.mode = AudioManager.MODE_NORMAL
-                } catch (_: Exception) {}
-            }
-
-            // ── STEP 2: Maximize ALL audio streams ──
-            // STREAM_MUSIC — primary stream for TTS in hands-free mode
-            val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
-
-            // STREAM_VOICE_CALL — used when useVoiceCallStream=true or earpiece mode
-            val maxVoiceCall = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-            audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCall, 0)
-
-            // STREAM_RING — some devices route TTS through this in communication mode
-            val maxRing = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
-            try {
-                audioManager.setStreamVolume(AudioManager.STREAM_RING, maxRing, 0)
-            } catch (_: Exception) {}
-
-            // STREAM_ALARM — Samsung devices sometimes route TTS through this
-            try {
-                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
-            } catch (_: Exception) {}
-
-            // STREAM_NOTIFICATION — Huawei/Honor devices route TTS here
-            try {
-                val maxNotification = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
-                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maxNotification, 0)
-            } catch (_: Exception) {}
-
-            // STREAM_SYSTEM — some devices use this for TTS in communication mode
-            try {
-                val maxSystem = audioManager.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
-                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSystem, 0)
-            } catch (_: Exception) {}
-
-            // STREAM_DTMF — v4.0: Some devices route TTS through this in communication mode
-            try {
-                val maxDtmf = audioManager.getStreamMaxVolume(AudioManager.STREAM_DTMF)
-                audioManager.setStreamVolume(AudioManager.STREAM_DTMF, maxDtmf, 0)
-            } catch (_: Exception) {}
-
-            // STREAM_ACCESSIBILITY — Android 8+ for accessibility TTS
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try {
-                    val maxAccessibility = audioManager.getStreamMaxVolume(AudioManager.STREAM_ACCESSIBILITY)
-                    audioManager.setStreamVolume(AudioManager.STREAM_ACCESSIBILITY, maxAccessibility, 0)
-                } catch (_: Exception) {}
-            }
-
-            // ── STEP 3: Force speaker ON with multiple re-apply cycles ──
-            // Some OEMs reset speaker state after volume changes
-            if (!isNearEar && !isBluetoothScoConnected) {
+                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
                 setSpeakerphoneOn(true)
-
-                // v4.0: 5 re-apply cycles with progressive delays
-                val reApplyDelays = listOf(80L, 200L, 400L, 600L, 1000L)
-                for ((index, delay) in reApplyDelays.withIndex()) {
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        if (audioSessionActive && !isNearEar) {
-                            // Re-apply MODE_NORMAL (OEMs may reset it)
-                            try { audioManager.mode = AudioManager.MODE_NORMAL } catch (_: Exception) {}
-                            setSpeakerphoneOn(true)
-                            // Re-verify STREAM_MUSIC is still at max (some devices auto-adjust)
-                            try {
-                                val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                                if (currentMusic < maxMusic) {
-                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
-                                }
-                            } catch (_: Exception) {}
-                            // Final cycle: full re-boost if anything was reset
-                            if (index == reApplyDelays.size - 1) {
-                                android.util.Log.d("SpeechManager", "Final volume verify: MUSIC=${audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)}/$maxMusic, mode=${audioManager.mode}, speakerActive=${isSpeakerphoneActive()}")
-                            }
-                        }
-                    }, delay)
+                
+                // Actual volume boost for STREAM_VOICE_CALL to fix low volume in hands-free mode
+                try {
+                    val maxVoiceCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCallVol, 0)
+                } catch (e: Exception) {
+                    android.util.Log.w("SpeechManager", "Failed to max voice call volume: ${e.message}")
                 }
             }
 
-            android.util.Log.d("SpeechManager", "Volume boosted: MUSIC=$maxMusic, VOICE_CALL=$maxVoiceCall, RING=$maxRing, DTMF=boosted, speaker=${!isNearEar}, mode=${audioManager.mode}")
+            android.util.Log.d("SpeechManager", "Volume Boost Applied for hands-free.")
         } catch (e: Exception) {
             android.util.Log.w("SpeechManager", "Volume boost failed: ${e.message}")
         }
@@ -943,18 +860,20 @@ class SpeechManager(private val application: Application) {
      */
     private fun reapplyHandsFreeRouting() {
         try {
-            // Force MODE_NORMAL for speaker output
-            try { audioManager.mode = AudioManager.MODE_NORMAL } catch (_: Exception) {}
+            // Use MODE_IN_COMMUNICATION to match VoIP pipeline
+            if (audioSessionActive) {
+                try { audioManager.mode = AudioManager.MODE_IN_COMMUNICATION } catch (_: Exception) {}
+            }
             // Force speaker ON
             setSpeakerphoneOn(true)
-            // Verify STREAM_MUSIC volume is still at max
+            
+            // Re-apply max volume here just in case OEM reset it
             try {
-                val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                val currentMusic = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                if (currentMusic < maxMusic) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
+                    val maxVoiceCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCallVol, 0)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {}
         } catch (e: Exception) {
             android.util.Log.w("SpeechManager", "Re-apply routing failed: ${e.message}")
         }
@@ -980,25 +899,21 @@ class SpeechManager(private val application: Application) {
     }
 
     private fun cleanForSpeech(text: String): String {
-        var cleaned = text
-            .replace(Regex("https?://\\S+"), "")
-            .replace(Regex("#{1,6}\\s*"), "")
-            .replace(Regex("\\*{1,3}(.+?)\\*{1,3}"), "$1")
-            .replace(Regex("_{1,3}(.+?)_{1,3}"), "$1")
-            .replace(Regex("\\*+"), "")
-            .replace(Regex("```[\\s\\S]*?```"), "código")
-            .replace(Regex("`([^`]+)`"), "$1")
-            .replace(Regex("\\[([^]]+)]\\([^)]+\\)"), "$1")
-            .replace(Regex("!\\[[^]]*]\\([^)]+\\)"), "")
-            .replace(Regex("\\n{2,}"), ". ")
-            .replace(Regex("\\n"), ". ")
-
-        // Preserve natural punctuation: keep ¿¡ and common symbols that aid TTS prosody
-        cleaned = cleaned.replace(Regex("[^\\p{L}\\p{N}\\s.,;:!?¿¡()\\-—]"), "")
-        cleaned = cleaned
-            .replace(Regex("\\s{2,}"), " ")
-            .replace(Regex("\\s*([.,;:!?])\\s*"), "$1 ")
-            .trim()
+        // 1. Remove URLs
+        var cleaned = text.replace(Regex("https?://\\S+"), "")
+        
+        // 2. Remove Markdown formatting
+        cleaned = cleaned.replace(Regex("#{1,6}\\s*"), "") // Headers
+        cleaned = cleaned.replace(Regex("\\*+"), "")     // Bold/Italic
+        cleaned = cleaned.replace(Regex("_+"), "")      // Italic
+        cleaned = cleaned.replace(Regex("`{1,3}[\\s\\S]*?`{1,3}"), "") // Code blocks
+        
+        // 3. Remove most symbols, but KEEP basic punctuation for natural prosody
+        // We keep letters, numbers, and .,?!:;
+        cleaned = cleaned.replace(Regex("[^\\p{L}\\p{N}\\s.,?!:;]"), " ")
+        
+        // 4. Cleanup white spaces
+        cleaned = cleaned.replace(Regex("\\s{2,}"), " ").trim()
 
         return cleaned
     }
@@ -1018,8 +933,16 @@ class SpeechManager(private val application: Application) {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, application.packageName)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            
+            // v5.3: Ultra-patient mode. Stay open as long as possible.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3000L)
+            
+            // This is key: tell Google not to cut off so quickly
+            putExtra("android.speech.extras.SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS", 10000L)
+            putExtra("android.speech.extras.SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS", 6000L)
+
             putExtra("android.speech.extra.DICTATION_MODE", true)
         }
     }
@@ -1116,7 +1039,26 @@ class SpeechManager(private val application: Application) {
                 stopSpeaking()
             }
 
+            // ── SILENCE the system beep that Android plays when SpeechRecognizer starts ──
+            // Android plays a short sound via STREAM_RING when the mic activates.
+            // We mute it for 300ms to hide the "bip" transition sound between speaking and listening.
+            val savedRingVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
+            val savedNotifVolume = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
+            try {
+                audioManager.setStreamVolume(AudioManager.STREAM_RING, 0, 0)
+                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 0, 0)
+            } catch (_: Exception) {}
+
             recognizer.startListening(buildRecognizerIntent())
+
+            // Restore after 300ms — just long enough to cover the startup beep
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    audioManager.setStreamVolume(AudioManager.STREAM_RING, savedRingVolume, 0)
+                    audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedNotifVolume, 0)
+                } catch (_: Exception) {}
+            }, 300)
+
         } catch (e: Exception) {
             isCurrentlyListening = false
             android.util.Log.e("SpeechManager", "Speech recognition error: ${e.message}", e)
@@ -1158,16 +1100,11 @@ class SpeechManager(private val application: Application) {
             // Set communication mode — eliminates clicks between TTS/recording transitions
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
 
-            // ── SAVE current volumes for later restoration ──
-            try {
-                savedMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                savedVoiceCallVolume = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
-            } catch (_: Exception) {}
+            // No longer saving volumes as we no longer override them
 
-            // ── VOLUME BOOST for hands-free mode ──
-            if (volumeBoostEnabled) {
-                boostVolumeForHandsFree()
-            }
+            // ── INITIAL VOLUME FOR HANDS-FREE ──
+            // The user requested not to force the volume to high initially.
+            // It will rely entirely on the system's current media volume.
 
             // Bluetooth SCO: route audio to BT headset if available
             detectBluetoothSco()
@@ -1179,39 +1116,27 @@ class SpeechManager(private val application: Application) {
                 enableProximitySensor()
                 // Initial state: use speaker for hands-free (louder)
                 setSpeakerphoneOn(!isNearEar)
-                if (!isNearEar) {
-                    // KEY FIX: Use MODE_NORMAL for speaker mode on most devices
-                    // MODE_IN_COMMUNICATION forces earpiece routing on many OEMs
-                    // We use MODE_NORMAL + speaker ON for maximum hands-free volume
-                    try {
-                        audioManager.mode = AudioManager.MODE_NORMAL
-                        setSpeakerphoneOn(true)
-                        // Boost volume after routing change
-                        if (volumeBoostEnabled) {
-                            boostVolumeForHandsFree()
+                
+                // Use MODE_IN_COMMUNICATION at all times during the session!
+                // This ensures hardware AEC knows we are in a voice call, which prevents
+                // Samsung and other OEMs from drastically ducking the volume to prevent echo.
+                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                
+                try {
+                    // Delayed re-apply to ensure routing sticks
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (audioSessionActive) {
+                            setSpeakerphoneOn(!isNearEar)
                         }
-                        // Delayed re-apply: some devices need speaker forced after mode change
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            if (audioSessionActive && !isNearEar) {
-                                setSpeakerphoneOn(true)
-                                if (volumeBoostEnabled) {
-                                    boostVolumeForHandsFree()
-                                }
-                            }
-                        }, 200)
-                        // Second delayed re-apply for stubborn devices (Samsung, Xiaomi, etc.)
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            if (audioSessionActive && !isNearEar) {
-                                setSpeakerphoneOn(true)
-                            }
-                        }, 500)
-                    } catch (e: Exception) {
-                        android.util.Log.w("SpeechManager", "Speaker force error: ${e.message}")
-                    }
-                } else {
-                    // Near ear: use MODE_IN_COMMUNICATION for earpiece + echo cancellation
-                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                    setSpeakerphoneOn(false)
+                    }, 200)
+                    // Second delayed re-apply for stubborn devices
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (audioSessionActive) {
+                            setSpeakerphoneOn(!isNearEar)
+                        }
+                    }, 500)
+                } catch (e: Exception) {
+                    android.util.Log.w("SpeechManager", "Speaker force error: ${e.message}")
                 }
             }
         } catch (e: Exception) {
@@ -1240,17 +1165,7 @@ class SpeechManager(private val application: Application) {
             // Finalmente abandonar foco de audio
             abandonAudioFocus()
 
-            // Restaurar volúmenes originales
-            try {
-                if (savedMusicVolume >= 0) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, savedMusicVolume, 0)
-                    savedMusicVolume = -1
-                }
-                if (savedVoiceCallVolume >= 0) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, savedVoiceCallVolume, 0)
-                    savedVoiceCallVolume = -1
-                }
-            } catch (_: Exception) {}
+            // No longer restoring volumes as we no longer override them
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Error stopping voice session: ${e.message}", e)
         }
@@ -1341,8 +1256,9 @@ class SpeechManager(private val application: Application) {
                         // Compute Zero-Crossing Rate (VAD)
                         val zcr = computeZCR(buffer, read)
 
-                        // Report volume level for visual feedback (normalized 0..1)
-                        val normalizedVolume = (db / 90.0).coerceIn(0.0, 1.0)
+                        // Report volume level for visual feedback (normalized 0..1 relative to noise floor)
+                        val relativeDb = db - noiseFloorDb
+                        val normalizedVolume = (relativeDb / 30.0).coerceIn(0.0, 1.0)
                         onVolumeLevelChanged?.invoke(normalizedVolume.toFloat())
 
                         // Calibrate noise floor during first frames

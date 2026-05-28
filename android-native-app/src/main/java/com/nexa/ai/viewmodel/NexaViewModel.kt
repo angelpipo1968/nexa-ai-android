@@ -1,8 +1,9 @@
 package com.nexa.ai.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -17,6 +18,7 @@ import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.StreamEvent
 import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.ui.NexaStrings
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,21 +32,26 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
-class NexaViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class NexaViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
+    private val speechManager: SpeechManager,
+    private val authManager: AuthManager,
+    private val repository: NexaRepository,
+    private val updateChecker: UpdateChecker,
+    private val settingsStore: SettingsStore,
+    private val networkMonitor: com.nexa.ai.data.NetworkMonitor
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NexaUiState())
     val uiState: StateFlow<NexaUiState> = _uiState.asStateFlow()
 
-    // Managers
-    private val speechManager = SpeechManager(application)
-    private val authManager = AuthManager(application)
-    private val locationStore = LocationStore(application)
-    private val repository = NexaRepository()
-    private val updateChecker = UpdateChecker()
-    private val sessionStore = SessionStore(application)
-    private val settingsStore = SettingsStore(application)
-    private val handsFree = com.nexa.ai.handsfree.NexaHandsFreeAllInOne(application)
+    // Managers (non-Hilt for now or until fully migrated)
+    private val locationStore = LocationStore(context as android.app.Application)
+    private val sessionStore = SessionStore(context as android.app.Application)
+    private val handsFree = com.nexa.ai.handsfree.NexaHandsFreeAllInOne(context as android.app.Application)
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -96,10 +103,19 @@ AUTONOMOUS AGENT CAPABILITIES:
 
 RESPONSE STYLE:
 - Intelligent, Precise, Analytical, Advanced, Technical, Futuristic, Reliable
-- Always include code examples when discussing development
+- When discussing development, mention code concepts clearly but AVOID excessive markdown if possible.
 - Provide step-by-step explanations for complex topics
 - Give multiple recommendations and alternatives
 - Support both Spanish and English responses matching the user's language
+
+VOICE INTERACTION & TTS (CRITICAL):
+- Your responses will be read aloud by a Text-To-Speech (TTS) engine.
+- DO NOT use markdown symbols like asterisks (*), hashtags (#), underscores (_), backticks (`), or slashes (/). Write naturally using plain text and normal punctuation.
+- Do not generate lists with symbols or markdown tables; use natural prose (e.g., "Primero...", "Segundo...").
+
+REAL-TIME DATA & SEARCHES (CRITICAL):
+- You have access to real-time flight search tools (Google Flights, Skyscanner, etc.) via your backend functions. ALWAYS use them when the user asks for flights, prices, or live data to provide accurate, real-time information.
+- When returning flight data or prices, ALWAYS format the response in clean, conversational prose without any symbols or tables, so the voice engine reads it fluidly as a professional concierge.
 
 NEVER: give lazy answers, invent data, ignore errors, produce incomplete architectures, skip optimization opportunities
 ALWAYS: improve solutions, verify information, provide scalable architectures, think recursively, optimize continuously
@@ -117,38 +133,38 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     // Debounce logic — prevents rapid/accidental voice triggers
-    // Reduced from 800ms to 600ms for faster response while still filtering noise
+    // Reduced from 600ms to 450ms for a more fluid conversation feel (like ChatGPT)
     private var speechDebounceJob: kotlinx.coroutines.Job? = null
-    private val speechDebounceTimeMs = 600L
+    private val speechDebounceTimeMs = 450L
 
     // Track last successful voice result time to prevent duplicate sends
     private var lastVoiceResultAt = 0L
     private val voiceResultCooldownMs = 1000L
 
     private val surprisePromptsEs = listOf(
-        "Cuéntame algo fascinante sobre el universo",
-        "Dame una receta rápida y deliciosa",
-        "¿Cuál es el mejor consejo de vida que puedes dar?",
-        "Escribe un poema corto sobre la tecnología",
-        "Explícame la mecánica cuántica como si tuviera 10 años",
-        "¿Qué pasaría si los humanos pudieran volar?",
-        "Dame 3 ideas para un negocio innovador",
-        "Cuéntame una historia de ciencia ficción en 100 palabras",
-        "¿Cuál es el misterio más grande de la humanidad?",
-        "Dame un plan de ejercicios para 15 minutos"
+        "Busca un vuelo de Miami a Las Vegas para mañana",
+        "¿Cuál es el precio actual de Bitcoin y Ethereum?",
+        "Muéstrame el clima actual en Tokio",
+        "¿Quién es el director de Inception y de qué trata?",
+        "¿Cuál es la distancia exacta de la Tierra a Marte?",
+        "Muéstrame la imagen de la NASA del día",
+        "Genera números de la suerte para el Powerball",
+        "Busca en YouTube el mejor tutorial de Kotlin",
+        "Abre la cámara y transcríbeme el texto",
+        "¿Qué se dice en Reddit sobre inteligencia artificial?"
     )
 
     private val surprisePromptsEn = listOf(
-        "Tell me something fascinating about the universe",
-        "Give me a quick and delicious recipe",
-        "What's the best life advice you can give?",
-        "Write a short poem about technology",
-        "Explain quantum mechanics like I'm 10",
-        "What if humans could fly?",
-        "Give me 3 ideas for an innovative business",
-        "Tell me a sci-fi story in 100 words",
-        "What's humanity's greatest mystery?",
-        "Give me a 15-minute workout plan"
+        "Find a flight from Miami to Las Vegas for tomorrow",
+        "What is the current price of Bitcoin and Ethereum?",
+        "Show me the current weather in Tokyo",
+        "Who directed Inception and what is it about?",
+        "What is the exact distance from Earth to Mars?",
+        "Show me the NASA picture of the day",
+        "Generate lucky numbers for Powerball",
+        "Search YouTube for the best Kotlin tutorial",
+        "Open the camera and transcribe the text for me",
+        "What is Reddit saying about artificial intelligence?"
     )
 
     init {
@@ -156,6 +172,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.initialize()
         locationStore.initialize()
         restoreState()
+        observeNetwork()
         // Auto-request location on startup
         requestLocation()
 
@@ -168,6 +185,17 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     // ═══════════════════════════════════════
     //  INITIALIZATION
     // ═══════════════════════════════════════
+
+    private fun observeNetwork() {
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { isOnline ->
+                _uiState.update { it.copy(isOnline = isOnline) }
+                if (!isOnline) {
+                    _uiState.update { it.copy(error = NexaStrings.get("no_internet", _uiState.value.language)) }
+                }
+            }
+        }
+    }
 
     private fun setupSpeechCallbacks() {
         speechManager.onListeningStateChanged = { isListening ->
@@ -194,12 +222,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                     // Start actual speech recognition if not already listening
                     if (!_uiState.value.isListening && !_uiState.value.isThinking) {
                         viewModelScope.launch {
-                            // ═══ v5.0 BUG 3 FIX ═══
-                            // Increased from 300ms to 700ms — on Samsung/Xiaomi/OPPO
-                            // devices the audio system needs more time to switch from
-                            // TTS output to mic input. 300ms caused SpeechRecognizer
-                            // errors and restart loops.
-                            kotlinx.coroutines.delay(700)
+                            // ═══ v5.3 SEAMLESS TRANSITION IMPROVEMENT ═══
+                            // Reduced from 450ms to 150ms. 
+                            // Using a much shorter gap to make it feel like "one" session.
+                            kotlinx.coroutines.delay(150)
                             if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                                 !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                                 speechManager.startListening()
@@ -303,10 +329,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    // ═══ v5.0 BUG 3 FIX ═══
-                    // Increased from 1500ms back to 2000ms — 1500ms was too
-                    // aggressive and caused rapid restart loops on some devices
-                    kotlinx.coroutines.delay(2000)
+                    // ═══ v5.3 FAST RE-ARM ═══
+                    // Reduced from 2000ms to 400ms for near-instant re-listening
+                    // if the user stops talking and the recognizer times out.
+                    kotlinx.coroutines.delay(400)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
@@ -425,7 +451,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
     fun openUpdatePage() {
         val info = _uiState.value.updateInfo ?: return
-        val context = getApplication<Application>()
         _uiState.value = _uiState.value.copy(showUpdateDialog = false)
         updateChecker.downloadAndInstall(context, info.downloadUrl, info.versionName)
     }
@@ -646,11 +671,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             activeSessionId = newActive
         )
 
-        if (updated.isEmpty()) {
-            createNewSession()
-        } else {
-            persistSessions()
-        }
+        persistSessions()
     }
 
     private fun updateActiveSession(transform: (ChatSession) -> ChatSession) {
@@ -877,12 +898,22 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         val userMsg = Message(role = "user", content = fullContent, attachmentName = attachmentName)
         val assistantId = "a-${System.currentTimeMillis()}"
 
-        val session = _uiState.value.activeSession
-        val isFirstMessage = session?.messages?.isEmpty() == true
+        var session = _uiState.value.activeSession
+        if (session == null) {
+            val newSession = ChatSession()
+            val updatedSessions = listOf(newSession) + _uiState.value.sessions
+            _uiState.value = _uiState.value.copy(
+                sessions = updatedSessions,
+                activeSessionId = newSession.id
+            )
+            session = newSession
+        }
+
+        val isFirstMessage = session.messages.isEmpty()
         val title = if (isFirstMessage) {
             content.take(30) + if (content.length > 30) "..." else ""
         } else {
-            session?.title ?: NexaStrings.get("new_chat", _uiState.value.language)
+            session.title.ifEmpty { NexaStrings.get("new_chat", _uiState.value.language) }
         }
 
         updateActiveSession { s ->
@@ -895,6 +926,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null, pendingAttachment = null)
 
+        fetchAiResponse(assistantId)
+    }
+
+    private fun fetchAiResponse(assistantId: String) {
         viewModelScope.launch {
             try {
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
@@ -951,10 +986,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                             _uiState.value = _uiState.value.copy(isThinking = false)
 
                             if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
-                                // Add a tiny "breathing" delay before speaking in voice mode
+                                // v5.2: Reduced "breathing" delay from 500ms to 250ms for snappier replies
                                 if (_uiState.value.voiceMode) {
                                     viewModelScope.launch {
-                                        kotlinx.coroutines.delay(500)
+                                        kotlinx.coroutines.delay(250)
                                         speak(fullResponse, assistantId)
                                     }
                                 } else {
@@ -971,6 +1006,23 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 )
             }
         }
+    }
+
+    fun regenerateResponse() {
+        val session = _uiState.value.activeSession ?: return
+        val messages = session.messages.toMutableList()
+        if (messages.isEmpty()) return
+
+        // Remove last assistant message if it exists
+        if (messages.last().role == "assistant") {
+            messages.removeAt(messages.size - 1)
+        }
+
+        updateActiveSession { it.copy(messages = messages) }
+
+        val assistantId = "a-${System.currentTimeMillis()}"
+        _uiState.value = _uiState.value.copy(isThinking = true, error = null)
+        fetchAiResponse(assistantId)
     }
 
     fun clearError() {
@@ -1287,7 +1339,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     fun exportSettings() {
-        val context = getApplication<Application>()
         viewModelScope.launch {
             try {
                 val settings = mapOf(
@@ -1311,7 +1362,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     fun importSettings() {
-        val context = getApplication<Application>()
         viewModelScope.launch {
             try {
                 val file = java.io.File(context.getExternalFilesDir(null), "nexa_settings_backup.json")
@@ -1343,7 +1393,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     fun copyToClipboard(text: String) {
-        val context = getApplication<Application>()
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("NEXA PRO", text)
         clipboard.setPrimaryClip(clip)
@@ -1351,7 +1400,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     fun shareText(text: String) {
-        val context = getApplication<Application>()
         val intent = android.content.Intent().apply {
             action = android.content.Intent.ACTION_SEND
             putExtra(android.content.Intent.EXTRA_TEXT, text)
@@ -1365,8 +1413,6 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     }
 
     fun exportToPdf(message: Message) {
-        val context = getApplication<Application>()
-
         try {
             val content = message.content.trim()
             if (content.isEmpty()) {

@@ -9,7 +9,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
 
 data class UpdateInfo(
     val versionCode: Int,
@@ -19,7 +23,8 @@ data class UpdateInfo(
     val forceUpdate: Boolean = false
 )
 
-class UpdateChecker {
+@Singleton
+class UpdateChecker @Inject constructor() {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -70,14 +75,25 @@ class UpdateChecker {
             }
 
             if (isNewer) {
-                val changelog = obj.get("body")?.asString ?: "Nueva versi\u00f3n disponible"
+                val changelog = obj.get("body")?.asString ?: "Nueva actualización disponible"
+                val assets = obj.getAsJsonArray("assets")
+                var downloadUrl = FALLBACK_DOWNLOAD_URL
+
+                // Try to find an APK in the assets
+                assets?.forEach { asset ->
+                    val assetObj = asset.asJsonObject
+                    val name = assetObj.get("name").asString
+                    if (name.endsWith(".apk")) {
+                        downloadUrl = assetObj.get("browser_download_url").asString
+                    }
+                }
 
                 UpdateInfo(
                     versionCode = currentVersionCode + 1,
                     versionName = remoteVersionName,
-                    downloadUrl = FALLBACK_DOWNLOAD_URL,
-                    changelog = changelog.take(500),
-                    forceUpdate = false
+                    downloadUrl = downloadUrl,
+                    changelog = changelog.take(1000),
+                    forceUpdate = changelog.contains("#FORCE_UPDATE", ignoreCase = true)
                 )
             } else {
                 null

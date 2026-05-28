@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nexa.ai.ui.theme.NexaAccent
+import com.nexa.ai.ui.theme.LocalAccentColor
 import com.nexa.ai.viewmodel.*
 import kotlinx.coroutines.launch
 
@@ -124,7 +125,8 @@ fun ChatMainScreen(
                 onCloneSession = onCloneSession,
                 onArchiveSession = onArchiveSession,
                 onShareSession = onShareSession,
-                onDownloadSession = onDownloadSession
+                onDownloadSession = onDownloadSession,
+                onToggleVoiceMode = onToggleVoiceMode
             )
             // Chat content
             ChatContent(
@@ -180,7 +182,8 @@ fun ChatMainScreen(
                     onNavigateToLottery = onNavigateToLottery, onNavigateToTranslator = onNavigateToTranslator,
                     onPinSession = onPinSession, onRenameSession = onRenameSession,
                     onCloneSession = onCloneSession, onArchiveSession = onArchiveSession,
-                    onShareSession = onShareSession, onDownloadSession = onDownloadSession
+                    onShareSession = onShareSession, onDownloadSession = onDownloadSession,
+                    onToggleVoiceMode = onToggleVoiceMode
                 )
             },
             gesturesEnabled = true
@@ -270,6 +273,16 @@ private fun ChatContent(
             // Center content on wide screens
             CenteredContent(maxWidth = AdaptiveDimens.maxContentWidth()) {
                 Column(modifier = Modifier.fillMaxSize()) {
+                    AnimatedVisibility(visible = !uiState.isOnline) {
+                        Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.errorContainer) {
+                            Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.WifiOff, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(NexaStrings.get("no_internet", uiState.language), color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
                     AnimatedVisibility(visible = uiState.error != null) {
                         ErrorBanner(uiState.error ?: "", onDismissError)
                     }
@@ -369,8 +382,9 @@ private fun ChatContent(
                         isListening = uiState.isListening, isSpeaking = uiState.isSpeaking,
                         pendingAttachment = uiState.pendingAttachment, onTextChange = onInputChange,
                         onSend = onSend, onStartListening = onStartListening,
-                        onStopListening = onStopListening, onStopSpeaking = onStopSpeaking,
-                        onAttachFile = onAttachFile, onClearAttachment = onClearAttachment)
+                        onStopListening = onStopListening,
+                        onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
+                        onInterrupt = onInterruptVoice, onToggleVoiceMode = onToggleVoiceMode)
                 }
 
                 if (uiState.voiceMode) {
@@ -428,8 +442,10 @@ private fun PermanentDrawerPanel(
     onCloneSession: (String) -> Unit = {},
     onArchiveSession: (String) -> Unit = {},
     onShareSession: (String) -> Unit = {},
-    onDownloadSession: (String) -> Unit = {}
+    onDownloadSession: (String) -> Unit = {},
+    onToggleVoiceMode: () -> Unit = {}
 ) {
+    val accentColor = LocalAccentColor.current
     val drawerWidth = AdaptiveDimens.permanentDrawerWidth()
     val lang = uiState.language
     val user = uiState.user
@@ -465,14 +481,14 @@ private fun PermanentDrawerPanel(
                         label = "permDrawerGlowAlpha"
                     )
                     Box(modifier = Modifier.size(AdaptiveDimens.avatarSmall()).clip(RoundedCornerShape(12.dp))
-                        .background(Brush.radialGradient(listOf(NexaAccent.copy(alpha = glowAlpha), NexaAccent.copy(alpha = 0.03f)))),
+                        .background(Brush.radialGradient(listOf(accentColor.copy(alpha = glowAlpha), accentColor.copy(alpha = 0.03f)))),
                         contentAlignment = Alignment.Center) { Text("⚡", fontSize = AdaptiveTypography.headlineSmall()) }
                     Column(modifier = Modifier.weight(1f)) {
                         Text("NEXA PRO", fontWeight = FontWeight.Black, fontSize = AdaptiveTypography.headlineSmall(), letterSpacing = 3.sp, color = MaterialTheme.colorScheme.onSurface)
                         if (user.isLoggedIn) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(NexaAccent))
-                                Text(user.displayName, fontSize = AdaptiveTypography.caption(), color = NexaAccent.copy(alpha = 0.9f),
+                                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(accentColor))
+                                Text(user.displayName, fontSize = AdaptiveTypography.caption(), color = accentColor.copy(alpha = 0.9f),
                                     fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
                             }
                         }
@@ -482,12 +498,12 @@ private fun PermanentDrawerPanel(
 
             // New Chat button
             Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable { onNewChat() },
-                shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()), color = NexaAccent.copy(alpha = 0.06f),
-                border = BorderStroke(0.5.dp, NexaAccent.copy(alpha = 0.12f))) {
+                shape = RoundedCornerShape(AdaptiveDimens.cornerMedium()), color = accentColor.copy(alpha = 0.06f),
+                border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.12f))) {
                 Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
-                    Text(NexaStrings.get("new_chat", lang), color = NexaAccent.copy(alpha = 0.8f),
+                    Icon(Icons.Default.Add, contentDescription = null, tint = accentColor.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                    Text(NexaStrings.get("new_chat", lang), color = accentColor.copy(alpha = 0.8f),
                         fontWeight = FontWeight.SemiBold, fontSize = AdaptiveTypography.labelMedium(), letterSpacing = 0.3.sp)
                 }
             }
@@ -550,15 +566,26 @@ private fun PermanentDrawerPanel(
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+            // Hands-Free button
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+                .clip(RoundedCornerShape(8.dp)).clickable { onToggleVoiceMode() }
+                .padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Headset, contentDescription = null,
+                    tint = accentColor.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                Text(NexaStrings.get("hands_free_drawer", lang), fontSize = AdaptiveTypography.labelMedium(), fontWeight = FontWeight.Medium,
+                    color = accentColor.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
             // Translator button
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
                 .clip(RoundedCornerShape(8.dp)).clickable { onNavigateToTranslator() }
                 .padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Language, contentDescription = stringResource(R.string.translator),
-                    tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
+                    tint = accentColor.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
                 Text(stringResource(R.string.translator_title), fontSize = AdaptiveTypography.labelMedium(), fontWeight = FontWeight.Medium,
-                    color = NexaAccent.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
+                    color = accentColor.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
             // Bottom actions
@@ -745,111 +772,79 @@ fun VoiceModeOverlay(
         ) {
             Spacer(modifier = Modifier.weight(0.8f))
 
+            // Dynamic scale based on voice volume
+            val volumeScale = 1f + (uiState.voiceVolumeLevel * 0.4f)
+            val finalScale = if (isListening || isSpeaking) coreScale * volumeScale else 1f
+
             Box(contentAlignment = Alignment.Center) {
+                // The Glowing Orb (Siri / OpenAI style)
                 Box(
                     modifier = Modifier
-                        .size(220.dp)
+                        .size((180 * finalScale).dp)
+                        .clip(CircleShape)
                         .graphicsLayer {
+                            // Slow rotation for the whole orb to feel alive
                             rotationZ = rotation
-                            alpha = 0.12f
                         }
-                        .drawBehind {
-                            val stroke = 1.5.dp.toPx()
-                            val dashLen = 12.dp.toPx()
-                            val gapLen = 8.dp.toPx()
-                            val r = size.minDimension / 2f
-                            val paint = android.graphics.Paint().apply {
-                                color = accentColor.copy(alpha = 0.12f).toArgb()
-                                strokeWidth = stroke
-                                style = android.graphics.Paint.Style.STROKE
-                                pathEffect = android.graphics.DashPathEffect(floatArrayOf(dashLen, gapLen), 0f)
-                                isAntiAlias = true
-                            }
-                            drawContext.canvas.nativeCanvas.drawCircle(
-                                size.width / 2f, size.height / 2f, r, paint
-                            )
+                        .clickable {
+                            if (isSpeaking) onInterrupt()
                         }
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size((170 * ring3Scale).dp)
-                        .graphicsLayer { alpha = 0.08f }
-                        .clip(CircleShape)
-                        .background(accentDim)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size((140 * ring2Scale).dp)
-                        .graphicsLayer { alpha = 0.12f }
-                        .clip(CircleShape)
-                        .background(accentMid)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size((110 * ring1Scale).dp)
-                        .graphicsLayer { alpha = 0.18f }
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.2f))
-                )
-
-                Canvas(
-                    modifier = Modifier
-                        .size(160.dp)
-                        .graphicsLayer { alpha = if (isListening || isSpeaking) 0.6f else 0.15f }
                 ) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    val baseRadius = size.minDimension / 2f - 10.dp.toPx()
-                    val segments = 60
-                    val amp = 12.dp.toPx() * waveAmplitude * if (isListening) 1f else if (isSpeaking) 0.7f else 0.2f
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
+                        val cx = w / 2f
+                        val cy = h / 2f
+                        val radius = w / 2f
 
-                    for (i in 0 until segments) {
-                        val angle1 = (2f * Math.PI.toFloat() * i / segments)
-                        val angle2 = (2f * Math.PI.toFloat() * (i + 1) / segments)
-                        val wave1 = baseRadius + amp * kotlin.math.sin(wavePhase * 3 + i * 0.4f)
-                        val wave2 = baseRadius + amp * kotlin.math.sin(wavePhase * 3 + (i + 1) * 0.4f)
-                        val x1 = cx + wave1 * kotlin.math.cos(angle1)
-                        val y1 = cy + wave1 * kotlin.math.sin(angle1)
-                        val x2 = cx + wave2 * kotlin.math.cos(angle2)
-                        val y2 = cy + wave2 * kotlin.math.sin(angle2)
-                        drawLine(
-                            color = accentColor.copy(alpha = 0.4f + 0.3f * kotlin.math.sin(wavePhase + i * 0.2f)),
-                            start = Offset(x1, y1),
-                            end = Offset(x2, y2),
-                            strokeWidth = 2.dp.toPx()
+                        // Base vivid blue background
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF3399FF), Color(0xFF0066FF)),
+                                center = Offset(cx, cy),
+                                radius = radius
+                            ),
+                            radius = radius
+                        )
+
+                        // Cyan cloud moving around
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF00FFFF).copy(alpha = 0.7f), Color.Transparent),
+                                center = Offset(
+                                    cx + kotlin.math.cos(wavePhase) * radius * 0.3f, 
+                                    cy + kotlin.math.sin(wavePhase * 1.2f) * radius * 0.3f
+                                ),
+                                radius = radius * 0.9f
+                            ),
+                            radius = radius,
+                            blendMode = androidx.compose.ui.graphics.BlendMode.Screen
+                        )
+
+                        // White / bright blue highlight reflecting on top
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color.White.copy(alpha = 0.9f), Color(0xFFE0F7FA).copy(alpha = 0.3f), Color.Transparent),
+                                center = Offset(
+                                    cx * 0.7f + kotlin.math.sin(wavePhase * 0.8f) * 10f, 
+                                    cy * 0.6f + kotlin.math.cos(wavePhase * 0.9f) * 10f
+                                ),
+                                radius = radius * 0.8f
+                            ),
+                            radius = radius,
+                            blendMode = androidx.compose.ui.graphics.BlendMode.Screen
+                        )
+                        
+                        // Deep shadow/contrast at bottom left
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF0033AA).copy(alpha = 0.8f), Color.Transparent),
+                                center = Offset(cx * 0.4f, cy * 1.5f),
+                                radius = radius
+                            ),
+                            radius = radius
                         )
                     }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size((80 * coreScale).dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    accentColor.copy(alpha = coreGlow),
-                                    accentColor.copy(alpha = coreGlow * 0.4f),
-                                    Color.Transparent
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = when {
-                            isListening -> Icons.Default.Mic
-                            isThinking -> Icons.Default.AutoAwesome
-                            isSpeaking -> Icons.AutoMirrored.Filled.VolumeUp
-                            else -> Icons.Default.Mic
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp),
-                        tint = accentColor
-                    )
                 }
             }
 
@@ -865,9 +860,9 @@ fun VoiceModeOverlay(
             ) { label ->
                 Text(
                     label,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Light,
-                    color = accentColor.copy(alpha = 0.9f),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
                     letterSpacing = 2.sp
                 )
             }
@@ -884,7 +879,7 @@ fun VoiceModeOverlay(
                     Text(
                         uiState.inputText,
                         fontSize = 13.sp,
-                        color = accentColor.copy(alpha = 0.7f),
+                        color = Color.White.copy(alpha = 0.9f),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         maxLines = 3,
                         lineHeight = 18.sp
@@ -897,9 +892,9 @@ fun VoiceModeOverlay(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "$msgCount ${NexaStrings.get("messages_count", uiState.language)}",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.12f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.5f),
                     letterSpacing = 2.sp
                 )
             }
@@ -964,13 +959,13 @@ fun VoiceModeOverlay(
                         ) {
                             Text(
                                 text = msg.content.take(80) + if (msg.content.length > 80) "…" else "",
-                                fontSize = 11.sp,
-                                fontWeight = if (isUser) FontWeight.Medium else FontWeight.Normal,
-                                color = if (isUser) Color.White.copy(alpha = 0.18f)
-                                else NexaAccent.copy(alpha = 0.15f),
-                                lineHeight = 16.sp,
-                                modifier = Modifier.widthIn(max = 260.dp),
-                                maxLines = 2
+                                fontSize = 13.sp,
+                                fontWeight = if (isUser) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isUser) Color.White.copy(alpha = 0.8f)
+                                else Color.White.copy(alpha = 0.9f),
+                                lineHeight = 18.sp,
+                                modifier = Modifier.widthIn(max = 280.dp),
+                                maxLines = 3
                             )
                         }
                     }
@@ -1161,7 +1156,8 @@ fun DrawerContent(
     onSetDrawerView: (Int) -> Unit, onNavigateToLottery: () -> Unit = {}, onNavigateToTranslator: () -> Unit = {},
     onPinSession: (String) -> Unit = {}, onRenameSession: (String) -> Unit = {},
     onCloneSession: (String) -> Unit = {}, onArchiveSession: (String) -> Unit = {},
-    onShareSession: (String) -> Unit = {}, onDownloadSession: (String) -> Unit = {}
+    onShareSession: (String) -> Unit = {}, onDownloadSession: (String) -> Unit = {},
+    onToggleVoiceMode: () -> Unit = {}
 ) {
     val sessions = uiState.sessions
     val activeSessionId = uiState.activeSessionId
@@ -1291,6 +1287,17 @@ fun DrawerContent(
             }
         }
 
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+        // Hands-Free button
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(8.dp)).clickable { onToggleVoiceMode(); onClose() }
+            .padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Headset, contentDescription = null,
+                tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+            Text(NexaStrings.get("hands_free_drawer", lang), fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                color = NexaAccent.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
         // Translator button
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)

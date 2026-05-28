@@ -79,6 +79,7 @@
     <string name="groq_key_info">Obtén tu clave gratis en console.groq.com • Velocidad 10x mayor</string>
     <string name="groq_key_placeholder">gsk_…</string>
     <string name="has_account">¿Ya tienes cuenta?</string>
+    <string name="hands_free_drawer">Manos Libres</string>
     <string name="history">Historial</string>
     <string name="import_settings">Importar</string>
     <string name="input_hint">Escribe un mensaje…</string>
@@ -119,6 +120,7 @@
     <string name="new_chat">Nuevo chat</string>
     <string name="no_account">¿No tienes cuenta?</string>
     <string name="no_chats">No hay chats aún</string>
+    <string name="no_internet">Sin conexión a internet</string>
     <string name="no_results">Sin resultados</string>
     <string name="nothing_to_export">No hay contenido para exportar</string>
     <string name="notifications">Notificaciones</string>

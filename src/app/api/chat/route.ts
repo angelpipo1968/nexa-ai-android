@@ -34,6 +34,7 @@ import {
     getLearningInsights, getUserProfile, updateUserProfile, generatePersonalizationContext,
     extractKnowledge, getRelatedKnowledge, analyzeMessageAdvanced
 } from '@/lib/nexa-core/machine-learning';
+import { detectVisionCategory, getCategoryInstructions } from '@/lib/nexa-core/vision-plus';
 
 export const maxDuration = 120;
 export const runtime = 'nodejs';
@@ -79,10 +80,15 @@ const PROVIDERS = {
         url: 'https://openrouter.ai/api/v1/chat/completions',
         model: 'anthropic/claude-3.5-sonnet',
         keyEnv: 'OPENROUTER_API_KEY'
+    },
+    ollama: {
+        url: process.env.OLLAMA_URL || 'http://localhost:11434/v1/chat/completions',
+        model: process.env.OLLAMA_MODEL || 'llama3.3',
+        keyEnv: 'OLLAMA_API_KEY' // Ollama usually doesn't need a key, but keeping the structure
     }
 };
 
-const FALLBACK_ORDER = ['openrouter', 'groq', 'zai', 'anthropic', 'gemini', 'deepseek', 'openai'];
+const FALLBACK_ORDER = ['openrouter', 'groq', 'zai', 'anthropic', 'gemini', 'deepseek', 'openai', 'ollama'];
 
 // ─── Key Rotation: Soporte para múltiples keys separadas por coma ───
 function getKeyList(envValue: string | undefined, envKey?: string): string[] {
@@ -130,7 +136,7 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
             if (toolContext) {
                 const toolMessage = {
                     role: 'system',
-                    content: `[DATOS EN TIEMPO REAL - Usa estos datos para responder al usuario]\n\n${toolContext}\n\nResponde al usuario usando estos datos. Sé natural y conversacional.`
+                    content: `[DATOS EN TIEMPO REAL - Usa estos datos para responder al usuario]\n\n${toolContext}\n\nResponde al usuario usando estos datos. Sé natural y conversacional. REGLA DE ORO PARA LA VOZ: NUNCA uses símbolos Markdown (*, #, -, \`, /, \). Tu respuesta será leída por un sintetizador de voz. NO hagas listas con viñetas, redacta todo en prosa fluida y continua. Escribe los números y precios de forma natural (ej. '400 dólares').`
                 };
                 // Insert tool message before the last user message
                 const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
@@ -153,20 +159,20 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                     logger.info(`Attempting chat with ${providerKey}`, 'chat', { requestId });
                     
         // FIX: Timeout helper to prevent slow providers from blocking all fallbacks
-        const fetchWithTimeout = (url: string, options: any, timeoutMs = 20000) => {
+        const fetchWithTimeout = (url: string, options: any, timeoutMs = 20000): Promise<Response> => {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), timeoutMs);
             return Promise.race([
                 fetch(url, { ...options, signal: controller.signal }),
-                new Promise((_, reject) => setTimeout(() => {
+                new Promise<Response>((_, reject) => setTimeout(() => {
                     clearTimeout(timeout);
                     reject(new Error(`Timeout: ${timeoutMs}ms`));
                 }, timeoutMs))
             ]).finally(() => clearTimeout(timeout));
         };
 
-                    // OpenAI Compatible (Groq, DeepSeek, OpenAI, Z.ai, OpenRouter)
-                    if (['groq', 'deepseek', 'openai', 'zai', 'openrouter'].includes(providerKey)) {
+                    // OpenAI Compatible (Groq, DeepSeek, OpenAI, Z.ai, OpenRouter, Ollama)
+                    if (['groq', 'deepseek', 'openai', 'zai', 'openrouter', 'ollama'].includes(providerKey)) {
                         const res = await fetchWithTimeout(config.url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -248,8 +254,13 @@ function createStream(requestId: string, messages: any[], keys: Record<string, s
                             const imageMatch = m.content.match(/\[IMAGE:(.*?)\]/);
                             if (imageMatch) {
                                 const base64 = imageMatch[1];
+                                const textQuery = m.content.replace(/\[IMAGE:.*?\]/, '').trim();
+                                
+                                const category = detectVisionCategory(textQuery);
+                                const visionInstructions = getCategoryInstructions(category);
+                                
                                 parts.push({ inlineData: { mimeType: "image/jpeg", data: base64 } });
-                                parts.push({ text: m.content.replace(/\[IMAGE:.*?\]/, '').trim() || "Describe esta imagen." });
+                                parts.push({ text: (textQuery || "Describe esta imagen. Si hay texto, transcríbelo.") + `\n\n[SISTEMA DE VISIÓN]: ${visionInstructions}` });
                             } else {
                                 parts.push({ text: m.content });
                             }
@@ -371,7 +382,7 @@ Hora Local: ${timeStr}
 
         // --- NEXA ML ENGINE V1 (Machine Learning) ---
         // Derive userId from client IP or custom header (no auth system yet).
-        const userId = getIdentifier(clientIp);
+        const userId = identifier;
         
         // 1. Emotion Analysis
         const emotion = analyzeEmotion(userQuery);
@@ -479,7 +490,7 @@ Interacciones totales: ${userProfile.interaction_count}
 
         // 2. IMÁGENES (Detección Ultra-Sensible)
         const triggerImages = ['dibuja', 'genera', 'diseña', 'crea', 'imagina', 'muestra', 'muéstrame', 'foto', 'imagen', 'ver', 'mira', 'playa', 'sol'];
-        if (triggerImages.some(kw => lowerQuery.includes(kw))) {
+        if (triggerImages.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(lowerQuery))) {
             try {
                 const promptRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',

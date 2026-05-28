@@ -11,10 +11,15 @@ import kotlinx.coroutines.flow.flowOn
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
 
 data class ChatMessage(
     val role: String,
@@ -28,13 +33,20 @@ data class ChatRequest(
     val systemPrompt: String? = null
 )
 
-class NexaRepository {
+@Singleton
+class NexaRepository @Inject constructor() {
+
+    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BASIC
+    }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS) // Aumentamos el tiempo de espera
-        .readTimeout(0, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true) // Reintentar automáticamente si falla la red
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.SECONDS) // SSE needs no read timeout
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(loggingInterceptor)
+        .retryOnConnectionFailure(true)
+        .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
         .build()
 
     private val gson = Gson()
@@ -124,16 +136,18 @@ class NexaRepository {
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 Log.e(TAG, "SSE Failure: ${t?.message}", t)
-                // Si es un error de red común, no matamos el chat, intentamos terminarlo con gracia
+                
+                val errorEvent = when {
+                    t is SocketTimeoutException -> StreamEvent.Error("timeout")
+                    t is IOException -> StreamEvent.Error("network_error")
+                    response?.code == 401 -> StreamEvent.AuthExpired
+                    response?.code == 429 -> StreamEvent.Error("rate_limit")
+                    (response?.code ?: 0) >= 500 -> StreamEvent.Error("server_error")
+                    else -> StreamEvent.Error(t?.localizedMessage ?: "unknown_error")
+                }
+
                 try {
-                    when {
-                        response?.code == 401 -> trySend(StreamEvent.AuthExpired)
-                        response?.code == 429 -> trySend(StreamEvent.Error("rate_limit"))
-                        else -> {
-                            // En lugar de dar error fatal, mandamos "Done" para que lo que haya llegado se lea
-                            trySend(StreamEvent.Done)
-                        }
-                    }
+                    trySend(errorEvent)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error sending failure event", e)
                 }

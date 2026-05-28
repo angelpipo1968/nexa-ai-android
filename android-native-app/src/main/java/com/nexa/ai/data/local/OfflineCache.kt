@@ -7,7 +7,7 @@ import androidx.room.*
  * Stores the last response for each conversation context so users can
  * view recent responses even without internet.
  */
-@Entity(tableName = "response_cache", indices = [Index("sessionId"), Index("query_hash"), Index("cachedAt")])
+@Entity(tableName = "response_cache", indices = [Index("sessionId"), Index("queryHash"), Index("cachedAt")])
 data class CachedResponseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sessionId: String,

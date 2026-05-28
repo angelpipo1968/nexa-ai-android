@@ -14,7 +14,7 @@ export async function generateImage(prompt: string): Promise<string> {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: "dall-e-3",
+                model: "dall-e-2",
                 prompt: prompt,
                 n: 1,
                 size: "1024x1024"

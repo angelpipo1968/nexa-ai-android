@@ -107,6 +107,8 @@ data class NexaUiState(
     val showVoiceCommandsHelp: Boolean = false,
     // Accent color
     val accentColor: Long = 0L,  // ARGB color value, 0 means default
+    // Connectivity
+    val isOnline: Boolean = true,
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false

@@ -3,6 +3,7 @@
 package com.nexa.ai.handsfree
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -28,6 +29,14 @@ import javax.inject.Singleton
 class NexaHandsFreeAllInOne @Inject constructor(
     @ApplicationContext private val context: Context
 ) : TextToSpeech.OnInitListener {
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.language = Locale.forLanguageTag(currentLang)
+        } else {
+            onError?.invoke("TTS initialization failed")
+        }
+    }
 
     // Estado reactivo para UI
     private val _state = MutableStateFlow(HandsFreeState())
@@ -62,6 +71,10 @@ class NexaHandsFreeAllInOne @Inject constructor(
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) = updateState(isSpeaking = true)
                     override fun onDone(utteranceId: String?) = updateState(isSpeaking = false)
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        updateState(isSpeaking = false)
+                    }
                     override fun onError(utteranceId: String?, errorCode: Int) {
                         updateState(isSpeaking = false)
                         onError?.invoke("TTS error: $errorCode")
@@ -104,7 +117,7 @@ class NexaHandsFreeAllInOne @Inject constructor(
 
     fun startListening() {
         if (_state.value.isListening) return
-        val intent = RecognizerIntent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLang)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)

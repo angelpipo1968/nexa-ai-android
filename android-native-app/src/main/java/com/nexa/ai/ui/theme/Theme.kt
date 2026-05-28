@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,19 +38,19 @@ val LocalAccentColor = compositionLocalOf { NexaAccent }
 private val DarkColorScheme = darkColorScheme(
     primary = NexaAccent,
     onPrimary = Color.Black,
-    background = Color(0xFF0A0A0F),
-    surface = Color(0xFF12121A),
-    surfaceVariant = Color(0xFF1A1A26),
-    surfaceContainerLow = Color(0xFF0A0A0F),
-    surfaceContainer = Color(0xFF12121A),
-    surfaceContainerHigh = Color(0xFF1A1A26),
-    onBackground = Color(0xFFE8E8EE),
-    onSurface = Color(0xFFE8E8EE),
-    onSurfaceVariant = Color(0xFF6B6B7B),
-    outline = Color(0xFF1E1E2E),
-    outlineVariant = Color(0xFF2A2A3A),
+    background = Color(0xFF050508),      // Deep futuristic black
+    surface = Color(0xFF0F0F14),         // Dark card surface
+    surfaceVariant = Color(0xFF16161F),  // Slightly lighter variant
+    surfaceContainerLow = Color(0xFF08080C),
+    surfaceContainer = Color(0xFF0F0F14),
+    surfaceContainerHigh = Color(0xFF16161F),
+    onBackground = Color(0xFFEEEEEE),    // Light text
+    onSurface = Color(0xFFEEEEEE),
+    onSurfaceVariant = Color(0xFF9090A0),
+    outline = Color(0xFF30303A),
+    outlineVariant = Color(0xFF25252F),
     error = Color(0xFFFF4466),
-    inverseSurface = Color(0xFFE8E8EE),
+    inverseSurface = Color(0xFFEEEEEE),
 )
 
 // ── Custom Light Theme ──
@@ -190,19 +191,8 @@ fun NexaTheme(
         inversePrimary = effectivePrimary.copy(alpha = 0.7f)
     )
 
-    // Animated theme transition
-    val animatedColorScheme = colorScheme.copy(
-        primary = animateColorAsState(colorScheme.primary, tween(500), label = "primary").value,
-        onPrimary = animateColorAsState(colorScheme.onPrimary, tween(500), label = "onPrimary").value,
-        background = animateColorAsState(colorScheme.background, tween(500), label = "background").value,
-        surface = animateColorAsState(colorScheme.surface, tween(500), label = "surface").value,
-        surfaceVariant = animateColorAsState(colorScheme.surfaceVariant, tween(500), label = "surfaceVariant").value,
-        onBackground = animateColorAsState(colorScheme.onBackground, tween(500), label = "onBackground").value,
-        onSurface = animateColorAsState(colorScheme.onSurface, tween(500), label = "onSurface").value,
-        onSurfaceVariant = animateColorAsState(colorScheme.onSurfaceVariant, tween(500), label = "onSurfaceVariant").value,
-        outline = animateColorAsState(colorScheme.outline, tween(500), label = "outline").value,
-        error = animateColorAsState(colorScheme.error, tween(500), label = "error").value,
-    )
+    // Animated theme transition (Simplified for stability)
+    val animatedColorScheme = colorScheme
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -228,6 +218,9 @@ fun NexaTheme(
 
     MaterialTheme(
         colorScheme = animatedColorScheme,
-        content = content
-    )
+    ) {
+        CompositionLocalProvider(LocalAccentColor provides accentColor) {
+            content()
+        }
+    }
 }

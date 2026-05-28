@@ -15,8 +15,9 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url = uri("https://nexa-sdk.s3.amazonaws.com/android/repo") }
+        maven { url = uri("https://raw.githubusercontent.com/NexaAI/core/main") }
     }
 }
 
 rootProject.name = "Nexa AI"
-include(":app")
+include(":android-native-app")
