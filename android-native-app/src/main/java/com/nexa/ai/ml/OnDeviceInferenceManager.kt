@@ -2,14 +2,19 @@ package com.nexa.ai.ml
 
 import android.content.Context
 import android.util.Log
+import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.languageid.LanguageIdentifier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 /**
  * ═══════════════════════════════════════════════════════════
  *  NEXA AI — On-Device Inference Manager
  *  Qualcomm Nexa SDK wrapper for on-device AI inference
  *  Uses Snapdragon NPU for hardware-accelerated inference
+ *  Falls back gracefully via reflection if SDK is unavailable
  * ═══════════════════════════════════════════════════════════
  */
 class OnDeviceInferenceManager(private val context: Context) {
@@ -33,11 +38,22 @@ class OnDeviceInferenceManager(private val context: Context) {
     var currentModel: String? = null
         private set
 
+    // Nexa SDK engine (loaded via reflection for safety)
+    private var nexaEngine: Any? = null
+    private var nexaGenerateMethod: java.lang.reflect.Method? = null
+    private var nexaAnalyzeMethod: java.lang.reflect.Method? = null
+    private var nexaLoadModelMethod: java.lang.reflect.Method? = null
+    private var nexaShutdownMethod: java.lang.reflect.Method? = null
+
+    // ML Kit
+    private var languageIdentifier: LanguageIdentifier? = null
+
     // ─── Initialization ──────────────────────────
 
     /**
-     * Initialize the Nexa SDK engine.
-     * This loads the ML engine and prepares the NPU for inference.
+     * Initialize the Nexa SDK engine and ML Kit.
+     * Uses reflection to load the Nexa SDK so the app compiles
+     * even if the SDK AAR is not present on the build machine.
      * Call this on app startup (background thread).
      */
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
@@ -46,22 +62,59 @@ class OnDeviceInferenceManager(private val context: Context) {
         try {
             Log.i(TAG, "Initializing Nexa SDK on-device inference...")
 
-            // TODO: Initialize Nexa SDK engine here
-            // val engine = NexaEngine.Builder(context)
-            //     .setComputeUnit(NexaEngine.ComputeUnit.NPU_PREFERRED)
-            //     .setModelCacheDir(File(context.filesDir, "nexa_models"))
-            //     .build()
+            // Try to load Nexa SDK via reflection
+            try {
+                val engineClass = Class.forName("ai.nexa.core.NexaEngine")
+                val builderClass = Class.forName("ai.nexa.core.NexaEngine\$Builder")
+                val computeUnitClass = Class.forName("ai.nexa.core.NexaEngine\$ComputeUnit")
+
+                val npuPreferred = computeUnitClass.getField("NPU_PREFERRED").get(null)
+                val builder = builderClass.getConstructor(Context::class.java).newInstance(context)
+
+                // Set compute unit
+                builderClass.getMethod("setComputeUnit", computeUnitClass).invoke(builder, npuPreferred)
+
+                // Set model cache dir
+                val cacheDir = java.io.File(context.filesDir, "nexa_models")
+                cacheDir.mkdirs()
+                builderClass.getMethod("setModelCacheDir", java.io.File::class.java).invoke(builder, cacheDir)
+
+                // Build engine
+                nexaEngine = builderClass.getMethod("build").invoke(builder)
+
+                // Cache method references for faster calls
+                nexaGenerateMethod = engineClass.getMethod("generate", String::class.java, String::class.java, Int::class.java)
+                nexaAnalyzeMethod = engineClass.getMethod("analyzeImage", String::class.java, String::class.java)
+                nexaLoadModelMethod = engineClass.getMethod("loadModel", String::class.java)
+                nexaShutdownMethod = engineClass.getMethod("shutdown")
+
+                Log.i(TAG, "Nexa SDK engine loaded successfully via reflection")
+            } catch (e: ClassNotFoundException) {
+                Log.w(TAG, "Nexa SDK not available on this device — falling back to cloud-only mode")
+            } catch (e: Exception) {
+                Log.w(TAG, "Nexa SDK initialization failed: ${e.message} — cloud-only mode")
+            }
+
+            // Initialize ML Kit Language Identification
+            try {
+                languageIdentifier = LanguageIdentification.getClient()
+                Log.i(TAG, "ML Kit Language ID initialized")
+            } catch (e: Exception) {
+                Log.w(TAG, "ML Kit Language ID init failed: ${e.message}")
+            }
 
             isInitialized = true
-            isReady = true
-            Log.i(TAG, "Nexa SDK initialized successfully")
+            isReady = nexaEngine != null || languageIdentifier != null
+            Log.i(TAG, "On-device inference initialized (ready=$isReady, hasNexaEngine=${nexaEngine != null}, hasMLKit=${languageIdentifier != null})")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize Nexa SDK: ${e.message}")
+            Log.e(TAG, "Failed to initialize: ${e.message}")
             isReady = false
             false
         }
     }
+
+    // ─── Model Loading ───────────────────────────
 
     /**
      * Load a specific model for inference.
@@ -76,10 +129,23 @@ class OnDeviceInferenceManager(private val context: Context) {
 
         try {
             Log.i(TAG, "Loading model: $modelId")
-            // TODO: Load model via Nexa SDK
-            // engine.loadModel(modelId)
+
+            if (nexaEngine != null && nexaLoadModelMethod != null) {
+                val result = nexaLoadModelMethod!!.invoke(nexaEngine, modelId)
+                val loaded = result as? Boolean ?: true
+                if (loaded) {
+                    currentModel = modelId
+                    Log.i(TAG, "Model loaded via Nexa SDK: $modelId")
+                    return@withContext true
+                } else {
+                    Log.w(TAG, "Nexa SDK returned false for model load: $modelId")
+                }
+            }
+
+            // Fallback: mark as current model for routing purposes
+            // even if Nexa SDK couldn't load it
             currentModel = modelId
-            Log.i(TAG, "Model loaded: $modelId")
+            Log.i(TAG, "Model marked as current (no SDK): $modelId")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load model $modelId: ${e.message}")
@@ -99,7 +165,6 @@ class OnDeviceInferenceManager(private val context: Context) {
      * @param maxTokens Maximum tokens to generate (default: 512)
      * @return Generated response text, or null if failed
      */
-    @Suppress("UNUSED_PARAMETER")
     suspend fun generateText(
         prompt: String,
         systemPrompt: String? = null,
@@ -114,13 +179,23 @@ class OnDeviceInferenceManager(private val context: Context) {
             Log.d(TAG, "Generating text on-device (model: $currentModel)")
             val startTime = System.currentTimeMillis()
 
-            // TODO: Run inference via Nexa SDK
-            // val result = engine.generate(prompt, systemPrompt, maxTokens)
-            val result = "Nexa SDK inference placeholder — modelo '$currentModel' no disponible aún. Integración en progreso."
+            if (nexaEngine != null && nexaGenerateMethod != null) {
+                val result = nexaGenerateMethod!!.invoke(
+                    nexaEngine,
+                    prompt,
+                    systemPrompt ?: "",
+                    maxTokens
+                ) as? String
 
+                val elapsed = System.currentTimeMillis() - startTime
+                Log.i(TAG, "On-device inference completed in ${elapsed}ms")
+                return@withContext result
+            }
+
+            // No Nexa engine available
             val elapsed = System.currentTimeMillis() - startTime
-            Log.i(TAG, "On-device inference completed in ${elapsed}ms")
-            result
+            Log.w(TAG, "No Nexa engine for on-device inference (${elapsed}ms)")
+            null
         } catch (e: Exception) {
             Log.e(TAG, "Text generation failed: ${e.message}")
             null
@@ -137,13 +212,12 @@ class OnDeviceInferenceManager(private val context: Context) {
      * @param question Optional question about the image
      * @return Analysis text, or null if failed
      */
-    @Suppress("UNUSED_PARAMETER")
     suspend fun analyzeImage(
         imageBase64: String,
         question: String = "Describe lo que ves en esta imagen."
     ): String? = withContext(Dispatchers.IO) {
         if (!isReady) {
-            Log.w(TAG, "Cannot analyze image: on-device engine not ready")
+            Log.w(TAG, "Cannot analyze image: engine not ready")
             return@withContext null
         }
 
@@ -151,13 +225,16 @@ class OnDeviceInferenceManager(private val context: Context) {
             Log.d(TAG, "Analyzing image on-device")
             val startTime = System.currentTimeMillis()
 
-            // TODO: Run vision inference via Nexa SDK
-            // val result = engine.analyzeImage(imageBase64, question)
-            val elapsed = System.currentTimeMillis() - startTime
-            Log.i(TAG, "On-device image analysis completed in ${elapsed}ms")
+            if (nexaEngine != null && nexaAnalyzeMethod != null) {
+                val result = nexaAnalyzeMethod!!.invoke(nexaEngine, imageBase64, question) as? String
+                val elapsed = System.currentTimeMillis() - startTime
+                Log.i(TAG, "On-device image analysis completed in ${elapsed}ms")
+                return@withContext result
+            }
 
-            // Placeholder — will be replaced with actual Nexa SDK call
-            "Análisis on-device: Imagen recibida (${imageBase64.length} chars). Nexa SDK vision model próximamente disponible."
+            val elapsed = System.currentTimeMillis() - startTime
+            Log.w(TAG, "No vision model available for on-device analysis (${elapsed}ms)")
+            null
         } catch (e: Exception) {
             Log.e(TAG, "Image analysis failed: ${e.message}")
             null
@@ -173,15 +250,27 @@ class OnDeviceInferenceManager(private val context: Context) {
      * @param text Input text to identify
      * @return ISO 639-1 language code (e.g., "es", "en"), or null
      */
-    suspend fun detectLanguage(text: String): String? = withContext(Dispatchers.IO) {
-        try {
-            // TODO: Use ML Kit Language Identification
-            // val identifier = LanguageIdentification.getClient()
-            // val langCode = identifier.identifyLanguage(text).await()
-            // langCode
-            null // Placeholder
+    suspend fun detectLanguage(text: String): String? {
+        if (text.isBlank()) return null
+
+        return try {
+            val identifier = languageIdentifier ?: return null
+            suspendCancellableCoroutine { continuation ->
+                identifier.identifyLanguage(text)
+                    .addOnSuccessListener { langCode ->
+                        if (langCode != "und") {
+                            continuation.resume(langCode)
+                        } else {
+                            continuation.resume(null)
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Language detection failed: ${e.message}")
+                        continuation.resume(null)
+                    }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Language detection failed: ${e.message}")
+            Log.e(TAG, "Language detection error: ${e.message}")
             null
         }
     }
@@ -190,12 +279,16 @@ class OnDeviceInferenceManager(private val context: Context) {
 
     /**
      * Check if the device supports NPU acceleration.
+     * Checks both hardware (Qualcomm SoC) and whether the
+     * Nexa SDK engine was actually instantiated.
      */
     fun isNPUAvailable(): Boolean {
-        // TODO: Check device capabilities via Nexa SDK
-        // Qualcomm Snapdragon devices with Hexagon NPU
-        return android.os.Build.HARDWARE.contains("qcom") ||
+        // Check hardware
+        val hasQualcommHardware = android.os.Build.HARDWARE.contains("qcom") ||
                android.os.Build.SOC_MANUFACTURER.equals("Qualcomm", ignoreCase = true)
+
+        // Also check if Nexa SDK engine was actually loaded
+        return hasQualcommHardware && nexaEngine != null
     }
 
     /**
@@ -216,9 +309,17 @@ class OnDeviceInferenceManager(private val context: Context) {
      */
     fun shutdown() {
         try {
-            // TODO: Unload models, release engine
+            nexaShutdownMethod?.invoke(nexaEngine)
+            languageIdentifier?.close()
+            nexaEngine = null
+            nexaGenerateMethod = null
+            nexaAnalyzeMethod = null
+            nexaLoadModelMethod = null
+            nexaShutdownMethod = null
+            languageIdentifier = null
             currentModel = null
             isReady = false
+            isInitialized = false
             Log.i(TAG, "Nexa SDK shut down")
         } catch (e: Exception) {
             Log.e(TAG, "Shutdown error: ${e.message}")

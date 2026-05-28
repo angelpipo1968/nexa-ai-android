@@ -109,9 +109,21 @@ data class NexaUiState(
     val accentColor: Long = 0L,  // ARGB color value, 0 means default
     // Connectivity
     val isOnline: Boolean = true,
+    // Offline
+    val pendingMessageCount: Int = 0,
     // Update
     val updateInfo: UpdateInfo? = null,
-    val showUpdateDialog: Boolean = false
+    val showUpdateDialog: Boolean = false,
+    // Widgets & Notifications
+    val morningSummaryEnabled: Boolean = false,
+    // On-Device ML
+    val onDeviceReady: Boolean = false,
+    val inferenceMode: String = "HYBRID", // ONLINE, ON_DEVICE, HYBRID,
+    // Memory & Bilingual
+    val userProfileName: String = "",
+    val bilingualModeEnabled: Boolean = false,
+    val bilingualLangA: String = "es",
+    val bilingualLangB: String = "en"
 ) {
     val activeSession: ChatSession?
         get() = sessions.find { it.id == activeSessionId }

@@ -52,6 +52,10 @@ class NexaViewModel @Inject constructor(
     private val locationStore = LocationStore(context as android.app.Application)
     private val sessionStore = SessionStore(context as android.app.Application)
     private val handsFree = com.nexa.ai.handsfree.NexaHandsFreeAllInOne(context as android.app.Application)
+    private val smartRoutingManager = com.nexa.ai.ml.SmartRoutingManager(context as android.app.Application)
+    private val memoryManager = com.nexa.ai.memory.EpisodicMemoryManager(context as android.app.Application)
+    private val offlineManager = com.nexa.ai.data.OfflineManager(context as android.app.Application)
+    private val appLauncher = com.nexa.ai.shortcuts.AppLauncherManager(context as android.app.Application)
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -129,7 +133,17 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         } else {
             ""
         }
-        return advancedSystemPrompt + locationContext
+
+        // Add episodic memory context
+        val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
+        val memoryContext = memoryManager.buildMemoryContext(lastUserMsg)
+        val memorySection = if (memoryContext.isNotBlank()) {
+            "\n\nUSER CONTEXT FROM MEMORY:\n$memoryContext"
+        } else {
+            ""
+        }
+
+        return advancedSystemPrompt + locationContext + memorySection
     }
 
     // Debounce logic — prevents rapid/accidental voice triggers
@@ -173,6 +187,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         locationStore.initialize()
         restoreState()
         observeNetwork()
+        observeOfflineState()
         // Auto-request location on startup
         requestLocation()
 
@@ -180,6 +195,18 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         handsFree.initialize()
         handsFree.onUserSaid = { text -> sendMessage(text) }
         handsFree.onError = { error -> _uiState.update { it.copy(error = error) } }
+
+        // Initialize on-device ML engine
+        viewModelScope.launch {
+            val initialized = smartRoutingManager.initialize()
+            if (initialized) {
+                android.util.Log.i("NexaVM", "On-device ML engine initialized — hybrid mode available")
+                _uiState.update { it.copy(onDeviceReady = true) }
+            }
+        }
+
+        // Initialize notification channels
+        com.nexa.ai.notification.NexaNotificationManager.createChannels(context)
     }
 
     // ═══════════════════════════════════════
@@ -190,8 +217,31 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         viewModelScope.launch {
             networkMonitor.isOnline.collect { isOnline ->
                 _uiState.update { it.copy(isOnline = isOnline) }
+                // Update SmartRoutingManager with network status
+                smartRoutingManager.updateNetworkStatus(isOnline)
                 if (!isOnline) {
                     _uiState.update { it.copy(error = NexaStrings.get("no_internet", _uiState.value.language)) }
+                }
+            }
+        }
+    }
+
+    private fun observeOfflineState() {
+        viewModelScope.launch {
+            offlineManager.pendingCount.collect { count ->
+                _uiState.update { it.copy(pendingMessageCount = count) }
+            }
+        }
+        viewModelScope.launch {
+            offlineManager.isOnline.collect { online ->
+                if (online) {
+                    // Network restored — flush pending messages
+                    val pending = offlineManager.flushPendingMessages()
+                    for ((sessionId, content) in pending) {
+                        if (sessionId == _uiState.value.activeSessionId) {
+                            sendMessage(content)
+                        }
+                    }
                 }
             }
         }
@@ -886,6 +936,131 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 sendMessage(codePrompt)
                 return
             }
+            // Voice command: remember this / store fact
+            if (cmd.contains("recuerda") || cmd.contains("recordar") || cmd.contains("remember this") || cmd.contains("memoriza")) {
+                val fact = cmd
+                    .replace(Regex("(recuerda|recordar|remember this|memoriza|que)\\s+"), "")
+                    .trim()
+                if (fact.isNotBlank()) {
+                    memoryManager.storeFact(fact)
+                    memoryManager.storeMemory(com.nexa.ai.memory.EpisodicMemoryManager.MemoryEntry(
+                        content = fact,
+                        category = com.nexa.ai.memory.EpisodicMemoryManager.MemoryCategory.GENERAL,
+                        importance = 0.8f
+                    ))
+                    speak(if (lang == AppLanguage.SPANISH) "Lo recordaré: $fact" else "I'll remember that: $fact")
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "¿Qué quieres que recuerde?" else "What should I remember?")
+                }
+                return
+            }
+            // Voice command: what do you know about me
+            if (cmd.contains("qué sabes de mí") || cmd.contains("what do you know about me") || cmd.contains("quién soy")) {
+                val profile = memoryManager.getUserProfile()
+                val memories = memoryManager.getMemories().take(5)
+                val response = buildString {
+                    if (profile.name.isNotBlank()) append("Te llamas ${profile.name}. ")
+                    if (profile.occupation.isNotBlank()) append("Eres ${profile.occupation}. ")
+                    if (profile.location.isNotBlank()) append("Vives en ${profile.location}. ")
+                    if (memories.isNotEmpty()) {
+                        append("Recuerdo: ")
+                        memories.forEach { append("${it.content}. ") }
+                    }
+                    if (isEmpty()) append(if (lang == AppLanguage.SPANISH) "Aún no tengo mucha información sobre ti. ¡Cuéntame más!" else "I don't have much info about you yet. Tell me more!")
+                }
+                speak(response)
+                return
+            }
+            // Voice command: open app
+            if (cmd.contains("abre") || cmd.contains("open") || cmd.contains("abrir")) {
+                val appName = cmd
+                    .replace(Regex("(abre|open|abrir)\\s+"), "")
+                    .trim()
+                if (appName.isNotBlank()) {
+                    val opened = appLauncher.openApp(appName)
+                    speak(if (lang == AppLanguage.SPANISH) {
+                        if (opened) "Abriendo $appName" else "No encontré la aplicación $appName"
+                    } else {
+                        if (opened) "Opening $appName" else "Couldn't find app $appName"
+                    })
+                }
+                return
+            }
+            // Voice command: set alarm
+            if (cmd.contains("alarma") || cmd.contains("alarm")) {
+                val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
+                val match = timeRegex.find(cmd)
+                if (match != null) {
+                    val hour = match.groupValues[1].toInt()
+                    val minute = match.groupValues[2].toInt()
+                    appLauncher.setAlarm(hour, minute)
+                    speak(if (lang == AppLanguage.SPANISH) "Alarma configurada a las $hour:$minute" else "Alarm set for $hour:$minute")
+                } else {
+                    // Try extracting just a number
+                    val numRegex = Regex("(\\d{1,2})")
+                    val numMatch = numRegex.find(cmd.replace(Regex("(alarma|alarm)"), ""))
+                    if (numMatch != null) {
+                        val hour = numMatch.groupValues[1].toInt()
+                        appLauncher.setAlarm(hour, 0)
+                        speak(if (lang == AppLanguage.SPANISH) "Alarma configurada a las $hour" else "Alarm set for $hour")
+                    } else {
+                        speak(if (lang == AppLanguage.SPANISH) "¿A qué hora quieres la alarma?" else "What time for the alarm?")
+                    }
+                }
+                return
+            }
+            // Voice command: call
+            if (cmd.contains("llama a") || cmd.contains("llamar a") || cmd.contains("call")) {
+                val contact = cmd
+                    .replace(Regex("(llama a|llamar a|call)\\s+"), "")
+                    .trim()
+                if (contact.isNotBlank()) {
+                    // Try to extract a phone number, otherwise open dialer
+                    val phoneRegex = Regex("\\+?\\d[\\d\\s-]{6,}")
+                    val phoneMatch = phoneRegex.find(contact)
+                    if (phoneMatch != null) {
+                        appLauncher.makeCall(phoneMatch.value)
+                    } else {
+                        // Open dialer with name (user will select contact)
+                        appLauncher.makeCall("")
+                    }
+                    speak(if (lang == AppLanguage.SPANISH) "Llamando a $contact" else "Calling $contact")
+                }
+                return
+            }
+            // Voice command: remind me / reminder
+            if (cmd.contains("recuérdame") || cmd.contains("recuerdame") || cmd.contains("remind me") || cmd.contains("recordatorio")) {
+                val reminderText = cmd
+                    .replace(Regex("(recuérdame|recuerdame|remind me|recordatorio)\\s+"), "")
+                    .trim()
+                    .replace(Regex("(a las|at)\\s+\\d{1,2}(:\\d{2})?"), "")
+                    .trim()
+                if (reminderText.isNotBlank()) {
+                    // Parse time - for now use a simple approach: 1 minute from now for demo
+                    val id = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+                    val timeMillis = System.currentTimeMillis() + 60000 // 1 min from now
+                    com.nexa.ai.notification.NexaNotificationManager.createChannels(context)
+                    com.nexa.ai.notification.NexaNotificationManager.scheduleReminder(context, reminderText, timeMillis, id)
+                    speak(if (lang == AppLanguage.SPANISH) "Recordatorio guardado: $reminderText" else "Reminder saved: $reminderText")
+                }
+                return
+            }
+            // Voice command: timer
+            if (cmd.contains("temporizador") || cmd.contains("timer") || cmd.contains("cuenta atrás")) {
+                val minuteRegex = Regex("(\\d+)\\s*(minutos?|minutes?|mins?)")
+                val minMatch = minuteRegex.find(cmd)
+                val secondsRegex = Regex("(\\d+)\\s*(segundos?|seconds?|secs?)")
+                val secMatch = secondsRegex.find(cmd)
+                val totalSeconds = (minMatch?.groupValues?.get(1)?.toIntOrNull()?.times(60) ?: 0) +
+                                   (secMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0)
+                if (totalSeconds > 0) {
+                    appLauncher.setTimer(totalSeconds)
+                    speak(if (lang == AppLanguage.SPANISH) "Temporizador de $totalSeconds segundos" else "Timer set for $totalSeconds seconds")
+                } else {
+                    speak(if (lang == AppLanguage.SPANISH) "¿Cuánto tiempo para el temporizador?" else "How long for the timer?")
+                }
+                return
+            }
         }
 
         val attachmentName = _uiState.value.pendingAttachment
@@ -926,6 +1101,45 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null, pendingAttachment = null)
 
+        // Offline-first: If no network, queue the message
+        if (!networkMonitor.isOnline.value) {
+            val sessionId = _uiState.value.activeSessionId ?: ""
+            viewModelScope.launch {
+                val queued = offlineManager.enqueueIfOffline(sessionId, content)
+                if (queued) {
+                    // Add a system message indicating offline queue
+                    updateActiveSession { s ->
+                        s.copy(
+                            messages = s.messages + Message(
+                                id = "offline-${System.currentTimeMillis()}",
+                                role = "assistant",
+                                content = if (_uiState.value.language == AppLanguage.SPANISH)
+                                    "Sin conexión a internet. Tu mensaje se enviará cuando vuelva la conexión."
+                                else
+                                    "No internet connection. Your message will be sent when connectivity is restored."
+                            ),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(isThinking = false)
+                    return@launch
+                }
+            }
+        }
+
+        // Extract and store episodic memories from user message
+        viewModelScope.launch(Dispatchers.IO) {
+            val extractedMemories = memoryManager.extractMemoriesFromMessage("user", content, _uiState.value.activeSessionId ?: "")
+            if (extractedMemories.isNotEmpty()) {
+                android.util.Log.d("NexaVM", "Extracted ${extractedMemories.size} memories from user message")
+                // Update user profile name in UI state if detected
+                val profile = memoryManager.getUserProfile()
+                if (profile.name.isNotBlank() && profile.name != _uiState.value.userProfileName) {
+                    _uiState.update { it.copy(userProfileName = profile.name) }
+                }
+            }
+        }
+
         fetchAiResponse(assistantId)
     }
 
@@ -934,6 +1148,37 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             try {
                 // v5.2: Refresh location before sending to ensure accurate GPS data
                 refreshLocationIfNeeded()
+
+                // ── Smart routing: check if we should use on-device inference ──
+                val content = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
+                val routingDecision = smartRoutingManager.shouldUseOnDevice(
+                    query = content,
+                    hasImage = _uiState.value.pendingAttachment != null
+                )
+                android.util.Log.d("NexaVM", "Routing decision: useOnDevice=${routingDecision.useOnDevice}, reason=${routingDecision.reason}")
+
+                if (routingDecision.useOnDevice && smartRoutingManager.getOnDeviceManager().isReady) {
+                    // Try on-device inference first
+                    val onDeviceResult = smartRoutingManager.generateOnDevice(
+                        prompt = content,
+                        systemPrompt = buildSystemPrompt()
+                    )
+                    if (onDeviceResult != null) {
+                        // Use on-device result
+                        updateActiveSession { s ->
+                            s.copy(
+                                messages = s.messages + Message(id = assistantId, role = "assistant", content = onDeviceResult),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        }
+                        _uiState.value = _uiState.value.copy(isThinking = false)
+                        if (_uiState.value.autoSpeak && onDeviceResult.isNotBlank()) {
+                            speak(onDeviceResult, assistantId)
+                        }
+                        return@launch
+                    }
+                    // Fall through to cloud inference if on-device failed
+                }
 
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
@@ -1000,6 +1245,15 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                                 s.copy(messages = updated, updatedAt = System.currentTimeMillis())
                             }
                             _uiState.value = _uiState.value.copy(isThinking = false)
+
+                            // Cache the response for offline access
+                            val sessionId = _uiState.value.activeSessionId ?: ""
+                            if (sessionId.isNotBlank() && fullResponse.isNotBlank()) {
+                                val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
+                                viewModelScope.launch {
+                                    offlineManager.cacheResponse(sessionId, lastUserMsg, fullResponse, _uiState.value.currentProvider ?: "")
+                                }
+                            }
 
                             if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
                                 // v5.2: Reduced "breathing" delay from 500ms to 250ms for snappier replies
@@ -1588,5 +1842,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         super.onCleared()
         speechManager.destroy()
         handsFree.release()
+        offlineManager.destroy()
+        smartRoutingManager.shutdown()
     }
 }
