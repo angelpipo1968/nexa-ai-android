@@ -309,7 +309,7 @@ class SpeechManager(private val application: Application) {
             // + USAGE_VOICE_COMMUNICATION = consistent VoIP pipeline that Android won't duck.
             val attrs = if (audioSessionActive) {
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             } else {
@@ -367,11 +367,7 @@ class SpeechManager(private val application: Application) {
                 hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
             } else {
                 @Suppress("DEPRECATION")
-                val streamType = if (audioSessionActive) {
-                    AudioManager.STREAM_VOICE_CALL  // VoIP pipeline
-                } else {
-                    AudioManager.STREAM_MUSIC
-                }
+                val streamType = AudioManager.STREAM_MUSIC
                 val result = audioManager.requestAudioFocus(
                     { focusChange ->
                         when (focusChange) {
@@ -741,13 +737,9 @@ class SpeechManager(private val application: Application) {
             ttsStartedAt = System.currentTimeMillis()
             val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
 
-            // Use STREAM_VOICE_CALL during active sessions to ensure proper Hardware AEC and VoIP routing.
-            // This prevents Samsung and other OEMs from ducking the volume to prevent echo.
-            val useStream = if (audioSessionActive) {
-                AudioManager.STREAM_VOICE_CALL
-            } else {
-                AudioManager.STREAM_MUSIC
-            }
+            // Use STREAM_MUSIC to ensure loud volume via media channel.
+            // Avoid STREAM_VOICE_CALL as it routes to earpiece on some OEM devices.
+            val useStream = AudioManager.STREAM_MUSIC
 
             val params = Bundle().apply {
                 putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
@@ -833,17 +825,17 @@ class SpeechManager(private val application: Application) {
      */
     private fun boostVolumeForHandsFree() {
         try {
-            // Force audio mode to IN_COMMUNICATION for speaker output to maintain VoIP AEC
+            // Force audio mode to NORMAL for speaker output to maintain loud volume
             if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
-                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                audioManager.mode = AudioManager.MODE_NORMAL
                 setSpeakerphoneOn(true)
                 
-                // Actual volume boost for STREAM_VOICE_CALL to fix low volume in hands-free mode
+                // Actual volume boost for STREAM_MUSIC to fix low volume in hands-free mode
                 try {
-                    val maxVoiceCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCallVol, 0)
+                    val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
                 } catch (e: Exception) {
-                    android.util.Log.w("SpeechManager", "Failed to max voice call volume: ${e.message}")
+                    android.util.Log.w("SpeechManager", "Failed to max music volume: ${e.message}")
                 }
             }
 
@@ -860,9 +852,9 @@ class SpeechManager(private val application: Application) {
      */
     private fun reapplyHandsFreeRouting() {
         try {
-            // Use MODE_IN_COMMUNICATION to match VoIP pipeline
+            // Use MODE_NORMAL to match media pipeline
             if (audioSessionActive) {
-                try { audioManager.mode = AudioManager.MODE_IN_COMMUNICATION } catch (_: Exception) {}
+                try { audioManager.mode = AudioManager.MODE_NORMAL } catch (_: Exception) {}
             }
             // Force speaker ON
             setSpeakerphoneOn(true)
@@ -870,8 +862,8 @@ class SpeechManager(private val application: Application) {
             // Re-apply max volume here just in case OEM reset it
             try {
                 if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
-                    val maxVoiceCallVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceCallVol, 0)
+                    val maxMusicVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusicVol, 0)
                 }
             } catch (e: Exception) {}
         } catch (e: Exception) {
@@ -1097,8 +1089,8 @@ class SpeechManager(private val application: Application) {
             // Request audio focus for voice communication
             requestAudioFocus()
 
-            // Set communication mode — eliminates clicks between TTS/recording transitions
-            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            // Set normal mode for media playback
+            audioManager.mode = AudioManager.MODE_NORMAL
 
             // No longer saving volumes as we no longer override them
 
@@ -1117,10 +1109,9 @@ class SpeechManager(private val application: Application) {
                 // Initial state: use speaker for hands-free (louder)
                 setSpeakerphoneOn(!isNearEar)
                 
-                // Use MODE_IN_COMMUNICATION at all times during the session!
-                // This ensures hardware AEC knows we are in a voice call, which prevents
-                // Samsung and other OEMs from drastically ducking the volume to prevent echo.
-                audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                // Use MODE_NORMAL at all times during the session!
+                // This ensures loud media playback via speakerphone.
+                audioManager.mode = AudioManager.MODE_NORMAL
                 
                 try {
                     // Delayed re-apply to ensure routing sticks

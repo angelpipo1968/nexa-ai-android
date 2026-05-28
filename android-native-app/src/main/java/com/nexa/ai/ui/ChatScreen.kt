@@ -773,7 +773,13 @@ fun VoiceModeOverlay(
             Spacer(modifier = Modifier.weight(0.8f))
 
             // Dynamic scale based on voice volume
-            val volumeScale = 1f + (uiState.voiceVolumeLevel * 0.4f)
+            // El usuario pidió que no vibre bruscamente. Reducimos el multiplicador para un pulso suave.
+            val animatedVolume by animateFloatAsState(
+                targetValue = uiState.voiceVolumeLevel,
+                animationSpec = tween(durationMillis = 200),
+                label = "volumeAnim"
+            )
+            val volumeScale = 1f + (animatedVolume * 0.05f)
             val finalScale = if (isListening || isSpeaking) coreScale * volumeScale else 1f
 
             Box(contentAlignment = Alignment.Center) {
