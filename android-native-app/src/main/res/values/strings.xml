@@ -257,4 +257,10 @@
     <string name="welcome_msg">How can I help you?</string>
     <string name="write_code">Write code</string>
     <string name="your_name">Your name</string>
+    <string name="menu_camera">Camera</string>
+    <string name="menu_photos">Photos</string>
+    <string name="menu_files">Files</string>
+    <string name="menu_reasoning">Reasoning</string>
+    <string name="menu_deep_research">Deep research</string>
+    <string name="menu_web_search">Search the web</string>
 </resources>

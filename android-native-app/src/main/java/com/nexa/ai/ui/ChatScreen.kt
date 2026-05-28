@@ -96,7 +96,11 @@ fun ChatMainScreen(
     onShareMessage: (String) -> Unit = {},
     onQuickAction: (String) -> Unit = {},
     onCaptureImage: () -> Unit = {},
-    onDismissPreview: () -> Unit = {}
+    onDismissPreview: () -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    onDeepResearch: () -> Unit = {},
+    onReasoning: () -> Unit = {},
+    onWebSearch: () -> Unit = {}
 ) {
     val adaptiveInfo = LocalWindowAdaptiveInfo.current
     val usePermanentDrawer = adaptiveInfo.shouldShowPermanentDrawer
@@ -155,6 +159,11 @@ fun ChatMainScreen(
                 onShareMessage = onShareMessage,
                 onQuickAction = onQuickAction,
                 onDismissPreview = onDismissPreview,
+                onCaptureImage = onCaptureImage,
+                onPickPhoto = onPickPhoto,
+                onDeepResearch = onDeepResearch,
+                onReasoning = onReasoning,
+                onWebSearch = onWebSearch,
                 showMenuButton = false // No need for menu button on tablet — drawer is always visible
             )
         }
@@ -214,6 +223,11 @@ fun ChatMainScreen(
                 onShareMessage = onShareMessage,
                 onQuickAction = onQuickAction,
                 onDismissPreview = onDismissPreview,
+                onCaptureImage = onCaptureImage,
+                onPickPhoto = onPickPhoto,
+                onDeepResearch = onDeepResearch,
+                onReasoning = onReasoning,
+                onWebSearch = onWebSearch,
                 showMenuButton = true
             )
         }
@@ -252,6 +266,11 @@ private fun ChatContent(
     onShareMessage: (String) -> Unit,
     onQuickAction: (String) -> Unit,
     onDismissPreview: () -> Unit,
+    onCaptureImage: () -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    onDeepResearch: () -> Unit = {},
+    onReasoning: () -> Unit = {},
+    onWebSearch: () -> Unit = {},
     showMenuButton: Boolean
 ) {
     val hPad = AdaptiveDimens.horizontalPadding()
@@ -384,7 +403,10 @@ private fun ChatContent(
                         onSend = onSend, onStartListening = onStartListening,
                         onStopListening = onStopListening,
                         onAttachFile = onAttachFile, onClearAttachment = onClearAttachment,
-                        onInterrupt = onInterruptVoice, onToggleVoiceMode = onToggleVoiceMode)
+                        onInterrupt = onInterruptVoice, onToggleVoiceMode = onToggleVoiceMode,
+                        onCaptureImage = onCaptureImage, onPickPhoto = onPickPhoto,
+                        onDeepResearch = onDeepResearch, onReasoning = onReasoning,
+                        onWebSearch = onWebSearch)
                 }
 
                 if (uiState.voiceMode) {

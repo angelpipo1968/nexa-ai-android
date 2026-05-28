@@ -85,6 +85,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val pickPhoto = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val fileName = it.lastPathSegment ?: "foto"
+            viewModel.setPendingAttachment(fileName)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         volumeControlStream = android.media.AudioManager.STREAM_MUSIC
@@ -208,6 +217,34 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     requestCameraPermission.launch(Manifest.permission.CAMERA)
                                 }
+                            },
+                            onPickPhoto = { pickPhoto.launch("image/*") },
+                            onDeepResearch = {
+                                val lang = uiState.language
+                                val prefix = if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Investiga a fondo: " else "Deep research: "
+                                val query = uiState.inputText.ifBlank {
+                                    if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH) "Investiga sobre el tema actual" else "Research the current topic"
+                                }
+                                viewModel.sendMessage(prefix + query)
+                            },
+                            onReasoning = {
+                                val lang = uiState.language
+                                val prefix = if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Razona paso a paso: " else "Reason step by step: "
+                                val query = uiState.inputText.ifBlank {
+                                    if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH) "Razona sobre este tema" else "Reason about this topic"
+                                }
+                                viewModel.sendMessage(prefix + query)
+                            },
+                            onWebSearch = {
+                                val lang = uiState.language
+                                val prefix = if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH)
+                                    "Busca en la web: " else "Search the web: "
+                                val query = uiState.inputText.ifBlank {
+                                    if (lang == com.nexa.ai.viewmodel.AppLanguage.SPANISH) "Busca información actual" else "Search for current information"
+                                }
+                                viewModel.sendMessage(prefix + query)
                             },
                             onDismissPreview = { viewModel.dismissPreview() },
                             onQuickAction = { action ->

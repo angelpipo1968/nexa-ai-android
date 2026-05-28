@@ -257,4 +257,10 @@
     <string name="welcome_msg">¿En qué te puedo ayudar?</string>
     <string name="write_code">Escribir código</string>
     <string name="your_name">Tu nombre</string>
+    <string name="menu_camera">Cámara</string>
+    <string name="menu_photos">Fotos</string>
+    <string name="menu_files">Archivos</string>
+    <string name="menu_reasoning">Razonamiento</string>
+    <string name="menu_deep_research">Investiga a fondo</string>
+    <string name="menu_web_search">Busca en la web</string>
 </resources>

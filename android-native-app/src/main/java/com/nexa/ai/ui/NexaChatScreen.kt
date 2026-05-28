@@ -74,6 +74,10 @@ fun NexaChatScreen(
     onCaptureImage: () -> Unit = {},
     onDismissPreview: () -> Unit = {},
     onQuickAction: (String) -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    onDeepResearch: () -> Unit = {},
+    onReasoning: () -> Unit = {},
+    onWebSearch: () -> Unit = {},
     onPreviewVoice: () -> Unit = {},
     onSetAccentColor: (Color) -> Unit = {},
     onExportSettings: () -> Unit = {},
@@ -134,7 +138,11 @@ fun NexaChatScreen(
             onShareMessage = onShareMessage,
             onQuickAction = onQuickAction,
             onCaptureImage = onCaptureImage,
-            onDismissPreview = onDismissPreview)
+            onDismissPreview = onDismissPreview,
+            onPickPhoto = onPickPhoto,
+            onDeepResearch = onDeepResearch,
+            onReasoning = onReasoning,
+            onWebSearch = onWebSearch)
         Screen.LOTTERY -> LotteryScreen(
             language = uiState.language,
             isDarkTheme = isDark,

@@ -773,7 +773,12 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
     pendingAttachment: String?, onTextChange: (String) -> Unit, onSend: () -> Unit,
     onStartListening: () -> Unit, onStopListening: () -> Unit,
     onAttachFile: () -> Unit, onClearAttachment: () -> Unit, onInterrupt: () -> Unit = {},
-    onToggleVoiceMode: () -> Unit = {}) {
+    onToggleVoiceMode: () -> Unit = {},
+    onCaptureImage: () -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    onDeepResearch: () -> Unit = {},
+    onReasoning: () -> Unit = {},
+    onWebSearch: () -> Unit = {}) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var showMenu by remember { mutableStateOf(false) }
     val hPad = AdaptivePadding.horizontal()
@@ -819,8 +824,39 @@ fun InputBar(text: String, language: AppLanguage, isListening: Boolean, isSpeaki
                         }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             val accentColor = LocalAccentColor.current
-                            DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = Modifier.size(20.dp), tint = accentColor); Text(NexaStrings.get("upload_photo", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
-                            DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(20.dp), tint = accentColor); Text(NexaStrings.get("upload_pdf", language), fontSize = 14.sp) } }, onClick = { showMenu = false; onAttachFile() })
+                            val menuIconSize = Modifier.size(20.dp)
+
+                            // Camera
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.CameraAlt, null, modifier = menuIconSize, tint = accentColor); Text(NexaStrings.get("menu_camera", language), fontSize = 14.sp) } },
+                                onClick = { showMenu = false; onCaptureImage() }
+                            )
+                            // Photos (gallery)
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Photo, null, modifier = menuIconSize, tint = accentColor); Text(NexaStrings.get("menu_photos", language), fontSize = 14.sp) } },
+                                onClick = { showMenu = false; onPickPhoto() }
+                            )
+                            // Files (PDF, docs, etc.)
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.InsertDriveFile, null, modifier = menuIconSize, tint = accentColor); Text(NexaStrings.get("menu_files", language), fontSize = 14.sp) } },
+                                onClick = { showMenu = false; onAttachFile() }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                            // Reasoning
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Psychology, null, modifier = menuIconSize, tint = accentColor); Text(NexaStrings.get("menu_reasoning", language), fontSize = 14.sp) } },
+                                onClick = { showMenu = false; onReasoning() }
+                            )
+                            // Deep research
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.ManageSearch, null, modifier = menuIconSize, tint = accentColor); Text(NexaStrings.get("menu_deep_research", language), fontSize = 14.sp) } },
+                                onClick = { showMenu = false; onDeepResearch() }
+                            )
+                            // Web search
+                            DropdownMenuItem(
+                                text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.TravelExplore, null, modifier = menuIconSize, tint = accentColor); Text(NexaStrings.get("menu_web_search", language), fontSize = 14.sp) } },
+                                onClick = { showMenu = false; onWebSearch() }
+                            )
                         }
                     }
 
