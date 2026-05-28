@@ -253,8 +253,8 @@
     <string name="voice_unavailable">Reconocimiento de voz no disponible</string>
     <string name="volume_boost">Aumentar volumen</string>
     <string name="volume_boost_desc">Volumen alto en manos libres</string>
-    <string name="welcome_message">Bienvenido a NEXA PRO</string>
-    <string name="welcome_msg">Toca el micrófono y habla,\no escribe tu mensaje.</string>
+    <string name="welcome_message">Bienvenido a NEXA</string>
+    <string name="welcome_msg">¿En qué te puedo ayudar?</string>
     <string name="write_code">Escribir código</string>
     <string name="your_name">Tu nombre</string>
 </resources>

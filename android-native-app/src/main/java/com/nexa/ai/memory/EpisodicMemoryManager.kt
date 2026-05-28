@@ -161,7 +161,7 @@ class EpisodicMemoryManager(context: Context) {
         
         // Detect preferences
         val preferencePatterns = listOf(
-            Regex("(?:me gusta|me encanta|me fascina|amo)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
+            Regex("(?:me gusta|me encanta|me fascina|amo|prefiero)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
             Regex("(?:i like|i love|i enjoy|i prefer)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
             Regex("(?:no me gusta|odio|detesto)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
             Regex("(?:i don't like|i hate|i dislike)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE)
@@ -177,13 +177,19 @@ class EpisodicMemoryManager(context: Context) {
                     sessionId = sessionId,
                     importance = 0.7f
                 ))
+                // Update profile interests
+                val currentInterests = getUserProfile().interests.toMutableList()
+                if (isPositive && preference !in currentInterests) {
+                    currentInterests.add(preference.trim())
+                    updateProfile { it.copy(interests = currentInterests.takeLast(10)) }
+                }
             }
         }
         
         // Detect location references
         val locationPatterns = listOf(
-            Regex("(?:vivo en|estoy en|soy de|mi casa está en)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
-            Regex("(?:i live in|i'm from|i'm in|my home is in)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE)
+            Regex("(?:vivo en|estoy en|soy de|mi casa está en|estamos en|vive en)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
+            Regex("(?:i live in|i'm from|i'm in|my home is in|we are in|we live in)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE)
         )
         for (pattern in locationPatterns) {
             pattern.find(content)?.groupValues?.get(1)?.let { location ->
@@ -193,14 +199,14 @@ class EpisodicMemoryManager(context: Context) {
                     sessionId = sessionId,
                     importance = 0.8f
                 ))
-                updateProfile { it.copy(location = location) }
+                updateProfile { it.copy(location = location.trim()) }
             }
         }
         
         // Detect occupation
         val occupationPatterns = listOf(
-            Regex("(?:soy|trabajo como|me dedico a)\\s+((?:ingeniero|doctor|profesor|estudiante|programador|diseñador|arquitecto|abogado|enfermero|chef|empresario|desarrollador)[\\wáéíóúñ]*)", RegexOption.IGNORE_CASE),
-            Regex("(?:i am|i work as)\\s+((?:engineer|doctor|teacher|student|programmer|designer|architect|lawyer|nurse|chef|entrepreneur|developer)\\w*)", RegexOption.IGNORE_CASE)
+            Regex("(?:soy|trabajo como|me dedico a|trabajo de)\\s+((?:ingeniero|doctor|profesor|estudiante|programador|diseñador|arquitecto|abogado|enfermero|chef|empresario|desarrollador|mecánico|electricista|plomero|vendedor|contador|administrador|médico|piloto|polícia|militar|taxista|conductor)[\\wáéíóúñ]*)", RegexOption.IGNORE_CASE),
+            Regex("(?:i am|i work as|i'm a)\\s+((?:engineer|doctor|teacher|student|programmer|designer|architect|lawyer|nurse|chef|entrepreneur|developer|mechanic|electrician|plumber|salesperson|accountant|administrator|physician|pilot|police|military|driver)\\w*)", RegexOption.IGNORE_CASE)
         )
         for (pattern in occupationPatterns) {
             pattern.find(content)?.groupValues?.get(1)?.let { occupation ->
@@ -210,12 +216,110 @@ class EpisodicMemoryManager(context: Context) {
                     sessionId = sessionId,
                     importance = 0.8f
                 ))
-                updateProfile { it.copy(occupation = occupation) }
+                updateProfile { it.copy(occupation = occupation.trim()) }
+            }
+        }
+        
+        // v6.0: Detect age/birthday
+        val agePatterns = listOf(
+            Regex("(?:tengo|tengo)\\s+(\\d+)\\s*(?:años|año)", RegexOption.IGNORE_CASE),
+            Regex("(?:i am|i'm)\\s+(\\d+)\\s*(?:years old|yr old|yo)", RegexOption.IGNORE_CASE)
+        )
+        for (pattern in agePatterns) {
+            pattern.find(content)?.groupValues?.get(1)?.let { age ->
+                memories.add(MemoryEntry(
+                    content = "Edad del usuario: $age años",
+                    category = MemoryCategory.PERSONAL,
+                    sessionId = sessionId,
+                    importance = 0.8f
+                ))
+            }
+        }
+        
+        // v6.0: Detect family references
+        val familyPatterns = listOf(
+            Regex("(?:mi (?:esposa|mujer|marido|esposo|novia|novio|hijo|hija|mamá|papá|madre|padre|hermano|hermana))\\s+(?:se llama|es|se llama)\\s*([\\wáéíóúñ]+)", RegexOption.IGNORE_CASE),
+            Regex("(?:my (?:wife|husband|girlfriend|boyfriend|son|daughter|mom|dad|mother|father|brother|sister))(?:'s| is| is named| named)\\s*([\\w]+)?", RegexOption.IGNORE_CASE)
+        )
+        for (pattern in familyPatterns) {
+            pattern.find(content)?.let { match ->
+                val familyInfo = match.value
+                memories.add(MemoryEntry(
+                    content = "Familia: $familyInfo",
+                    category = MemoryCategory.PERSONAL,
+                    sessionId = sessionId,
+                    importance = 0.85f
+                ))
+            }
+        }
+        
+        // v6.0: Detect communication style preference
+        if (lower.contains("habla menos") || lower.contains("sé breve") || lower.contains("corto") ||
+            lower.contains("be brief") || lower.contains("short answer") || lower.contains("keep it short")) {
+            updateProfile { it.copy(communicationStyle = "concise") }
+            memories.add(MemoryEntry(
+                content = "Prefiere respuestas breves y concisas",
+                category = MemoryCategory.PREFERENCE,
+                sessionId = sessionId,
+                importance = 0.9f
+            ))
+        }
+        if (lower.contains("explica más") || lower.contains("dame detalles") || lower.contains("más detalle") ||
+            lower.contains("explain more") || lower.contains("more details") || lower.contains("elaborate")) {
+            updateProfile { it.copy(communicationStyle = "detailed") }
+            memories.add(MemoryEntry(
+                content = "Prefiere respuestas detalladas y completas",
+                category = MemoryCategory.PREFERENCE,
+                sessionId = sessionId,
+                importance = 0.9f
+            ))
+        }
+        
+        // v6.0: Detect food/drink preferences
+        val foodPatterns = listOf(
+            Regex("(?:me gusta comer|me encanta comer|mi comida favorita|me gusta tomar|mi bebida favorita)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE),
+            Regex("(?:i like to eat|i love eating|my favorite food|i like to drink|my favorite drink)\\s+(.+?)(?:\\.|,|$)", RegexOption.IGNORE_CASE)
+        )
+        for (pattern in foodPatterns) {
+            pattern.find(content)?.groupValues?.get(1)?.let { food ->
+                memories.add(MemoryEntry(
+                    content = "Comida/bebida favorita: $food",
+                    category = MemoryCategory.PREFERENCE,
+                    sessionId = sessionId,
+                    importance = 0.6f
+                ))
+            }
+        }
+        
+        // v6.0: Detect important events / appointments
+        val eventPatterns = listOf(
+            Regex("(?:mañana|el próximo|el lunes|el martes|el miércoles|el jueves|el viernes|el sábado|el domingo|next|tomorrow)\\s+.+?(?:cita|reunión|cumpleaños|viaje|vuelo|entrevista|doctor|médico|appointment|meeting|birthday|trip|flight|interview))", RegexOption.IGNORE_CASE),
+            Regex("(?:tengo|I have)\\s+(?:una|un|a|an)\\s+.+?(?:cita|reunión|cumpleaños|viaje|vuelo|entrevista|appointment|meeting|birthday|trip|flight)", RegexOption.IGNORE_CASE)
+        )
+        for (pattern in eventPatterns) {
+            pattern.find(content)?.let { match ->
+                memories.add(MemoryEntry(
+                    content = "Evento: ${match.value}",
+                    category = MemoryCategory.EVENT,
+                    sessionId = sessionId,
+                    importance = 0.85f
+                ))
             }
         }
         
         // Store all extracted memories
         memories.forEach { storeMemory(it) }
+        
+        // v6.0: Always store a conversation summary if the message is substantial
+        if (content.length > 30 && memories.isEmpty()) {
+            storeMemory(MemoryEntry(
+                content = content.take(100),
+                category = MemoryCategory.CONVERSATION,
+                sessionId = sessionId,
+                importance = 0.3f
+            ))
+        }
+        
         return memories
     }
 
@@ -271,6 +375,14 @@ class EpisodicMemoryManager(context: Context) {
         }
         if (profile.interests.isNotEmpty()) {
             contextBuilder.append("USER INTERESTS: ${profile.interests.joinToString(", ")}. ")
+        }
+        // v6.0: Include communication style so AI knows how to respond
+        if (profile.communicationStyle.isNotBlank() && profile.communicationStyle != "friendly") {
+            contextBuilder.append("USER COMMUNICATION STYLE: ${profile.communicationStyle}. ")
+        }
+        // v6.0: Include total interactions for loyalty recognition
+        if (profile.totalInteractions > 10) {
+            contextBuilder.append("This is a returning user who has interacted ${profile.totalInteractions} times. Make them feel recognized. ")
         }
         
         if (relevantMemories.isNotEmpty()) {

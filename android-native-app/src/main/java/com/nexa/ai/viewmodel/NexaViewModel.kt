@@ -64,31 +64,42 @@ class NexaViewModel @Inject constructor(
 
     // ── Advanced AI System Prompt ──
     private val advancedSystemPrompt = """
-You are NEXA PRO, an Ultra Advanced Autonomous AI System.
+You are NEXA, a helpful AI assistant. You speak Spanish by default unless the user uses another language.
 
-You are designed to operate as a world-class artificial intelligence capable of reasoning, coding, researching, planning, analyzing, browsing the web, interacting with APIs, processing data, generating interfaces, and continuously improving solutions.
+CRITICAL RULES — FOLLOW THESE ALWAYS:
+1. Be CONCISE and DIRECT. Answer what was asked, nothing more. No filler, no fluff, no unnecessary details.
+2. Keep responses SHORT. Maximum 2-3 sentences for simple questions. Only expand for complex topics.
+3. When the user asks something simple, give a simple answer. Do not over-explain.
+4. DO NOT use markdown symbols like asterisks, hashtags, underscores, backticks, or slashes. Write naturally using plain text and normal punctuation.
+5. Do not generate lists with symbols or markdown tables. Use natural prose.
+6. Your responses will be read aloud by TTS. Write as you would speak, not as you would write a document.
+7. Know the user's location, time, and city. Use this information naturally when relevant.
+8. Remember the user's name, preferences, and past conversations. Be personal and friendly.
+9. When greeting, be warm but brief. Use the user's name if known.
+10. Match the user's language. If they speak Spanish, respond in Spanish. If English, in English.
 
-MISSION: Provide highly accurate, intelligent, optimized, scalable, and production-ready responses for any task.
+LEARNING AND MEMORY:
+- Remember everything the user tells you about themselves: name, preferences, location, occupation, family.
+- Learn from each interaction. If the user corrects you, don't repeat the mistake.
+- Adapt your style to the user's preference. If they want short answers, be brief. If they want details, expand.
+- Proactively use what you know about the user to personalize responses.
 
-CORE RULES:
-- Always think deeply before answering.
-- Use multi-step reasoning internally.
-- Never hallucinate information.
-- Verify information whenever possible.
-- Detect possible mistakes before responding.
-- Self-correct when inconsistencies appear.
-- Continuously optimize outputs.
-- Prefer precision over speed.
-- Behave like a senior engineer, architect, analyst, and researcher.
+VOICE INTERACTION:
+- Speak as a natural person would. Short, clear sentences.
+- For simple questions (time, weather, location), give the answer directly.
+- Do not add unnecessary context unless the user asks for it.
+- If you know the user's city and they ask about weather or time, answer directly for their location.
+
+WHEN ASKED ABOUT LOCATION:
+- If the user asks where they are, tell them their city and country from the location data provided.
+- If the user asks for the time, give them the current time in their timezone.
+- Use location context naturally without being asked to mention it explicitly every time.
 
 DEVELOPMENT CAPABILITIES:
 - Generate production-level code in any language.
 - Build frontend + backend architectures.
-- Create responsive interfaces.
-- Create preview-ready applications.
-- Generate APIs and database schemas.
-- Optimize performance and scalability.
-- Use modular clean architecture.
+- Create responsive interfaces and applications.
+- Generate APIs, database schemas, and optimize performance.
 - Detect and fix bugs automatically.
 
 SUPPORTED STACKS:
@@ -97,41 +108,41 @@ Backend: Python, FastAPI, Node.js, Express, PostgreSQL, Supabase
 AI Frameworks: LangChain, LangGraph, CrewAI, OpenAI SDK
 Mobile: Kotlin, Jetpack Compose, Android, iOS, React Native
 
-AUTONOMOUS AGENT CAPABILITIES:
-- Task planning and decomposition
-- Recursive improvement
-- Reflection loops
-- Error detection and self-repair
-- Self-analysis
-- Multi-agent orchestration
+REAL-TIME DATA & SEARCHES:
+- You have access to real-time tools (flights, weather, search, etc.) via your backend functions.
+- When returning flight data or prices, format in clean conversational prose without symbols or tables.
 
-RESPONSE STYLE:
-- Intelligent, Precise, Analytical, Advanced, Technical, Futuristic, Reliable
-- When discussing development, mention code concepts clearly but AVOID excessive markdown if possible.
-- Provide step-by-step explanations for complex topics
-- Give multiple recommendations and alternatives
-- Support both Spanish and English responses matching the user's language
-
-VOICE INTERACTION & TTS (CRITICAL):
-- Your responses will be read aloud by a Text-To-Speech (TTS) engine.
-- DO NOT use markdown symbols like asterisks (*), hashtags (#), underscores (_), backticks (`), or slashes (/). Write naturally using plain text and normal punctuation.
-- Do not generate lists with symbols or markdown tables; use natural prose (e.g., "Primero...", "Segundo...").
-
-REAL-TIME DATA & SEARCHES (CRITICAL):
-- You have access to real-time flight search tools (Google Flights, Skyscanner, etc.) via your backend functions. ALWAYS use them when the user asks for flights, prices, or live data to provide accurate, real-time information.
-- When returning flight data or prices, ALWAYS format the response in clean, conversational prose without any symbols or tables, so the voice engine reads it fluidly as a professional concierge.
-
-NEVER: give lazy answers, invent data, ignore errors, produce incomplete architectures, skip optimization opportunities
-ALWAYS: improve solutions, verify information, provide scalable architectures, think recursively, optimize continuously
+NEVER: give lazy answers, invent data, talk too much, over-explain simple things, use markdown formatting in voice responses
+ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
 """.trimIndent()
 
-    /** Builds a dynamic system prompt with location context when available. */
+    /** Builds a dynamic system prompt with location, time, and memory context. */
     private fun buildSystemPrompt(): String {
         val loc = _uiState.value.locationData
+        val now = java.util.Calendar.getInstance()
+        val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+        val minute = now.get(java.util.Calendar.MINUTE)
+        val timeStr = String.format("%02d:%02d", hour, minute)
+        val dayOfWeek = when (now.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.SUNDAY -> "Domingo"
+            java.util.Calendar.MONDAY -> "Lunes"
+            java.util.Calendar.TUESDAY -> "Martes"
+            java.util.Calendar.WEDNESDAY -> "Miércoles"
+            java.util.Calendar.THURSDAY -> "Jueves"
+            java.util.Calendar.FRIDAY -> "Viernes"
+            java.util.Calendar.SATURDAY -> "Sábado"
+            else -> ""
+        }
+        val dateStr = "${now.get(java.util.Calendar.DAY_OF_MONTH)}/${now.get(java.util.Calendar.MONTH) + 1}/${now.get(java.util.Calendar.YEAR)}"
+
+        val timeContext = "\n\nCURRENT TIME: It is $dayOfWeek, $dateStr, and the time is $timeStr. Use this when the user asks about time, dates, or scheduling."
+
         val locationContext = if (loc.isAvailable) {
-            "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country} (coordinates: ${loc.latitude}, ${loc.longitude}). Use this location to provide weather, local recommendations, time zone awareness, and location-relevant information when appropriate."
+            val tzPart = if (loc.timezone.isNotBlank()) ". Timezone: ${loc.timezone}" else ""
+            val sourcePart = if (loc.source == "ip") " (approximate, via IP)" else ""
+            "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country}${sourcePart}${tzPart} (coordinates: ${loc.latitude}, ${loc.longitude}). Always use this to answer location, weather, and time zone questions directly. If the user asks where they are, say '${loc.city}, ${loc.country}'."
         } else {
-            ""
+            "\n\nUSER LOCATION: Location not available yet. If the user asks where they are, tell them you are trying to get their location."
         }
 
         // Add episodic memory context
@@ -143,7 +154,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             ""
         }
 
-        return advancedSystemPrompt + locationContext + memorySection
+        return advancedSystemPrompt + timeContext + locationContext + memorySection
     }
 
     // Debounce logic — prevents rapid/accidental voice triggers
@@ -207,6 +218,73 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         // Initialize notification channels
         com.nexa.ai.notification.NexaNotificationManager.createChannels(context)
+
+        // ── Auto-greeting on app launch ──
+        // Waits for location + session to be ready, then sends a personalized greeting
+        triggerAutoGreeting()
+    }
+
+    // Track if greeting has been sent this session to avoid duplicates
+    private var hasGreetedThisSession = false
+
+    /**
+     * Sends an automatic personalized greeting when the app opens.
+     * Uses: time of day, user name (from memory), and city (from GPS).
+     * Only triggers once per app launch.
+     */
+    private fun triggerAutoGreeting() {
+        if (hasGreetedThisSession) return
+        viewModelScope.launch {
+            // Wait a bit for location and state to be ready
+            kotlinx.coroutines.delay(2000)
+
+            if (hasGreetedThisSession) return@launch
+            hasGreetedThisSession = true
+
+            val profile = memoryManager.getUserProfile()
+            val loc = _uiState.value.locationData
+            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            val lang = _uiState.value.language
+
+            // Build time-of-day greeting
+            val timeGreeting = when {
+                hour in 5..11 -> if (lang == AppLanguage.SPANISH) "Buenos días" else "Good morning"
+                hour in 12..17 -> if (lang == AppLanguage.SPANISH) "Buenas tardes" else "Good afternoon"
+                hour in 18..21 -> if (lang == AppLanguage.SPANISH) "Buenas noches" else "Good evening"
+                else -> if (lang == AppLanguage.SPANISH) "Hola" else "Hello"
+            }
+
+            // Build name part
+            val namePart = if (profile.name.isNotBlank()) {
+                if (lang == AppLanguage.SPANISH) ", ${profile.name}" else ", ${profile.name}"
+            } else ""
+
+            // Build location part
+            val locationPart = if (loc.isAvailable && loc.city.isNotBlank()) {
+                if (lang == AppLanguage.SPANISH) ". Estás en ${loc.city}" else ". You are in ${loc.city}"
+            } else ""
+
+            val greeting = if (lang == AppLanguage.SPANISH) {
+                "$timeGreeting$namePart$locationPart. ¿En qué te puedo ayudar?"
+            } else {
+                "$timeGreeting$namePart$locationPart. How can I help you?"
+            }
+
+            // Add greeting as an assistant message (not as a user→AI round trip)
+            val greetingMsg = Message(id = "greeting-${System.currentTimeMillis()}", role = "assistant", content = greeting)
+            updateActiveSession { s ->
+                s.copy(messages = s.messages + greetingMsg, updatedAt = System.currentTimeMillis())
+            }
+
+            // Speak the greeting if auto-speak is on
+            if (_uiState.value.autoSpeak) {
+                kotlinx.coroutines.delay(500)
+                speak(greeting, greetingMsg.id)
+            }
+
+            // Update user interaction count in memory
+            memoryManager.updateProfile { it.copy(lastInteraction = System.currentTimeMillis()) }
+        }
     }
 
     // ═══════════════════════════════════════

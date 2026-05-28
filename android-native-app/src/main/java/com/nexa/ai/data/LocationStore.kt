@@ -42,6 +42,9 @@ class LocationStore(private val context: Context) {
         val address: String = "",
         val city: String = "",
         val country: String = "",
+        val timezone: String = "",
+        val isp: String = "",
+        val source: String = "", // "gps", "network", "ip", "nominatim"
         val isAvailable: Boolean = false
     )
 
@@ -140,25 +143,32 @@ class LocationStore(private val context: Context) {
     private suspend fun getLocationWithRetry(): LocationData {
         // Attempt 1: FusedLocation high accuracy
         var location = tryGetFusedLocation(Priority.PRIORITY_HIGH_ACCURACY)
-        if (location != null) return resolveAddress(location)
+        if (location != null) return resolveAddress(location, "gps")
 
         // Attempt 2: FusedLocation balanced power
         location = tryGetFusedLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
-        if (location != null) return resolveAddress(location)
+        if (location != null) return resolveAddress(location, "network")
 
         // Attempt 3: FusedLocation last known
         location = tryGetFusedLastLocation()
-        if (location != null) return resolveAddress(location)
+        if (location != null) return resolveAddress(location, "gps")
 
         // Attempt 4: Request a fresh GPS fix via LocationManager updates
         location = requestFreshLocation()
-        if (location != null) return resolveAddress(location)
+        if (location != null) return resolveAddress(location, "network")
 
         // Attempt 5: LocationManager last known location
         location = tryGetLocationManagerLastLocation()
-        if (location != null) return resolveAddress(location)
+        if (location != null) return resolveAddress(location, "network")
 
-        android.util.Log.w("LocationStore", "All location attempts failed")
+        // Attempt 6: IP-based geolocation fallback (works without GPS permission)
+        val ipLocation = tryGetIpLocation()
+        if (ipLocation != null) {
+            android.util.Log.d("LocationStore", "Using IP-based location: ${ipLocation.city}, ${ipLocation.country}")
+            return ipLocation
+        }
+
+        android.util.Log.w("LocationStore", "All location attempts failed (including IP fallback)")
         return LocationData(isAvailable = false)
     }
 
@@ -309,8 +319,9 @@ class LocationStore(private val context: Context) {
      * with CountDownLatch. Now runs Geocoder on IO dispatcher.
      * Handles both API 33+ async and legacy sync APIs.
      * Fallback: If Geocoder fails, still returns coordinates.
+     * v6.0: Added source parameter to track where the location came from.
      */
-    private suspend fun resolveAddress(location: Location): LocationData =
+    private suspend fun resolveAddress(location: Location, source: String = "gps"): LocationData =
         withContext(kotlinx.coroutines.Dispatchers.IO) {
         val geocoder = Geocoder(context, Locale.getDefault())
         var address = ""
@@ -437,7 +448,7 @@ class LocationStore(private val context: Context) {
             }
         }
 
-        android.util.Log.d("LocationStore", "Location resolved: $city, $country (${location.latitude}, ${location.longitude})")
+        android.util.Log.d("LocationStore", "Location resolved: $city, $country (${location.latitude}, ${location.longitude}) source=$source")
 
         LocationData(
             latitude = location.latitude,
@@ -445,9 +456,112 @@ class LocationStore(private val context: Context) {
             address = address,
             city = city,
             country = country,
+            source = source,
             isAvailable = true  // v4.0: Even without address, coordinates are available
         )
     }
+
+    /**
+     * v6.0: IP-based geolocation fallback.
+     * Uses free IP geolocation APIs to determine the user's approximate location
+     * when GPS is not available (no permission, indoor, or GPS disabled).
+     * Accuracy: city-level (good enough for weather, time zone, and general context).
+     * 
+     * Sources tried:
+     * 1. ip-api.com (free, no key needed, includes timezone and ISP)
+     * 2. ipapi.co (backup)
+     */
+    private suspend fun tryGetIpLocation(): LocationData? =
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
+            // Try ip-api.com first (most reliable, includes timezone)
+            try {
+                val url = java.net.URL("http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().readText()
+                    val json = org.json.JSONObject(response)
+
+                    if (json.optString("status") == "success") {
+                        val city = json.optString("city", "")
+                        val country = json.optString("country", "")
+                        val lat = json.optDouble("lat", 0.0)
+                        val lon = json.optDouble("lon", 0.0)
+                        val timezone = json.optString("timezone", "")
+                        val isp = json.optString("isp", "")
+                        val query = json.optString("query", "")
+
+                        if (city.isNotBlank() || country.isNotBlank()) {
+                            android.util.Log.d("LocationStore", "IP location resolved: $city, $country (IP: $query, ISP: $isp)")
+                            connection.disconnect()
+                            return@withContext LocationData(
+                                latitude = lat,
+                                longitude = lon,
+                                address = "$city, $country",
+                                city = city,
+                                country = country,
+                                timezone = timezone,
+                                isp = isp,
+                                source = "ip",
+                                isAvailable = true
+                            )
+                        }
+                    }
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.w("LocationStore", "ip-api.com failed: ${e.message}")
+            }
+
+            // Fallback: ipapi.co
+            try {
+                val url = java.net.URL("https://ipapi.co/json/")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().readText()
+                    val json = org.json.JSONObject(response)
+
+                    val city = json.optString("city", "")
+                    val country = json.optString("country_name", "")
+                    val lat = json.optDouble("latitude", 0.0)
+                    val lon = json.optDouble("longitude", 0.0)
+                    val timezone = json.optString("timezone", "")
+                    val isp = json.optString("org", "")
+
+                    if (city.isNotBlank() || country.isNotBlank()) {
+                        android.util.Log.d("LocationStore", "IP location resolved (ipapi.co): $city, $country")
+                        connection.disconnect()
+                        return@withContext LocationData(
+                            latitude = lat,
+                            longitude = lon,
+                            address = "$city, $country",
+                            city = city,
+                            country = country,
+                            timezone = timezone,
+                            isp = isp,
+                            source = "ip",
+                            isAvailable = true
+                        )
+                    }
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                android.util.Log.w("LocationStore", "ipapi.co failed: ${e.message}")
+            }
+
+            null
+        }
 
     fun destroy() {
         fusedClient = null

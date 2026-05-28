@@ -73,6 +73,8 @@ class NexaHandsFreeAllInOne @Inject constructor(
         try {
             speechRecognizer?.stopListening()
             tts?.stop()
+            isPaused = true
+            android.util.Log.d("NexaHandsFree", "Paused — SpeechManager has control")
         } catch (e: Exception) {
             android.util.Log.w("NexaHandsFree", "Pause error: ${e.message}")
         }
@@ -82,9 +84,12 @@ class NexaHandsFreeAllInOne @Inject constructor(
      * v5.2: Resume this component when SpeechManager is no longer active.
      */
     fun resume() {
-        // No-op: NexaHandsFreeAllInOne is a supplementary module.
-        // SpeechManager handles the main voice flow now.
+        isPaused = false
+        android.util.Log.d("NexaHandsFree", "Resumed — available again")
     }
+
+    // v6.0: Track paused state to avoid conflicts
+    private var isPaused = false
 
     private fun initTTS() {
         tts = TextToSpeech(context) { status ->
@@ -139,6 +144,10 @@ class NexaHandsFreeAllInOne @Inject constructor(
 
     fun startListening() {
         if (_state.value.isListening) return
+        if (isPaused) {
+            android.util.Log.w("NexaHandsFree", "Cannot start listening — paused by SpeechManager")
+            return
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLang)
@@ -154,6 +163,10 @@ class NexaHandsFreeAllInOne @Inject constructor(
     }
 
     fun speak(text: String) {
+        if (isPaused) {
+            android.util.Log.w("NexaHandsFree", "Cannot speak — paused by SpeechManager")
+            return
+        }
         if (tts == null || text.isBlank()) return
         val id = UUID.randomUUID().toString()
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle().apply {
