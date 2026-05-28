@@ -932,12 +932,28 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     private fun fetchAiResponse(assistantId: String) {
         viewModelScope.launch {
             try {
+                // v5.2: Refresh location before sending to ensure accurate GPS data
+                refreshLocationIfNeeded()
+
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
 
+                // Send GPS location data to the API server so it can use
+                // real GPS coordinates instead of IP-based geolocation (which
+                // returns the CDN server location, not the user location)
+                val loc = _uiState.value.locationData
+                val lat = if (loc.isAvailable) loc.latitude else null
+                val lon = if (loc.isAvailable) loc.longitude else null
+                val userCity = if (loc.isAvailable && loc.city.isNotBlank()) loc.city else null
+                val userCountry = if (loc.isAvailable && loc.country.isNotBlank()) loc.country else null
+
                 repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
                     language = _uiState.value.language.code,
-                    systemPrompt = buildSystemPrompt()).collect { event ->
+                    systemPrompt = buildSystemPrompt(),
+                    latitude = lat,
+                    longitude = lon,
+                    city = userCity,
+                    country = userCountry).collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
@@ -1040,6 +1056,8 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
+            // v5.2: Pause NexaHandsFreeAllInOne to prevent TTS/STT conflict
+            handsFree.pause()
             speechManager.startVoiceAudioSession()
             speechManager.startListening()
         } else {
@@ -1047,6 +1065,8 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             speechManager.stopListening()
             speechManager.stopSpeaking()
             speechManager.stopVoiceAudioSession()
+            // v5.2: Resume NexaHandsFreeAllInOne
+            handsFree.resume()
         }
     }
 
@@ -1064,14 +1084,28 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         _uiState.update { it.copy(handsFreeEnabled = activating) }
 
         if (activating) {
-            // AL ACTIVAR: Modo voz y auto-habla activados
+            // AL ACTIVAR: Iniciar sesión de audio completa para manos libres
             _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
+            // v5.2: Pause NexaHandsFreeAllInOne to prevent TTS/STT conflict
+            handsFree.pause()
+            // CRITICAL FIX: startVoiceAudioSession() must be called to configure:
+            // - Audio focus, MODE_NORMAL, speaker routing, Bluetooth SCO, proximity sensor
+            // Without this, hands-free audio goes to earpiece with low volume
+            speechManager.startVoiceAudioSession()
             speechManager.startListening()
             val lang = _uiState.value.language
             speak(if (lang == AppLanguage.SPANISH) "Modo manos libres activado" else "Hands-free mode activated")
         } else {
-            // AL DESACTIVAR: Detener habla pero mantener escucha
+            // AL DESACTIVAR: Detener todo y liberar recursos de audio
+            speechManager.stopBargeInMonitor()
             speechManager.stopSpeaking()
+            speechManager.stopListening()
+            // CRITICAL FIX: stopVoiceAudioSession() must be called to release:
+            // - Audio focus, speaker routing, Bluetooth SCO, proximity sensor
+            speechManager.stopVoiceAudioSession()
+            _uiState.update { it.copy(voiceMode = false) }
+            // v5.2: Resume NexaHandsFreeAllInOne
+            handsFree.resume()
             val lang = _uiState.value.language
             speak(if (lang == AppLanguage.SPANISH) "Modo manos libres desactivado" else "Hands-free mode deactivated")
         }
@@ -1110,6 +1144,25 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
                 _uiState.update { it.copy(isLocating = false) }
             }
+        }
+    }
+
+    /**
+     * v5.2: Refresh location before sending a message to ensure
+     * the AI always has the most current user position.
+     * Called automatically before each AI request in fetchAiResponse.
+     */
+    private suspend fun refreshLocationIfNeeded() {
+        if (!locationStore.hasLocationPermission()) return
+        try {
+            val location = locationStore.getCurrentLocation()
+            if (location.isAvailable) {
+                _uiState.update { it.copy(locationData = location) }
+                android.util.Log.d("NexaVM", "Location refreshed: ${location.city}, ${location.country}")
+            }
+        } catch (e: Exception) {
+            // Don't block message sending if location refresh fails
+            android.util.Log.w("NexaVM", "Location refresh failed (non-blocking): ${e.message}")
         }
     }
 

@@ -49,6 +49,11 @@ class LocationStore(private val context: Context) {
     private var locationManager: LocationManager? = null
     private var cachedLocation: LocationData? = null
 
+    // v5.2: Track when location was last fetched for auto-refresh logic
+    private var lastLocationTime: Long = 0L
+    // Refresh location if older than 5 minutes (300000ms)
+    private val locationStaleThresholdMs = 300_000L
+
     fun initialize() {
         try {
             fusedClient = LocationServices.getFusedLocationProviderClient(context)
@@ -106,14 +111,21 @@ class LocationStore(private val context: Context) {
 
         if (result != null && result.isAvailable) {
             cachedLocation = result
+            lastLocationTime = System.currentTimeMillis()
             return result
         }
 
-        // Return cached location if available
+        // Return cached location if available and not too stale
         val cached = cachedLocation
         if (cached != null && cached.isAvailable) {
-            android.util.Log.d("LocationStore", "Using cached location: ${cached.city}, ${cached.country}")
-            return cached
+            val age = System.currentTimeMillis() - lastLocationTime
+            if (age < locationStaleThresholdMs) {
+                android.util.Log.d("LocationStore", "Using cached location: ${cached.city}, ${cached.country} (age: ${age/1000}s)")
+                return cached
+            } else {
+                android.util.Log.d("LocationStore", "Cached location is stale (${age/1000}s old), but no fresh location available")
+                return cached  // Still return stale cache rather than nothing
+            }
         }
 
         return LocationData(isAvailable = false)

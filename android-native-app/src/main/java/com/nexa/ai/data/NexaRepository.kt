@@ -30,7 +30,11 @@ data class ChatRequest(
     val messages: List<ChatMessage>,
     val provider: String? = null,
     val language: String? = null,
-    val systemPrompt: String? = null
+    val systemPrompt: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val city: String? = null,
+    val country: String? = null
 )
 
 @Singleton
@@ -60,9 +64,13 @@ class NexaRepository @Inject constructor() {
         baseUrl: String,
         provider: String? = null,
         language: String? = null,
-        systemPrompt: String? = null
+        systemPrompt: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        city: String? = null,
+        country: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val chatRequest = ChatRequest(messages, provider, language, systemPrompt)
+        val chatRequest = ChatRequest(messages, provider, language, systemPrompt, latitude, longitude, city, country)
         val body = gson.toJsonTree(chatRequest).asJsonObject
 
         // Remove systemPrompt from body and inject as first message instead

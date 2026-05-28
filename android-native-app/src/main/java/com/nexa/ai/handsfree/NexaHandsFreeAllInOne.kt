@@ -64,6 +64,28 @@ class NexaHandsFreeAllInOne @Inject constructor(
         initSTT()
     }
 
+    /**
+     * v5.2: Pause this component when SpeechManager is controlling voice mode.
+     * Prevents both TTS engines from speaking at the same time and
+     * both SpeechRecognizers from competing for the microphone.
+     */
+    fun pause() {
+        try {
+            speechRecognizer?.stopListening()
+            tts?.stop()
+        } catch (e: Exception) {
+            android.util.Log.w("NexaHandsFree", "Pause error: ${e.message}")
+        }
+    }
+
+    /**
+     * v5.2: Resume this component when SpeechManager is no longer active.
+     */
+    fun resume() {
+        // No-op: NexaHandsFreeAllInOne is a supplementary module.
+        // SpeechManager handles the main voice flow now.
+    }
+
     private fun initTTS() {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
