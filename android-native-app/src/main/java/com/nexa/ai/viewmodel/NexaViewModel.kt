@@ -1545,12 +1545,12 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
 
     private val visionGson = Gson()
 
-    fun sendVisionRequest(base64Image: String) {
+    fun sendVisionRequest(base64Image: String, mimeType: String = "image/jpeg") {
         val lang = _uiState.value.language
         val prompt = if (lang == AppLanguage.SPANISH)
-            "Analiza esta imagen y describe lo que ves en detalle. Incluye objetos, personas, texto, colores, escena y cualquier información relevante."
+            "Analiza esta imagen y describe lo que ves en detalle. Incluye objetos, personas, texto, colores, escena y cualquier información relevante. Responde en español de forma clara y concisa."
         else
-            "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information."
+            "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information. Respond clearly and concisely."
 
         _uiState.update { it.copy(cameraImageUri = null) }
 
@@ -1569,7 +1569,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         viewModelScope.launch {
             try {
                 val responseText = withContext(Dispatchers.IO) {
-                    performVisionRequest(BuildConfig.API_BASE_URL, base64Image, prompt)
+                    performVisionRequest(BuildConfig.API_BASE_URL, base64Image, prompt, mimeType)
                 }
 
                 if (responseText != null) {
@@ -1610,10 +1610,10 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         }
     }
 
-    private fun performVisionRequest(baseUrl: String, base64Image: String, question: String): String? {
+    private fun performVisionRequest(baseUrl: String, base64Image: String, question: String, mimeType: String = "image/jpeg"): String? {
         val jsonBody = JsonObject().apply {
             addProperty("image", base64Image)
-            addProperty("mimeType", "image/jpeg")
+            addProperty("mimeType", mimeType)
             addProperty("question", question)
         }
 

@@ -23,6 +23,8 @@ import com.nexa.ai.viewmodel.NexaViewModel
 import androidx.compose.ui.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import kotlin.concurrent.thread
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -80,8 +82,19 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            val fileName = it.lastPathSegment ?: "archivo"
-            viewModel.setPendingAttachment(fileName)
+            val mimeType = contentResolver.getType(it) ?: "application/octet-stream"
+            // If it's an image, send to vision API
+            if (mimeType.startsWith("image/")) {
+                val base64 = uriToBase64(it)
+                if (base64 != null) {
+                    viewModel.sendVisionRequest(base64, mimeType)
+                } else {
+                    viewModel.setPendingAttachment(it.lastPathSegment ?: "archivo")
+                }
+            } else {
+                // Non-image file: store as attachment
+                viewModel.setPendingAttachment(it.lastPathSegment ?: "archivo")
+            }
         }
     }
 
@@ -89,8 +102,49 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            val fileName = it.lastPathSegment ?: "foto"
-            viewModel.setPendingAttachment(fileName)
+            val mimeType = contentResolver.getType(it) ?: "image/jpeg"
+            val base64 = uriToBase64(it)
+            if (base64 != null) {
+                viewModel.sendVisionRequest(base64, mimeType)
+            } else {
+                // Fallback: try to decode as bitmap
+                try {
+                    val inputStream = contentResolver.openInputStream(it)
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                    inputStream?.close()
+                    if (bitmap != null) {
+                        val baos = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos)
+                        val base64FromBitmap = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                        viewModel.sendVisionRequest(base64FromBitmap, "image/jpeg")
+                    }
+                } catch (e: Exception) {
+                    viewModel.setPendingAttachment(it.lastPathSegment ?: "foto")
+                }
+            }
+        }
+    }
+
+    /**
+     * Converts a content URI to a base64 string.
+     * Reads the file bytes directly, preserving the original format (PNG, JPEG, WEBP, etc.)
+     * Returns null if the file is too large (>20MB) or cannot be read.
+     */
+    private fun uriToBase64(uri: android.net.Uri): String? {
+        return try {
+            val inputStream: InputStream? = contentResolver.openInputStream(uri)
+            inputStream?.use {
+                val bytes = it.readBytes()
+                // Safety: skip files larger than 20MB
+                if (bytes.size > 20 * 1024 * 1024) {
+                    android.util.Log.w("MainActivity", "File too large for base64: ${bytes.size} bytes")
+                    return null
+                }
+                Base64.encodeToString(bytes, Base64.NO_WRAP)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to read URI as base64: ${e.message}")
+            null
         }
     }
 
