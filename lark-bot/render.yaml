@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: nexa-pro-lark-dify
+    runtime: node
+    plan: free
+    repo: https://github.com/angelpipo1968/nexa-ai-android
+    branch: main
+    rootDir: lark-bot
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: LARK_APP_ID
+        sync: false
+      - key: LARK_APP_SECRET
+        sync: false
+      - key: LARK_VERIFICATION_TOKEN
+        sync: false
+      - key: LARK_ENCRYPT_KEY
+        sync: false
+      - key: DIFY_API_KEY
+        sync: false
+      - key: DIFY_BASE_URL
+        value: https://api.dify.ai/v1
+      - key: NODE_ENV
+        value: production
