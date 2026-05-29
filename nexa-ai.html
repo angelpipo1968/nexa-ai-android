@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXA AI — Your AI Assistant for Everything</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%2300d4ff'/><stop offset='100%25' style='stop-color:%237c3aed'/></linearGradient></defs><circle cx='50' cy='50' r='40' fill='url(%23g)'/><text x='50' y='62' font-size='36' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial'>N</text></svg>">
+<style>
+/* ===== RESET & BASE ===== */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-primary:#0a0a0f;
+  --bg-secondary:#111118;
+  --bg-tertiary:#1a1a24;
+  --bg-hover:#22222e;
+  --bg-active:#2a2a3a;
+  --text-primary:#e8e8f0;
+  --text-secondary:#9898a8;
+  --text-tertiary:#6868788;
+  --text-muted:#505060;
+  --accent:#00d4ff;
+  --accent2:#7c3aed;
+  --accent3:#a855f7;
+  --accent-gradient:linear-gradient(135deg,#00d4ff,#7c3aed);
+  --accent-gradient2:linear-gradient(135deg,#7c3aed,#ec4899);
+  --border-color:rgba(255,255,255,0.06);
+  --border-hover:rgba(255,255,255,0.12);
+  --glass:rgba(255,255,255,0.03);
+  --glass-border:rgba(255,255,255,0.08);
+  --shadow-sm:0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.5);
+  --shadow-glow:0 0 20px rgba(0,212,255,0.15);
+  --radius-sm:8px;
+  --radius-md:12px;
+  --radius-lg:16px;
+  --radius-xl:24px;
+  --sidebar-width:280px;
+  --sidebar-collapsed:0px;
+  --transition:0.3s cubic-bezier(0.4,0,0.2,1);
+}
+html{font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg-primary);
+  color:var(--text-primary);
+  height:100vh;
+  overflow:hidden;
+  display:flex;
+}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+
+/* ===== ANIMATED BACKGROUND ===== */
+.bg-grid{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(circle at 20% 50%,rgba(0,212,255,0.03) 0%,transparent 50%),
+    radial-gradient(circle at 80% 20%,rgba(124,58,237,0.03) 0%,transparent 50%),
+    radial-gradient(circle at 50% 80%,rgba(168,85,247,0.02) 0%,transparent 50%);
+}
+.bg-grid::before{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse at center,black 30%,transparent 70%);
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar{
+  width:var(--sidebar-width);
+  min-width:var(--sidebar-width);
+  height:100vh;
+  background:var(--bg-secondary);
+  border-right:1px solid var(--border-color);
+  display:flex;flex-direction:column;
+  transition:var(--transition);
+  z-index:100;
+  position:relative;
+  overflow:hidden;
+}
+.sidebar.collapsed{width:var(--sidebar-collapsed);min-width:var(--sidebar-collapsed)}
+.sidebar.collapsed .sidebar-content{opacity:0;pointer-events:none}
+
+.sidebar-header{
+  padding:16px;
+  border-bottom:1px solid var(--border-color);
+  display:flex;align-items:center;justify-content:space-between;
+  min-height:64px;
+}
+.logo{
+  display:flex;align-items:center;gap:10px;
+  text-decoration:none;
+}
+.logo-icon{
+  width:34px;height:34px;
+  border-radius:10px;
+  background:var(--accent-gradient);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:16px;color:#fff;
+  box-shadow:0 0 15px rgba(0,212,255,0.3);
+}
+.logo-text{
+  font-size:18px;font-weight:700;
+  background:var(--accent-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo-version{
+  font-size:10px;font-weight:500;
+  color:var(--text-muted);
+  background:var(--bg-tertiary);
+  padding:2px 6px;border-radius:4px;
+  margin-left:4px;
+}
+
+.btn-sidebar-toggle{
+  width:32px;height:32px;border-radius:var(--radius-sm);
+  background:var(--bg-tertiary);border:1px solid var(--border-color);
+  color:var(--text-secondary);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--transition);
+}
+.btn-sidebar-toggle:hover{background:var(--bg-hover);color:var(--text-primary)}
+
+.sidebar-content{
+  flex:1;overflow-y:auto;padding:8px;
+  transition:opacity 0.2s;
+}
+
+.btn-new-chat{
+  width:100%;padding:10px 14px;
+  border-radius:var(--radius-md);
+  background:var(--accent-gradient);
+  color:#fff;font-weight:600;font-size:13px;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:var(--transition);
+  margin-bottom:12px;
+  box-shadow:0 0 20px rgba(0,212,255,0.2);
+}
+.btn-new-chat:hover{
+  transform:translateY(-1px);
+  box-shadow:0 0 30px rgba(0,212,255,0.3);
+}
+.btn-new-chat svg{width:16px;height:16px}
+
+/* Sidebar search */
+.sidebar-search{
+  position:relative;margin-bottom:12px;
+}
+.sidebar-search input{
+  width:100%;padding:8px 12px 8px 34px;
+  border-radius:var(--radius-sm);
+  background:var(--bg-tertiary);border:1px solid var(--border-color);
+  color:var(--text-primary);font-size:13px;
+  outline:none;transition:var(--transition);
+}
+.sidebar-search input::placeholder{color:var(--text-muted)}
+.sidebar-search input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,0.1)}
+.sidebar-search svg{
+  position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  width:14px;height:14px;color:var(--text-muted)
+}
+
+/* Chat sections */
+.chat-section{margin-bottom:8px}
+.chat-section-title{
+  font-size:11px;font-weight:600;
+  color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:0.05em;
+  padding:8px 10px 4px;
+}
+.chat-item{
+  padding:8px 10px;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:var(--transition);
+  color:var(--text-secondary);
+  font-size:13px;
+  position:relative;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.chat-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.chat-item.active{background:var(--bg-active);color:var(--text-primary)}
+.chat-item.active::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:60%;border-radius:0 3px 3px 0;
+  background:var(--accent-gradient);
+}
+.chat-item svg{width:14px;height:14px;flex-shrink:0;opacity:0.5}
+.chat-item .chat-title{flex:1;overflow:hidden;text-overflow:ellipsis}
+
+/* Sidebar footer */
+.sidebar-footer{
+  padding:12px 16px;
+  border-top:1px solid var(--border-color);
+  display:flex;flex-direction:column;gap:8px;
+}
+.sidebar-footer-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:var(--transition);
+  color:var(--text-secondary);font-size:13px;
+  text-decoration:none;
+}
+.sidebar-footer-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.sidebar-footer-item svg{width:16px;height:16px;opacity:0.6}
+.user-profile{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:var(--transition);
+}
+.user-profile:hover{background:var(--bg-hover)}
+.user-avatar{
+  width:30px;height:30px;border-radius:50%;
+  background:var(--accent-gradient2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#fff;
+}
+.user-name{font-size:13px;font-weight:500;color:var(--text-primary)}
+.user-plan{font-size:11px;color:var(--text-muted)}
+
+/* ===== MAIN CONTENT ===== */
+.main{
+  flex:1;display:flex;flex-direction:column;
+  height:100vh;position:relative;z-index:1;
+  overflow:hidden;
+}
+
+/* Top bar */
+.topbar{
+  height:56px;min-height:56px;
+  padding:0 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border-color);
+  background:rgba(10,10,15,0.8);
+  backdrop-filter:blur(20px);
+  z-index:10;
+}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.btn-expand-sidebar{
+  width:34px;height:34px;border-radius:var(--radius-sm);
+  background:transparent;border:none;
+  color:var(--text-secondary);cursor:pointer;
+  display:none;align-items:center;justify-content:center;
+  transition:var(--transition);
+}
+.sidebar.collapsed ~ .main .btn-expand-sidebar{display:flex}
+.btn-expand-sidebar:hover{background:var(--bg-hover);color:var(--text-primary)}
+
+.model-selector{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 12px;border-radius:var(--radius-sm);
+  background:var(--bg-tertiary);border:1px solid var(--border-color);
+  cursor:pointer;transition:var(--transition);
+  font-size:13px;font-weight:500;color:var(--text-primary);
+  position:relative;
+}
+.model-selector:hover{border-color:var(--border-hover);background:var(--bg-hover)}
+.model-selector svg{width:14px;height:14px;color:var(--text-muted)}
+.model-badge{
+  font-size:9px;font-weight:600;
+  padding:1px 5px;border-radius:3px;
+  background:var(--accent-gradient);color:#fff;
+}
+
+/* Model dropdown */
+.model-dropdown{
+  position:absolute;top:calc(100% + 8px);left:0;
+  width:280px;
+  background:var(--bg-secondary);border:1px solid var(--border-color);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-lg);
+  padding:6px;
+  z-index:200;
+  display:none;
+}
+.model-dropdown.show{display:block;animation:fadeInDown 0.2s ease}
+.model-option{
+  padding:10px 12px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:var(--transition);
+  display:flex;align-items:center;gap:10px;
+}
+.model-option:hover{background:var(--bg-hover)}
+.model-option.active{background:rgba(0,212,255,0.08)}
+.model-option-name{font-size:13px;font-weight:500;color:var(--text-primary)}
+.model-option-desc{font-size:11px;color:var(--text-muted)}
+.model-option-badge{
+  font-size:9px;font-weight:600;
+  padding:2px 6px;border-radius:3px;
+  background:var(--accent-gradient);color:#fff;margin-left:auto;
+}
+
+.topbar-right{display:flex;align-items:center;gap:8px}
+.topbar-btn{
+  width:34px;height:34px;border-radius:var(--radius-sm);
+  background:transparent;border:none;
+  color:var(--text-secondary);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--transition);position:relative;
+}
+.topbar-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.topbar-btn svg{width:18px;height:18px}
+.notification-dot{
+  position:absolute;top:6px;right:6px;
+  width:7px;height:7px;border-radius:50%;
+  background:#ef4444;border:2px solid var(--bg-primary);
+}
+.btn-upgrade{
+  padding:6px 14px;border-radius:var(--radius-sm);
+  background:var(--accent-gradient);
+  color:#fff;font-size:12px;font-weight:600;
+  border:none;cursor:pointer;
+  transition:var(--transition);
+  display:flex;align-items:center;gap:6px;
+}
+.btn-upgrade:hover{transform:translateY(-1px);box-shadow:var(--shadow-glow)}
+.btn-upgrade svg{width:14px;height:14px}
+
+/* ===== CHAT AREA ===== */
+.chat-area{
+  flex:1;overflow-y:auto;
+  display:flex;flex-direction:column;
+  padding:0;
+}
+
+/* Welcome screen */
+.welcome{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:40px 20px;
+  text-align:center;
+}
+.welcome-icon{
+  width:72px;height:72px;border-radius:20px;
+  background:var(--accent-gradient);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:24px;
+  box-shadow:0 0 40px rgba(0,212,255,0.2);
+  animation:pulse-glow 3s ease-in-out infinite;
+}
+.welcome-icon svg{width:36px;height:36px;color:#fff}
+@keyframes pulse-glow{
+  0%,100%{box-shadow:0 0 40px rgba(0,212,255,0.2)}
+  50%{box-shadow:0 0 60px rgba(0,212,255,0.35)}
+}
+.welcome h1{
+  font-size:32px;font-weight:700;
+  margin-bottom:8px;
+  background:var(--accent-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.welcome p{
+  font-size:15px;color:var(--text-secondary);
+  max-width:500px;line-height:1.6;
+  margin-bottom:36px;
+}
+
+/* Suggestion cards */
+.suggestions{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;
+  max-width:800px;
+  width:100%;
+}
+.suggestion-card{
+  padding:16px;
+  border-radius:var(--radius-md);
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  cursor:pointer;
+  transition:var(--transition);
+  text-align:left;
+}
+.suggestion-card:hover{
+  background:var(--bg-hover);
+  border-color:var(--border-hover);
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-md);
+}
+.suggestion-icon{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:10px;font-size:18px;
+}
+.suggestion-card:nth-child(1) .suggestion-icon{background:rgba(0,212,255,0.1);color:var(--accent)}
+.suggestion-card:nth-child(2) .suggestion-icon{background:rgba(124,58,237,0.1);color:var(--accent2)}
+.suggestion-card:nth-child(3) .suggestion-icon{background:rgba(236,72,153,0.1);color:#ec4899}
+.suggestion-card:nth-child(4) .suggestion-icon{background:rgba(34,197,94,0.1);color:#22c55e}
+.suggestion-card h3{font-size:13px;font-weight:600;margin-bottom:4px}
+.suggestion-card p{font-size:12px;color:var(--text-muted);line-height:1.4}
+
+/* Messages */
+.messages-container{
+  flex:1;overflow-y:auto;
+  padding:20px 0;
+}
+.message{
+  padding:16px 24px;
+  display:flex;gap:14px;
+  max-width:860px;
+  margin:0 auto;width:100%;
+  animation:fadeInUp 0.3s ease;
+}
+@keyframes fadeInUp{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes fadeInDown{
+  from{opacity:0;transform:translateY(-6px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.message-avatar{
+  width:32px;height:32px;border-radius:50%;
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;
+}
+.message.user .message-avatar{
+  background:var(--accent-gradient2);color:#fff;
+}
+.message.assistant .message-avatar{
+  background:var(--accent-gradient);color:#fff;
+}
+.message-content{
+  flex:1;min-width:0;
+}
+.message-sender{
+  font-size:13px;font-weight:600;
+  margin-bottom:4px;
+  display:flex;align-items:center;gap:8px;
+}
+.message-sender .timestamp{
+  font-size:11px;font-weight:400;
+  color:var(--text-muted);
+}
+.message-text{
+  font-size:14px;line-height:1.7;
+  color:var(--text-primary);
+}
+.message-text p{margin-bottom:8px}
+.message-text p:last-child{margin-bottom:0}
+.message-text code{
+  font-family:'JetBrains Mono',monospace;
+  background:var(--bg-tertiary);
+  padding:2px 6px;border-radius:4px;
+  font-size:13px;
+}
+.message-text pre{
+  background:var(--bg-tertiary);
+  border-radius:var(--radius-sm);
+  padding:14px;overflow-x:auto;
+  margin:8px 0;
+  border:1px solid var(--border-color);
+}
+.message-text pre code{
+  background:transparent;padding:0;
+}
+.message-actions{
+  display:flex;gap:4px;margin-top:8px;
+  opacity:0;transition:var(--transition);
+}
+.message:hover .message-actions{opacity:1}
+.msg-action{
+  width:28px;height:28px;border-radius:6px;
+  background:transparent;border:none;
+  color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--transition);
+}
+.msg-action:hover{background:var(--bg-hover);color:var(--text-primary)}
+.msg-action svg{width:14px;height:14px}
+
+/* Typing indicator */
+.typing-indicator{
+  display:flex;align-items:center;gap:4px;
+  padding:8px 0;
+}
+.typing-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);
+  animation:typingBounce 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(2){animation-delay:0.2s}
+.typing-dot:nth-child(3){animation-delay:0.4s}
+@keyframes typingBounce{
+  0%,60%,100%{transform:translateY(0);opacity:0.4}
+  30%{transform:translateY(-6px);opacity:1}
+}
+
+/* ===== INPUT AREA ===== */
+.input-area{
+  padding:12px 24px 20px;
+  max-width:860px;margin:0 auto;width:100%;
+}
+.input-wrapper{
+  background:var(--bg-secondary);
+  border:1px solid var(--border-color);
+  border-radius:var(--radius-lg);
+  padding:4px;
+  transition:var(--transition);
+}
+.input-wrapper:focus-within{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px rgba(0,212,255,0.1);
+}
+.input-top{
+  display:flex;align-items:flex-end;gap:4px;
+}
+.input-top textarea{
+  flex:1;
+  background:transparent;border:none;outline:none;
+  color:var(--text-primary);font-size:14px;
+  font-family:inherit;
+  resize:none;
+  padding:10px 12px;
+  min-height:24px;max-height:200px;
+  line-height:1.5;
+}
+.input-top textarea::placeholder{color:var(--text-muted)}
+
+.input-actions-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:4px 8px 6px;
+}
+.input-actions-left{display:flex;align-items:center;gap:2px}
+.input-actions-right{display:flex;align-items:center;gap:2px}
+
+.input-action-btn{
+  width:32px;height:32px;border-radius:var(--radius-sm);
+  background:transparent;border:none;
+  color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--transition);
+  position:relative;
+}
+.input-action-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.input-action-btn.active{color:var(--accent);background:rgba(0,212,255,0.08)}
+.input-action-btn svg{width:18px;height:18px}
+
+.btn-send{
+  width:34px;height:34px;border-radius:var(--radius-sm);
+  background:var(--accent-gradient);
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;
+  transition:var(--transition);
+}
+.btn-send:hover{transform:scale(1.05);box-shadow:var(--shadow-glow)}
+.btn-send:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-send svg{width:16px;height:16px}
+
+/* Feature pills */
+.feature-pills{
+  display:flex;gap:8px;margin-bottom:12px;
+  padding:0 24px;
+  max-width:860px;margin-left:auto;margin-right:auto;
+  width:100%;
+  flex-wrap:wrap;
+}
+.feature-pill{
+  padding:6px 14px;
+  border-radius:20px;
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  color:var(--text-secondary);
+  font-size:12px;font-weight:500;
+  cursor:pointer;
+  transition:var(--transition);
+  display:flex;align-items:center;gap:6px;
+}
+.feature-pill:hover{
+  background:var(--bg-hover);
+  border-color:var(--border-hover);
+  color:var(--text-primary);
+}
+.feature-pill svg{width:14px;height:14px}
+.feature-pill.active{
+  background:rgba(0,212,255,0.08);
+  border-color:rgba(0,212,255,0.3);
+  color:var(--accent);
+}
+
+/* ===== SETTINGS MODAL ===== */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(4px);
+  z-index:500;
+  display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.show{display:flex;animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{
+  width:580px;max-height:80vh;
+  background:var(--bg-secondary);
+  border:1px solid var(--border-color);
+  border-radius:var(--radius-xl);
+  box-shadow:var(--shadow-lg);
+  overflow:hidden;
+  animation:scaleIn 0.2s ease;
+}
+@keyframes scaleIn{from{transform:scale(0.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-header{
+  padding:20px 24px;
+  border-bottom:1px solid var(--border-color);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-header h2{font-size:18px;font-weight:600}
+.modal-close{
+  width:32px;height:32px;border-radius:var(--radius-sm);
+  background:var(--bg-tertiary);border:none;
+  color:var(--text-secondary);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--transition);
+}
+.modal-close:hover{background:var(--bg-hover);color:var(--text-primary)}
+.modal-body{
+  padding:24px;overflow-y:auto;max-height:calc(80vh - 70px);
+}
+.setting-group{margin-bottom:20px}
+.setting-group-title{
+  font-size:12px;font-weight:600;
+  color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:0.05em;
+  margin-bottom:10px;
+}
+.setting-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;
+  border-radius:var(--radius-sm);
+  background:var(--bg-tertiary);
+  margin-bottom:6px;
+}
+.setting-info{display:flex;flex-direction:column;gap:2px}
+.setting-label{font-size:13px;font-weight:500;color:var(--text-primary)}
+.setting-desc{font-size:11px;color:var(--text-muted)}
+
+/* Toggle switch */
+.toggle{
+  width:40px;height:22px;border-radius:11px;
+  background:var(--bg-active);
+  cursor:pointer;position:relative;
+  transition:var(--transition);
+}
+.toggle.active{background:var(--accent)}
+.toggle::after{
+  content:'';position:absolute;
+  width:16px;height:16px;border-radius:50%;
+  background:#fff;top:3px;left:3px;
+  transition:var(--transition);
+}
+.toggle.active::after{left:21px}
+
+/* Select */
+.setting-select{
+  padding:6px 10px;border-radius:6px;
+  background:var(--bg-secondary);border:1px solid var(--border-color);
+  color:var(--text-primary);font-size:12px;
+  outline:none;cursor:pointer;
+}
+
+/* ===== FEATURES PAGE (Landing Content) ===== */
+.landing-page{
+  flex:1;overflow-y:auto;
+  display:none;
+}
+.landing-page.show{display:block}
+
+.hero{
+  min-height:80vh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;
+  padding:60px 24px;
+  position:relative;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:20px;
+  background:rgba(0,212,255,0.08);
+  border:1px solid rgba(0,212,255,0.2);
+  color:var(--accent);
+  font-size:12px;font-weight:500;
+  margin-bottom:24px;
+}
+.hero h1{
+  font-size:56px;font-weight:800;
+  line-height:1.1;
+  margin-bottom:16px;
+  max-width:700px;
+}
+.hero h1 .gradient-text{
+  background:var(--accent-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero p{
+  font-size:18px;color:var(--text-secondary);
+  max-width:540px;line-height:1.6;
+  margin-bottom:32px;
+}
+.hero-buttons{display:flex;gap:12px}
+.btn-primary{
+  padding:12px 28px;border-radius:var(--radius-md);
+  background:var(--accent-gradient);
+  color:#fff;font-weight:600;font-size:14px;
+  border:none;cursor:pointer;
+  transition:var(--transition);
+  display:flex;align-items:center;gap:8px;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 30px rgba(0,212,255,0.3)}
+.btn-secondary{
+  padding:12px 28px;border-radius:var(--radius-md);
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  color:var(--text-primary);font-weight:600;font-size:14px;
+  cursor:pointer;transition:var(--transition);
+  display:flex;align-items:center;gap:8px;
+}
+.btn-secondary:hover{background:var(--bg-hover);border-color:var(--border-hover)}
+
+/* Features grid */
+.features-section{padding:60px 24px}
+.features-section h2{
+  text-align:center;font-size:36px;font-weight:700;
+  margin-bottom:8px;
+}
+.features-section .section-sub{
+  text-align:center;color:var(--text-secondary);
+  font-size:15px;margin-bottom:48px;
+}
+.features-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:16px;max-width:1000px;margin:0 auto;
+}
+.feature-card{
+  padding:24px;
+  border-radius:var(--radius-lg);
+  background:var(--glass);
+  border:1px solid var(--glass-border);
+  transition:var(--transition);
+}
+.feature-card:hover{
+  background:var(--bg-hover);
+  border-color:var(--border-hover);
+  transform:translateY(-4px);
+  box-shadow:var(--shadow-md);
+}
+.feature-icon{
+  width:44px;height:44px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:14px;font-size:22px;
+}
+.feature-card:nth-child(1) .feature-icon{background:rgba(0,212,255,0.1);color:var(--accent)}
+.feature-card:nth-child(2) .feature-icon{background:rgba(124,58,237,0.1);color:var(--accent2)}
+.feature-card:nth-child(3) .feature-icon{background:rgba(236,72,153,0.1);color:#ec4899}
+.feature-card:nth-child(4) .feature-icon{background:rgba(34,197,94,0.1);color:#22c55e}
+.feature-card:nth-child(5) .feature-icon{background:rgba(251,146,60,0.1);color:#fb923c}
+.feature-card:nth-child(6) .feature-icon{background:rgba(59,130,246,0.1);color:#3b82f6}
+.feature-card h3{font-size:16px;font-weight:600;margin-bottom:6px}
+.feature-card p{font-size:13px;color:var(--text-secondary);line-height:1.5}
+
+/* CTA */
+.cta-section{
+  padding:80px 24px;text-align:center;
+}
+.cta-section h2{font-size:36px;font-weight:700;margin-bottom:8px}
+.cta-section p{color:var(--text-secondary);font-size:15px;margin-bottom:28px}
+
+/* ===== FOOTER ===== */
+.footer{
+  padding:20px 24px;
+  border-top:1px solid var(--border-color);
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  font-size:12px;color:var(--text-muted);
+}
+.footer a{color:var(--text-muted);text-decoration:none;transition:var(--transition)}
+.footer a:hover{color:var(--accent)}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media(max-width:768px){
+  .sidebar{
+    position:fixed;left:0;top:0;
+    transform:translateX(-100%);
+    z-index:1000;
+    box-shadow:var(--shadow-lg);
+  }
+  .sidebar.mobile-open{transform:translateX(0)}
+  .btn-expand-sidebar{display:flex!important}
+  .suggestions{grid-template-columns:1fr 1fr}
+  .hero h1{font-size:36px}
+  .features-grid{grid-template-columns:1fr}
+  .feature-pills{flex-wrap:wrap}
+}
+@media(max-width:480px){
+  .suggestions{grid-template-columns:1fr}
+  .hero h1{font-size:28px}
+  .hero-buttons{flex-direction:column;width:100%}
+  .hero-buttons button{width:100%;justify-content:center}
+}
+
+/* ===== UTILITY ===== */
+.hidden{display:none!important}
+.flex{display:flex}
+.items-center{align-items:center}
+.gap-2{gap:8px}
+.gap-4{gap:16px}
+.text-sm{font-size:13px}
+.text-muted{color:var(--text-muted)}
+
+/* Particles canvas */
+#particles{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.4}
+</style>
+</head>
+<body>
+<!-- Animated Background -->
+<div class="bg-grid"></div>
+<canvas id="particles"></canvas>
+
+<!-- ===== SIDEBAR ===== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="#" class="logo" onclick="switchToLanding()">
+      <div class="logo-icon">N</div>
+      <span class="logo-text">NEXA AI</span>
+      <span class="logo-version">v2.0</span>
+    </a>
+    <button class="btn-sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+  </div>
+
+  <div class="sidebar-content">
+    <button class="btn-new-chat" onclick="newChat()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      New Chat
+    </button>
+
+    <div class="sidebar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search chats..." oninput="filterChats(this.value)">
+    </div>
+
+    <div class="chat-section">
+      <div class="chat-section-title">Today</div>
+      <div class="chat-item active" onclick="selectChat(this)" data-id="1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">AI Assistant Overview</span>
+      </div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">React Component Design</span>
+      </div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="3">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">Python Data Analysis</span>
+      </div>
+    </div>
+
+    <div class="chat-section">
+      <div class="chat-section-title">Yesterday</div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="4">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">API Architecture Planning</span>
+      </div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="5">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">Marketing Strategy</span>
+      </div>
+    </div>
+
+    <div class="chat-section">
+      <div class="chat-section-title">Previous 7 Days</div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="6">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">Neural Network Explainer</span>
+      </div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="7">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">Database Schema Design</span>
+      </div>
+      <div class="chat-item" onclick="selectChat(this)" data-id="8">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="chat-title">Travel Itinerary Planner</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <a class="sidebar-footer-item" onclick="openSettings()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      Settings
+    </a>
+    <div class="user-profile">
+      <div class="user-avatar">U</div>
+      <div>
+        <div class="user-name">User</div>
+        <div class="user-plan">Free Plan</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-expand-sidebar" onclick="toggleSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <div class="model-selector" onclick="toggleModelDropdown()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span id="currentModel">NEXA Pro</span>
+        <span class="model-badge">NEW</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M6 9l6 6 6-6"/></svg>
+
+        <!-- Model Dropdown -->
+        <div class="model-dropdown" id="modelDropdown">
+          <div class="model-option active" onclick="selectModel(event,'NEXA Pro','Most capable model for complex tasks')">
+            <div>
+              <div class="model-option-name">NEXA Pro</div>
+              <div class="model-option-desc">Most capable model for complex tasks</div>
+            </div>
+            <span class="model-option-badge">NEW</span>
+          </div>
+          <div class="model-option" onclick="selectModel(event,'NEXA Fast','Optimized for speed and efficiency')">
+            <div>
+              <div class="model-option-name">NEXA Fast</div>
+              <div class="model-option-desc">Optimized for speed and efficiency</div>
+            </div>
+          </div>
+          <div class="model-option" onclick="selectModel(event,'NEXA Vision','Multimodal - images and text')">
+            <div>
+              <div class="model-option-name">NEXA Vision</div>
+              <div class="model-option-desc">Multimodal - images and text</div>
+            </div>
+            <span class="model-option-badge">BETA</span>
+          </div>
+          <div class="model-option" onclick="selectModel(event,'NEXA Code','Specialized for code generation')">
+            <div>
+              <div class="model-option-name">NEXA Code</div>
+              <div class="model-option-desc">Specialized for code generation</div>
+            </div>
+          </div>
+          <div class="model-option" onclick="selectModel(event,'NEXA Mini','Lightweight for simple tasks')">
+            <div>
+              <div class="model-option-name">NEXA Mini</div>
+              <div class="model-option-desc">Lightweight for simple tasks</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="topbar-btn" title="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="notification-dot"></span>
+      </button>
+      <button class="topbar-btn" title="Theme" onclick="toggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+      <button class="btn-upgrade" onclick="openSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Upgrade
+      </button>
+    </div>
+  </header>
+
+  <!-- Chat View -->
+  <div class="chat-area" id="chatArea">
+    <!-- Welcome Screen -->
+    <div class="welcome" id="welcomeScreen">
+      <div class="welcome-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <h1>NEXA AI</h1>
+      <p>Your AI assistant for everything. Ask me anything — from coding to creative writing, data analysis to daily tasks.</p>
+      <div class="suggestions">
+        <div class="suggestion-card" onclick="useSuggestion('Help me write a Python script to analyze CSV data and generate visualizations')">
+          <div class="suggestion-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3>Code Generation</h3>
+          <p>Write scripts and debug code in any language</p>
+        </div>
+        <div class="suggestion-card" onclick="useSuggestion('Search for the latest developments in AI and machine learning')">
+          <div class="suggestion-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          </div>
+          <h3>Web Search</h3>
+          <p>Find real-time information from the web</p>
+        </div>
+        <div class="suggestion-card" onclick="useSuggestion('Analyze this image and describe what you see in detail')">
+          <div class="suggestion-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          <h3>Vision Analysis</h3>
+          <p>Analyze images and visual content</p>
+        </div>
+        <div class="suggestion-card" onclick="useSuggestion('Create a detailed business plan for a SaaS startup in the AI space')">
+          <div class="suggestion-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <h3>Creative Writing</h3>
+          <p>Generate content, stories, and documents</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages Container (hidden initially) -->
+    <div class="messages-container hidden" id="messagesContainer"></div>
+  </div>
+
+  <!-- Feature Pills -->
+  <div class="feature-pills" id="featurePills">
+    <div class="feature-pill" onclick="toggleFeature(this,'search')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      Web Search
+    </div>
+    <div class="feature-pill" onclick="toggleFeature(this,'vision')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Vision
+    </div>
+    <div class="feature-pill" onclick="toggleFeature(this,'deepthink')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      Deep Think
+    </div>
+    <div class="feature-pill" onclick="toggleFeature(this,'code')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Write Code
+    </div>
+    <div class="feature-pill" onclick="toggleFeature(this,'slides')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8M12 17v4"/></svg>
+      AI Slides
+    </div>
+    <div class="feature-pill" onclick="toggleFeature(this,'fullstack')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      Full-Stack
+    </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div class="input-wrapper">
+      <div class="input-top">
+        <textarea id="messageInput" rows="1" placeholder="How can I help you today?" 
+          onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+      </div>
+      <div class="input-actions-row">
+        <div class="input-actions-left">
+          <button class="input-action-btn" title="Upload file" onclick="uploadFile()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <button class="input-action-btn" title="Voice input" onclick="toggleVoice()" id="voiceBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+          </button>
+          <button class="input-action-btn" id="deepThinkBtn" title="Deep Think" onclick="toggleDeepThink()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          </button>
+          <button class="input-action-btn" title="More options">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          </button>
+        </div>
+        <div class="input-actions-right">
+          <button class="btn-send" id="sendBtn" onclick="sendMessage()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a href="#">Terms of Service</a>
+    <span>|</span>
+    <a href="#">Privacy Policy</a>
+    <span>|</span>
+    <a href="#">Contact</a>
+    <span>|</span>
+    <span>NEXA AI v2.0</span>
+  </div>
+</main>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Settings</h2>
+      <button class="modal-close" onclick="closeSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-group">
+        <div class="setting-group-title">General</div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Dark Mode</span>
+            <span class="setting-desc">Use dark theme for the interface</span>
+          </div>
+          <div class="toggle active" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Sound Effects</span>
+            <span class="setting-desc">Play sounds for notifications</span>
+          </div>
+          <div class="toggle" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Language</span>
+            <span class="setting-desc">Interface language</span>
+          </div>
+          <select class="setting-select">
+            <option>Español</option>
+            <option>English</option>
+            <option>Português</option>
+            <option>Français</option>
+            <option>Deutsch</option>
+            <option>日本語</option>
+            <option>中文</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-group-title">AI Model</div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Default Model</span>
+            <span class="setting-desc">Model used for new conversations</span>
+          </div>
+          <select class="setting-select">
+            <option>NEXA Pro</option>
+            <option>NEXA Fast</option>
+            <option>NEXA Vision</option>
+            <option>NEXA Code</option>
+            <option>NEXA Mini</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Temperature</span>
+            <span class="setting-desc">Creativity level (0.0 - 2.0)</span>
+          </div>
+          <select class="setting-select">
+            <option>0.7 (Balanced)</option>
+            <option>0.3 (Precise)</option>
+            <option>1.0 (Creative)</option>
+            <option>1.5 (Very Creative)</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Stream Responses</span>
+            <span class="setting-desc">Show responses as they generate</span>
+          </div>
+          <div class="toggle active" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-group-title">Privacy</div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Chat History</span>
+            <span class="setting-desc">Save conversations for future reference</span>
+          </div>
+          <div class="toggle active" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Data Sharing</span>
+            <span class="setting-desc">Share anonymized data to improve AI</span>
+          </div>
+          <div class="toggle" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-group-title">Danger Zone</div>
+        <div class="setting-item" style="border:1px solid rgba(239,68,68,0.2)">
+          <div class="setting-info">
+            <span class="setting-label" style="color:#ef4444">Clear All Chats</span>
+            <span class="setting-desc">Permanently delete all conversations</span>
+          </div>
+          <button style="padding:6px 12px;border-radius:6px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;font-size:12px;font-weight:500;cursor:pointer" onclick="clearAllChats()">Delete All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let chatHistory = [];
+let isTyping = false;
+let deepThinkActive = false;
+let currentChatId = 1;
+
+// ===== PARTICLES ANIMATION =====
+(function(){
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  const PARTICLE_COUNT = 50;
+
+  function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize',resize);
+
+  class Particle{
+    constructor(){
+      this.reset();
+    }
+    reset(){
+      this.x = Math.random()*canvas.width;
+      this.y = Math.random()*canvas.height;
+      this.vx = (Math.random()-0.5)*0.3;
+      this.vy = (Math.random()-0.5)*0.3;
+      this.size = Math.random()*1.5+0.5;
+      this.opacity = Math.random()*0.5+0.1;
+    }
+    update(){
+      this.x += this.vx;
+      this.y += this.vy;
+      if(this.x<0||this.x>canvas.width)this.vx*=-1;
+      if(this.y<0||this.y>canvas.height)this.vy*=-1;
+    }
+    draw(){
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,212,255,${this.opacity})`;
+      ctx.fill();
+    }
+  }
+
+  for(let i=0;i<PARTICLE_COUNT;i++)particles.push(new Particle());
+
+  function connectParticles(){
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x;
+        const dy=particles[i].y-particles[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<150){
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle=`rgba(0,212,255,${0.05*(1-dist/150)})`;
+          ctx.lineWidth=0.5;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function animate(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{p.update();p.draw()});
+    connectParticles();
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ===== SIDEBAR =====
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('collapsed');
+  sb.classList.remove('mobile-open');
+}
+
+function filterChats(query){
+  const items = document.querySelectorAll('.chat-item');
+  items.forEach(item=>{
+    const title = item.querySelector('.chat-title').textContent.toLowerCase();
+    item.style.display = title.includes(query.toLowerCase()) ? 'flex' : 'none';
+  });
+}
+
+function selectChat(el){
+  document.querySelectorAll('.chat-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  currentChatId = el.dataset.id;
+  // Load chat (simulated)
+  const messagesContainer = document.getElementById('messagesContainer');
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  welcomeScreen.classList.add('hidden');
+  messagesContainer.classList.remove('hidden');
+  messagesContainer.innerHTML = '';
+}
+
+function newChat(){
+  document.querySelectorAll('.chat-item').forEach(i=>i.classList.remove('active'));
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  const messagesContainer = document.getElementById('messagesContainer');
+  welcomeScreen.classList.remove('hidden');
+  messagesContainer.classList.add('hidden');
+  messagesContainer.innerHTML = '';
+  chatHistory = [];
+  currentChatId = Date.now();
+
+  // Add new chat to sidebar
+  const section = document.querySelector('.chat-section:first-child');
+  const newItem = document.createElement('div');
+  newItem.className = 'chat-item active';
+  newItem.dataset.id = currentChatId;
+  newItem.onclick = function(){selectChat(this)};
+  newItem.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span class="chat-title">New Chat</span>
+  `;
+  section.insertBefore(newItem, section.children[1]);
+
+  // Close sidebar on mobile
+  if(window.innerWidth <= 768){
+    document.getElementById('sidebar').classList.remove('mobile-open');
+  }
+}
+
+// ===== MODEL SELECTOR =====
+function toggleModelDropdown(){
+  const dd = document.getElementById('modelDropdown');
+  dd.classList.toggle('show');
+}
+
+function selectModel(event, name, desc){
+  event.stopPropagation();
+  document.getElementById('currentModel').textContent = name;
+  document.getElementById('modelDropdown').classList.remove('show');
+  document.querySelectorAll('.model-option').forEach(o=>o.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.model-selector')){
+    document.getElementById('modelDropdown').classList.remove('show');
+  }
+});
+
+// ===== CHAT =====
+function sendMessage(){
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if(!text || isTyping) return;
+
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  const messagesContainer = document.getElementById('messagesContainer');
+  welcomeScreen.classList.add('hidden');
+  messagesContainer.classList.remove('hidden');
+
+  // Add user message
+  addMessage('user', text);
+  input.value = '';
+  autoResize(input);
+  document.getElementById('sendBtn').disabled = true;
+
+  // Update sidebar chat title
+  const activeChat = document.querySelector('.chat-item.active .chat-title');
+  if(activeChat && activeChat.textContent === 'New Chat'){
+    activeChat.textContent = text.substring(0, 40) + (text.length > 40 ? '...' : '');
+  }
+
+  // Simulate AI response
+  isTyping = true;
+  showTypingIndicator();
+
+  setTimeout(()=>{
+    removeTypingIndicator();
+    const response = generateResponse(text);
+    addMessage('assistant', response);
+    isTyping = false;
+  }, 1500 + Math.random() * 1500);
+}
+
+function addMessage(role, content){
+  const container = document.getElementById('messagesContainer');
+  const msg = document.createElement('div');
+  msg.className = `message ${role}`;
+
+  const avatar = role === 'user' ? 'U' : 'N';
+  const sender = role === 'user' ? 'You' : 'NEXA AI';
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  // Format content with basic markdown-like support
+  let formattedContent = content
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\n/g, '<br>');
+
+  const actions = role === 'assistant' ? `
+    <div class="message-actions">
+      <button class="msg-action" title="Copy" onclick="copyMessage(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      </button>
+      <button class="msg-action" title="Regenerate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </button>
+      <button class="msg-action" title="Like">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+      </button>
+      <button class="msg-action" title="Dislike">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/></svg>
+      </button>
+    </div>
+  ` : '';
+
+  msg.innerHTML = `
+    <div class="message-avatar">${avatar}</div>
+    <div class="message-content">
+      <div class="message-sender">${sender} <span class="timestamp">${time}</span></div>
+      <div class="message-text">${formattedContent}</div>
+      ${actions}
+    </div>
+  `;
+
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTypingIndicator(){
+  const container = document.getElementById('messagesContainer');
+  const indicator = document.createElement('div');
+  indicator.className = 'message assistant';
+  indicator.id = 'typingIndicator';
+  indicator.innerHTML = `
+    <div class="message-avatar">N</div>
+    <div class="message-content">
+      <div class="message-sender">NEXA AI</div>
+      <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+  `;
+  container.appendChild(indicator);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeTypingIndicator(){
+  const indicator = document.getElementById('typingIndicator');
+  if(indicator) indicator.remove();
+}
+
+function generateResponse(userMessage){
+  const msg = userMessage.toLowerCase();
+  if(msg.includes('python') || msg.includes('script') || msg.includes('code')){
+    return "Here's a Python script that can help you get started:\n\n\`\`\`python\nimport pandas as pd\nimport matplotlib.pyplot as plt\n\n# Load the CSV data\ndf = pd.read_csv('data.csv')\n\n# Display basic statistics\nprint(df.describe())\n\n# Create visualization\nfig, axes = plt.subplots(1, 2, figsize=(12, 5))\ndf.hist(ax=axes[0])\ndf.plot(kind='box', ax=axes[1])\nplt.tight_layout()\nplt.savefig('analysis.png')\nprint('Analysis complete!')\n\`\`\`\n\nThis script loads CSV data, computes basic statistics, and generates both histograms and box plots. You can customize the column selection and chart types based on your specific data. Want me to add more specific analysis or visualization features?";
+  }
+  if(msg.includes('search') || msg.includes('latest') || msg.includes('news')){
+    return "Based on the latest information available, here are the key developments in AI and machine learning:\n\n**1. Large Language Models** — New models are pushing boundaries in reasoning, multimodal understanding, and code generation. The focus has shifted toward efficiency and smaller, more capable models.\n\n**2. AI Agents** — Autonomous AI agents that can browse the web, write code, and complete complex tasks are becoming more sophisticated and reliable.\n\n**3. Open Source AI** — The open-source community continues to release powerful models, democratizing access to cutting-edge AI technology.\n\n**4. Responsible AI** — Increased focus on safety, alignment, and ethical considerations in AI development and deployment.\n\nWould you like me to dive deeper into any of these topics?";
+  }
+  if(msg.includes('image') || msg.includes('vision') || msg.includes('photo') || msg.includes('picture')){
+    return "I can analyze images and visual content for you! Here's what I can do:\n\n**Image Analysis Capabilities:**\n- Describe objects, scenes, and people in photos\n- Read and extract text from images (OCR)\n- Identify colors, patterns, and compositions\n- Analyze charts, graphs, and diagrams\n- Compare multiple images\n\nTo use this feature, simply upload an image using the attachment button (📎) in the input area, and I'll analyze it for you. You can also paste images directly into the chat.\n\nWould you like to try it out?";
+  }
+  if(msg.includes('business') || msg.includes('plan') || msg.includes('startup') || msg.includes('saas')){
+    return "**SaaS Startup Business Plan — AI Space**\n\n**Executive Summary:** A comprehensive plan for launching an AI-powered SaaS platform targeting enterprise automation needs.\n\n**1. Market Opportunity** — The global AI SaaS market is projected to reach $500B+ by 2027, with enterprise adoption accelerating across all sectors.\n\n**2. Product Strategy** — Build an AI-first platform that automates workflows, provides intelligent insights, and integrates seamlessly with existing tools. Start with a focused vertical, then expand.\n\n**3. Revenue Model** — Freemium + tiered subscriptions. Free tier for individual users, Pro at $29/mo, Enterprise at $99/mo per seat.\n\n**4. Go-to-Market** — Content marketing, developer community, strategic partnerships, and product-led growth.\n\n**5. Technical Architecture** — Cloud-native, microservices, LLM-agnostic layer, RAG pipeline, and real-time processing.\n\nWant me to expand any section with more detail?";
+  }
+  if(msg.includes('hello') || msg.includes('hi') || msg.includes('hey') || msg.includes('hola')){
+    return "Hello! 👋 I'm NEXA AI, your intelligent assistant. I'm here to help you with:\n\n- **Coding & Development** — Write, debug, and explain code\n- **Research & Analysis** — Search the web and analyze data\n- **Creative Writing** — Draft content, stories, and documents\n- **Problem Solving** — Break down complex challenges\n- **Learning** — Explain concepts and tutor on any topic\n\nHow can I assist you today?";
+  }
+  return "That's an interesting question! Let me think about this carefully.\n\nBased on my analysis, here are my thoughts:\n\n**Key Considerations:**\n- This topic has multiple facets that deserve careful examination\n- There are both opportunities and challenges to consider\n- The latest developments suggest some important trends\n\n**My Recommendation:**\nI'd suggest approaching this systematically. Start by defining your specific goals, then work through the options methodically. I can help you research, plan, and execute whatever you need.\n\nWould you like me to go deeper into any particular aspect? I can also help with code, analysis, or creative solutions depending on what you need.";
+}
+
+function useSuggestion(text){
+  document.getElementById('messageInput').value = text;
+  document.getElementById('sendBtn').disabled = false;
+  sendMessage();
+}
+
+// ===== INPUT HANDLING =====
+function handleKeyDown(e){
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(textarea){
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+  document.getElementById('sendBtn').disabled = !textarea.value.trim();
+}
+
+// ===== FEATURES =====
+function toggleFeature(el, feature){
+  el.classList.toggle('active');
+  if(feature === 'deepthink'){
+    deepThinkActive = el.classList.contains('active');
+    document.getElementById('deepThinkBtn').classList.toggle('active', deepThinkActive);
+  }
+}
+
+function toggleDeepThink(){
+  deepThinkActive = !deepThinkActive;
+  document.getElementById('deepThinkBtn').classList.toggle('active', deepThinkActive);
+  // Also toggle the pill
+  const pills = document.querySelectorAll('.feature-pill');
+  pills.forEach(p => {
+    if(p.textContent.includes('Deep Think')){
+      p.classList.toggle('active', deepThinkActive);
+    }
+  });
+}
+
+function uploadFile(){
+  // Simulate file upload
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,.pdf,.txt,.csv,.json,.py,.js,.html,.css';
+  input.onchange = function(e){
+    const file = e.target.files[0];
+    if(file){
+      document.getElementById('messageInput').value += `\n[Attached: ${file.name}]`;
+      document.getElementById('sendBtn').disabled = false;
+    }
+  };
+  input.click();
+}
+
+function toggleVoice(){
+  const btn = document.getElementById('voiceBtn');
+  btn.classList.toggle('active');
+  if(btn.classList.contains('active')){
+    // Simulate voice input
+    document.getElementById('messageInput').value = 'Voice input detected...';
+    document.getElementById('sendBtn').disabled = false;
+    setTimeout(()=>{
+      document.getElementById('messageInput').value = 'Hello, can you help me with something?';
+      btn.classList.remove('active');
+    }, 2000);
+  }
+}
+
+function copyMessage(btn){
+  const msgText = btn.closest('.message-content').querySelector('.message-text').innerText;
+  navigator.clipboard.writeText(msgText).then(()=>{
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(()=>{
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+    }, 2000);
+  });
+}
+
+// ===== SETTINGS =====
+function openSettings(){
+  document.getElementById('settingsModal').classList.add('show');
+}
+
+function closeSettings(){
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+function toggleSwitch(el){
+  el.classList.toggle('active');
+}
+
+function toggleTheme(){
+  // Simplified theme toggle
+  document.body.classList.toggle('light-theme');
+}
+
+function clearAllChats(){
+  if(confirm('Are you sure you want to delete all chats? This cannot be undone.')){
+    document.querySelectorAll('.chat-item').forEach(i=>i.remove());
+    newChat();
+    closeSettings();
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('settingsModal').addEventListener('click', function(e){
+  if(e.target === this) closeSettings();
+});
+
+// Close modal on Escape
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') closeSettings();
+});
+
+// Mobile sidebar
+document.addEventListener('click', function(e){
+  const sidebar = document.getElementById('sidebar');
+  if(window.innerWidth <= 768 && sidebar.classList.contains('mobile-open')){
+    if(!sidebar.contains(e.target)){
+      sidebar.classList.remove('mobile-open');
+    }
+  }
+});
+
+// ===== KEYBOARD SHORTCUT =====
+document.addEventListener('keydown', function(e){
+  // Ctrl+K for search
+  if((e.ctrlKey || e.metaKey) && e.key === 'k'){
+    e.preventDefault();
+    document.querySelector('.sidebar-search input').focus();
+    if(window.innerWidth <= 768){
+      document.getElementById('sidebar').classList.add('mobile-open');
+    }
+  }
+  // Ctrl+N for new chat
+  if((e.ctrlKey || e.metaKey) && e.key === 'n'){
+    e.preventDefault();
+    newChat();
+  }
+});
+</script>
+</body>
+</html>

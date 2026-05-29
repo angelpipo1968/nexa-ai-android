@@ -4,12 +4,135 @@ import * as cheerio from 'cheerio';
 import { exec } from 'child_process';
 import util from 'util';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 const execPromise = util.promisify(exec);
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// --- AUTOMATIC ENV LOADER (.env.local) ---
+function loadEnv() {
+    try {
+        const envPath = path.resolve(process.cwd(), '.env.local');
+        if (fs.existsSync(envPath)) {
+            const content = fs.readFileSync(envPath, 'utf8');
+            content.split(/\r?\n/).forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) return;
+                const match = trimmed.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+                if (match) {
+                    const key = match[1];
+                    let value = match[2] || '';
+                    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+                    if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+                    process.env[key] = value.trim();
+                }
+            });
+            console.log('[Hermes Config] .env.local cargado con éxito.');
+        } else {
+            console.warn('[Hermes Config] Archivo .env.local no encontrado, usando variables del sistema.');
+        }
+    } catch (e) {
+        console.warn('[Hermes Config] No se pudo cargar .env.local:', e.message);
+    }
+}
+loadEnv();
+
+// --- LOCAL SKILLS ENGINE (Auto-Aprendizaje Autónomo) ---
+const SKILLS_FILE = path.resolve(process.cwd(), 'hermes-skills.json');
+
+function loadLocalSkills() {
+    try {
+        if (fs.existsSync(SKILLS_FILE)) {
+            return JSON.parse(fs.readFileSync(SKILLS_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.warn('[Hermes Skills] Error leyendo hermes-skills.json:', e.message);
+    }
+    return [];
+}
+
+function saveLocalSkill(skill) {
+    try {
+        const skills = loadLocalSkills();
+        const filtered = skills.filter(s => s.name !== skill.name);
+        filtered.push(skill);
+        fs.writeFileSync(SKILLS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+        console.log(`[Hermes Skills] ¡Nueva habilidad aprendida y guardada localmente!: ${skill.name}`);
+    } catch (e) {
+        console.error('[Hermes Skills] Error guardando skill local:', e.message);
+    }
+}
+
+// Analizar la conversación en segundo plano para aprender reglas o correcciones
+async function extractAndLearnSkills(userMessage, assistantMessage) {
+    const lowerUser = userMessage.toLowerCase();
+    const teachingIndicators = [
+        'debes hacer', 'siempre que te pida', 'nunca hagas', 'cuando te diga',
+        'regla:', 'instrucción:', 'la forma correcta', 'así es como se', 'para hacer esto',
+        'no es así', 'te equivocaste', 'corrige'
+    ];
+
+    const seemsLikeTeaching = teachingIndicators.some(indicator => lowerUser.includes(indicator));
+    if (!seemsLikeTeaching) return;
+
+    const difyKey = process.env.DIFY_API_KEY;
+    if (!difyKey) return;
+
+    try {
+        console.log('[Hermes Skills] Detectado posible intento de enseñanza, extrayendo regla...');
+        const prompt = `Analiza esta conversación y extrae la regla de comportamiento, flujo o instrucción reutilizable que el usuario está enseñando o corrigiendo al asistente.
+Si encuentras una regla reutilizable, devuélvela estrictamente en este formato JSON (sin markdown ni texto adicional, solo el JSON puro):
+{
+  "name": "nombre-descriptivo-en-minúsculas-y-guiones",
+  "description": "cuándo aplicar esta habilidad",
+  "instructions": "instrucciones exactas y claras que el asistente debe seguir"
+}
+Si no se está enseñando ninguna regla o procedimiento útil para el futuro, responde únicamente: "NONE".
+
+Conversación:
+Usuario: ${userMessage}
+Asistente: ${assistantMessage}`;
+
+        const res = await fetch('https://api.dify.ai/v1/chat-messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${difyKey}`
+            },
+            body: JSON.stringify({
+                inputs: {},
+                query: prompt,
+                response_mode: 'blocking',
+                user: 'hermes-skills-extractor'
+            })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            const answer = data.answer?.trim() || '';
+            if (answer && !answer.includes('NONE')) {
+                const match = answer.match(/\{[\s\S]*?\}/);
+                if (match) {
+                    const parsed = JSON.parse(match[0]);
+                    if (parsed.name && parsed.instructions) {
+                        saveLocalSkill({
+                            name: parsed.name.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+                            description: parsed.description || '',
+                            instructions: parsed.instructions,
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[Hermes Skills] Falló la extracción en segundo plano:', e.message);
+    }
+}
 
 // --- RATE LIMITING MIDDLEWARE ---
 const rateLimitMap = new Map();
@@ -47,22 +170,23 @@ app.get('/api/health', (req, res) => {
         status: 'ok',
         uptime: process.uptime(),
         model_configured: MODEL,
+        dify_active: !!process.env.DIFY_API_KEY,
+        skills_learned: loadLocalSkills().length,
         timestamp: new Date().toISOString()
     });
 });
 
-const OLLAMA_URL = 'http://127.0.0.1:11434/api/generate';
-const MODEL = 'llama3.2:3b'; // Cambiado temporalmente porque nexa-os:latest no existe en tu sistema
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/generate';
+const MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
 
 async function fetchUrlContent(url) {
     try {
         const response = await fetch(url);
         const html = await response.text();
         const $ = cheerio.load(html);
-        // Remove scripts, styles, etc.
         $('script, style, nav, footer, header').remove();
         const text = $('body').text().replace(/\s+/g, ' ').trim();
-        return text.substring(0, 5000); // Limit to 5000 chars to fit in context window
+        return text.substring(0, 5000); // Límite de 5000 caracteres
     } catch (e) {
         return `Error al leer la URL: ${e.message}`;
     }
@@ -73,9 +197,19 @@ app.post('/api/chat', async (req, res) => {
     console.log(`[REQ-${reqId}] Nueva petición recibida a las ${new Date().toLocaleTimeString()}`);
     
     try {
-        const userMessage = req.body.message;
+        const userMessage = req.body.message || '';
         let enhancedPrompt = userMessage;
         let systemContext = "Eres Hermes, un asistente de IA local para Nexa OS. Eres experto en programación y muy servicial.";
+
+        // Inyección de Skills (Aprendizaje Autónomo Local)
+        const localSkills = loadLocalSkills();
+        if (localSkills.length > 0) {
+            let skillsContext = "\n\n[HABILIDADES Y REGLAS LOCALES APRENDIDAS - Síguelas estrictamente]:\n";
+            localSkills.forEach(skill => {
+                skillsContext += `- [${skill.name}]: ${skill.instructions}\n`;
+            });
+            systemContext += skillsContext;
+        }
 
         // Detectar si hay una URL
         const urlMatch = userMessage.match(/https?:\/\/[^\s]+/);
@@ -91,9 +225,7 @@ app.post('/api/chat', async (req, res) => {
         if (msgLower.includes('commit') || msgLower.includes('push') || msgLower.includes('guarda los cambios') || msgLower.includes('sube los cambios')) {
             console.log(`[REQ-${reqId}] Ejecutando Git Commit y Push...`);
             try {
-                // Determine a commit message
                 let commitMsg = "Automated commit via Hermes";
-                // run git commands
                 await execPromise('git add .');
                 await execPromise(`git commit -m "${commitMsg}"`);
                 await execPromise('git push');
@@ -104,40 +236,92 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
-        // Llamar a Ollama
-        console.log(`[REQ-${reqId}] Enviando a Ollama (Modelo: ${MODEL})...`);
-        const ollamaRes = await fetch(OLLAMA_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: MODEL,
-                prompt: enhancedPrompt,
-                system: systemContext,
-                stream: false
-            })
-        });
+        // --- SISTEMA DE DOBLE PROVEEDOR RESILIENTE (Ollama con Fallback transparente a Dify) ---
+        let responseSent = false;
+        let finalResponseText = '';
 
-        if (!ollamaRes.ok) {
-            if (ollamaRes.status === 404) {
-                throw new Error(`El modelo '${MODEL}' no se encontró en Ollama. Asegúrate de haberlo descargado con 'ollama run ${MODEL}'.`);
+        // 1. Intentar Ollama primero si está activo
+        try {
+            console.log(`[REQ-${reqId}] Enviando a Ollama (Modelo: ${MODEL})...`);
+            const ollamaRes = await fetch(OLLAMA_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: MODEL,
+                    prompt: enhancedPrompt,
+                    system: systemContext,
+                    stream: false
+                }),
+                signal: AbortSignal.timeout(15000) // Timeout de 15 segundos para evitar bloqueos
+            });
+
+            if (!ollamaRes.ok) {
+                throw new Error(`Ollama HTTP ${ollamaRes.status}`);
             }
-            throw new Error(`Ollama devolvió estado HTTP ${ollamaRes.status}: ${ollamaRes.statusText}`);
+
+            const data = await ollamaRes.json();
+            finalResponseText = data.response;
+            console.log(`[REQ-${reqId}] Respuesta procesada con éxito desde Ollama.`);
+            res.json({ response: finalResponseText });
+            responseSent = true;
+        } catch (ollamaErr) {
+            console.warn(`[REQ-${reqId}] Ollama falló o está inactivo: ${ollamaErr.message}`);
+            
+            // 2. Fallback transparente a Dify si Ollama falla y la API Key existe
+            const difyKey = process.env.DIFY_API_KEY;
+            if (difyKey) {
+                console.log(`[REQ-${reqId}] Activando Fallback Transparente a Dify...`);
+                try {
+                    const difyRes = await fetch('https://api.dify.ai/v1/chat-messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${difyKey}`
+                        },
+                        body: JSON.stringify({
+                            inputs: {},
+                            query: enhancedPrompt,
+                            response_mode: 'blocking',
+                            user: 'hermes-local-user'
+                        })
+                    });
+
+                    if (!difyRes.ok) {
+                        const errData = await difyRes.json().catch(() => ({}));
+                        throw new Error(errData.message || `Dify HTTP ${difyRes.status}`);
+                    }
+
+                    const difyData = await difyRes.json();
+                    finalResponseText = difyData.answer;
+                    console.log(`[REQ-${reqId}] Respuesta procesada con éxito desde Dify (Fallback).`);
+                    res.json({ response: finalResponseText });
+                    responseSent = true;
+                } catch (difyErr) {
+                    console.error(`[REQ-${reqId}] Error en Dify (Fallback):`, difyErr.message);
+                    res.status(500).json({ error: `Ambos proveedores fallaron. Ollama: ${ollamaErr.message}. Dify: ${difyErr.message}` });
+                    responseSent = true;
+                }
+            } else {
+                // Si no hay Dify configurado, devolver el error original de conexión de Ollama
+                if (ollamaErr.cause && ollamaErr.cause.code === 'ECONNREFUSED') {
+                    res.status(503).json({ error: "No se pudo conectar a Ollama. Asegúrate de que Ollama esté en ejecución (http://127.0.0.1:11434) o configura DIFY_API_KEY en .env.local." });
+                } else {
+                    res.status(500).json({ error: ollamaErr.message });
+                }
+                responseSent = true;
+            }
         }
 
-        const data = await ollamaRes.json();
-        
-        console.log(`[REQ-${reqId}] Respuesta procesada con éxito y enviada.`);
-        res.json({ response: data.response });
+        // 3. Extracción de habilidades de auto-aprendizaje en segundo plano (no bloquea al usuario)
+        if (responseSent && finalResponseText) {
+            extractAndLearnSkills(userMessage, finalResponseText).catch(console.error);
+        }
 
     } catch (error) {
-        console.error(`[REQ-${reqId}] ERROR:`, error.message);
-        
-        // Manejo específico para errores de conexión
-        if (error.cause && error.cause.code === 'ECONNREFUSED') {
-            return res.status(503).json({ error: "No se pudo conectar a Ollama. Asegúrate de que Ollama esté en ejecución (http://127.0.0.1:11434)." });
+        console.error(`[REQ-${reqId}] ERROR CRÍTICO:`, error.message);
+        if (!res.headersSent) {
+            res.status(500).json({ error: error.message });
         }
-        
-        res.status(500).json({ error: error.message });
     }
 });
 

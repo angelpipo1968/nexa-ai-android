@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
     FileText, Image as ImageIcon, Film, Music, Camera,
     Plus, Mic, Menu, X,
@@ -369,6 +369,7 @@ export function NexaApp() {
     };
 
     const loadConvs = async () => {
+        if (!isSupabaseConfigured) return;
         setConvLoading(true);
         try {
             const { data, error } = await sb.from('conversations').select('*').order('updated_at', { ascending: false });
@@ -378,10 +379,12 @@ export function NexaApp() {
 
     const createConv = async (title = 'Nueva conversación') => {
         const local: Conv = { id: `c-${Date.now()}`, title };
-        try {
-            const { data, error } = await sb.from('conversations').insert({ title }).select().single();
-            if (!error && data) { local.id = data.id; local.title = data.title; }
-        } catch {}
+        if (isSupabaseConfigured) {
+            try {
+                const { data, error } = await sb.from('conversations').insert({ title }).select().single();
+                if (!error && data) { local.id = data.id; local.title = data.title; }
+            } catch {}
+        }
         setConvs(p => [local, ...(Array.isArray(p) ? p : [])]);
         setConvId(local.id);
         setMsgs([]);
@@ -389,19 +392,23 @@ export function NexaApp() {
     };
 
     const delConv = async (id: string) => {
-        try { await sb.from('messages').delete().eq('conversation_id', id); await sb.from('conversations').delete().eq('id', id); } catch {}
+        if (isSupabaseConfigured) {
+            try { await sb.from('messages').delete().eq('conversation_id', id); await sb.from('conversations').delete().eq('id', id); } catch {}
+        }
         setConvs(p => Array.isArray(p) ? p.filter(c => c.id !== id) : []);
         if (convId === id) { setConvId(null); setMsgs([]); }
     };
 
     const selConv = async (id: string) => {
         setConvId(id); setDrawer(false);
-        try {
-            const { data, error } = await sb.from('messages').select('*').eq('conversation_id', id).order('created_at');
-            if (!error && Array.isArray(data)) {
-                setMsgs(data.map((m: any) => ({ id: m.id, role: m.role, content: m.content || '', ts: +new Date(m.created_at) })));
-            }
-        } catch {}
+        if (isSupabaseConfigured) {
+            try {
+                const { data, error } = await sb.from('messages').select('*').eq('conversation_id', id).order('created_at');
+                if (!error && Array.isArray(data)) {
+                    setMsgs(data.map((m: any) => ({ id: m.id, role: m.role, content: m.content || '', ts: +new Date(m.created_at) })));
+                }
+            } catch {}
+        }
         setTimeout(() => scrollToBottom(false), 100);
     };
 
@@ -474,7 +481,13 @@ export function NexaApp() {
             const fetchTimeout = setTimeout(() => controller.abort(), 55000); // < 60s server limit
             
         try {
-            await sb.from('messages').insert({ conversation_id: currentCid, role: 'user', content: finalContent });
+            if (isSupabaseConfigured) {
+                try {
+                    await sb.from('messages').insert({ conversation_id: currentCid, role: 'user', content: finalContent });
+                } catch (dbErr) {
+                    console.warn('[NEXA] Error guardando mensaje de usuario en Supabase:', dbErr);
+                }
+            }
             
             const res = await fetch('/api/chat', {
                 method: 'POST',
@@ -538,7 +551,9 @@ export function NexaApp() {
                 const errMsg = serverError ? `❌ ${serverError.split('\n')[0]}` : '❌ No se recibió respuesta del servidor.';
                 setMsgs(p => p.map(m => m.id === aid ? { ...m, content: errMsg, streaming: false } : m));
             } else {
-                try { await sb.from('messages').insert({ conversation_id: currentCid, role: 'assistant', content: full }); } catch {}
+                if (isSupabaseConfigured) {
+                    try { await sb.from('messages').insert({ conversation_id: currentCid, role: 'assistant', content: full }); } catch {}
+                }
             }
 
             clearTimeout(fetchTimeout);
