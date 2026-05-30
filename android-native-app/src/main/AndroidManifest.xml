@@ -44,6 +44,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Hands-Free Wheel Trigger Support for Android Auto / Google Play -->
+            <intent-filter>
+                <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -104,6 +113,12 @@
             android:name=".notification.MorningSummaryService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Persistent Background Voice Recognition Service -->
+        <service
+            android:name=".voice.NexaSpeechService"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- Google Play Compliant Android Auto & Automotive Service -->
         <service

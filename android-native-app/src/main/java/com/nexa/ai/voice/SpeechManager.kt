@@ -1,4 +1,4 @@
-package com.nexa.ai.viewmodel
+package com.nexa.ai.voice
 
 import android.app.Application
 import android.content.BroadcastReceiver

@@ -27,6 +27,7 @@ import com.nexa.ai.sensors.NexaSensorManager
 import com.nexa.ai.ui.NexaStrings
 import com.nexa.ai.voice.NaturalConversationEngine
 import com.nexa.ai.voice.VoiceEnhancer
+import com.nexa.ai.voice.SpeechManager
 import com.nexa.ai.web.WebResultProcessor
 import com.nexa.ai.web.WebSearchManager
 import dagger.hilt.android.lifecycle.HiltViewModel

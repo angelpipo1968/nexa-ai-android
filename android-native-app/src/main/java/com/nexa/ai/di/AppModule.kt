@@ -8,7 +8,7 @@ import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.SessionStore
 import com.nexa.ai.viewmodel.AuthManager
-import com.nexa.ai.viewmodel.SpeechManager
+import com.nexa.ai.voice.SpeechManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
