@@ -1,141 +1,248 @@
-package com.nexa.ai.memory
+﻿package com.nexa.ai.memory
 
-import android.content.Context
-import android.content.SharedPreferences
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mock
-import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 
 /**
- * Unit tests for EpisodicMemoryManager.
- * Tests memory storage, retrieval, search, auto-extraction, and user profile management.
+ * Unit tests for EpisodicMemoryManager — tests storage, querying, and eviction.
  */
 class EpisodicMemoryManagerTest {
 
-    @Mock
-    private lateinit var mockContext: Context
-    
-    @Mock
-    private lateinit var mockPrefs: SharedPreferences
-    
-    @Mock
-    private lateinit var mockEditor: SharedPreferences.Editor
-    
-    private lateinit var memoryManager: EpisodicMemoryManager
+    private lateinit var manager: EpisodicMemoryManager
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        `when`(mockContext.getSharedPreferences("nexa_episodic_memory", Context.MODE_PRIVATE))
-            .thenReturn(mockPrefs)
-        `when`(mockPrefs.edit()).thenReturn(mockEditor)
-        `when`(mockEditor.putString(anyString(), anyString())).thenReturn(mockEditor)
-        `when`(mockPrefs.getString(anyString(), isNull())).thenReturn(null)
-        
-        memoryManager = EpisodicMemoryManager(mockContext)
+    fun setUp() {
+        manager = EpisodicMemoryManager()
+    }
+
+    // ─── Consent Tests ───────────────────────────────────────
+
+    @Test
+    fun `Memory disabled by default`() {
+        assertFalse(manager.hasConsent())
     }
 
     @Test
-    fun `store and retrieve memory`() {
-        val entry = EpisodicMemoryManager.MemoryEntry(
-            content = "El usuario se llama Juan",
-            category = EpisodicMemoryManager.MemoryCategory.PERSONAL,
-            importance = 0.9f
+    fun `Enable memory sets consent`() {
+        manager.setConsent(true)
+        assertTrue(manager.hasConsent())
+    }
+
+    @Test
+    fun `Disable memory revokes consent`() {
+        manager.setConsent(true)
+        manager.setConsent(false)
+        assertFalse(manager.hasConsent())
+    }
+
+    // ─── Storage Tests ───────────────────────────────────────
+
+    @Test
+    fun `Store memory without consent returns entry but does not store`() {
+        val entry = manager.storeMemory(
+            sessionId = "s1",
+            type = MemoryType.FACT,
+            content = "User likes pizza",
+            summary = "Likes pizza"
         )
-        memoryManager.storeMemory(entry)
-        
-        // Verify the memory was stored (SharedPreferences.put was called)
-        verify(mockEditor).putString(eq("episodic_memories"), anyString())
+        assertNotNull(entry)
+        assertEquals("s1", entry.sessionId)
+        assertEquals(0, manager.getStats().totalMemories)
     }
 
     @Test
-    fun `extract name from Spanish message`() {
-        val memories = memoryManager.extractMemoriesFromMessage(
-            role = "user",
-            content = "Me llamo Carlos",
-            sessionId = "test-session"
+    fun `Store memory with consent stores successfully`() {
+        manager.setConsent(true)
+        val entry = manager.storeMemory(
+            sessionId = "s1",
+            type = MemoryType.FACT,
+            content = "User likes pizza",
+            summary = "Likes pizza",
+            importance = 0.8f
         )
-        
-        assertTrue("Should extract name memory", memories.any { 
-            it.category == EpisodicMemoryManager.MemoryCategory.PERSONAL &&
-            it.content.contains("Carlos")
-        })
+        assertNotNull(entry)
+        assertEquals(1, manager.getStats().totalMemories)
     }
 
     @Test
-    fun `extract name from English message`() {
-        val memories = memoryManager.extractMemoriesFromMessage(
-            role = "user",
-            content = "My name is Alice",
-            sessionId = "test-session"
-        )
-        
-        assertTrue("Should extract name memory", memories.any { 
-            it.category == EpisodicMemoryManager.MemoryCategory.PERSONAL &&
-            it.content.contains("Alice")
-        })
+    fun `Store multiple memories`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "Lives in Madrid", "Lives in Madrid", importance = 0.9f)
+        manager.storeMemory("s1", MemoryType.PREFERENCE, "Prefers dark mode", "Dark mode preference")
+        manager.storeMemory("s2", MemoryType.EVENT, "Discussed AI", "AI discussion")
+
+        assertEquals(3, manager.getStats().totalMemories)
+    }
+
+    // ─── Query Tests ─────────────────────────────────────────
+
+    @Test
+    fun `Query memories by keyword`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "User loves Android development", "Android dev lover", importance = 0.8f)
+        manager.storeMemory("s1", MemoryType.FACT, "User has a cat named Luna", "Cat named Luna", importance = 0.6f)
+
+        val results = manager.queryMemories(MemoryQuery(keywords = listOf("android")))
+        assertEquals(1, results.size)
+        assertEquals("Android dev lover", results[0].summary)
     }
 
     @Test
-    fun `extract preference from Spanish message`() {
-        val memories = memoryManager.extractMemoriesFromMessage(
-            role = "user",
-            content = "Me gusta la música rock",
-            sessionId = "test-session"
-        )
-        
-        assertTrue("Should extract preference memory", memories.any { 
-            it.category == EpisodicMemoryManager.MemoryCategory.PREFERENCE
-        })
+    fun `Query memories by type`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "Name is Juan", "Name: Juan", importance = 0.9f)
+        manager.storeMemory("s1", MemoryType.PREFERENCE, "Likes Spanish", "Likes Spanish")
+        manager.storeMemory("s1", MemoryType.FACT, "Works at Google", "Works at Google", importance = 0.8f)
+
+        val facts = manager.queryMemories(MemoryQuery(type = MemoryType.FACT))
+        assertEquals(2, facts.size)
     }
 
     @Test
-    fun `extract location from message`() {
-        val memories = memoryManager.extractMemoriesFromMessage(
-            role = "user",
-            content = "Vivo en Madrid",
-            sessionId = "test-session"
-        )
-        
-        assertTrue("Should extract location memory", memories.any { 
-            it.category == EpisodicMemoryManager.MemoryCategory.LOCATION &&
-            it.content.contains("Madrid")
-        })
+    fun `Query memories by session`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.EVENT, "Event 1", "E1", importance = 0.5f)
+        manager.storeMemory("s2", MemoryType.EVENT, "Event 2", "E2", importance = 0.5f)
+
+        val session1 = manager.queryMemories(MemoryQuery(sessionId = "s1"))
+        assertEquals(1, session1.size)
+        assertEquals("s1", session1[0].sessionId)
     }
 
     @Test
-    fun `no extraction from assistant messages`() {
-        val memories = memoryManager.extractMemoriesFromMessage(
-            role = "assistant",
-            content = "Me llamo AI Assistant",
-            sessionId = "test-session"
-        )
-        
-        assertTrue("Should not extract from assistant messages", memories.isEmpty())
+    fun `Query memories by minimum importance`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "Important", "High importance", importance = 0.9f)
+        manager.storeMemory("s1", MemoryType.FACT, "Not important", "Low importance", importance = 0.2f)
+
+        val important = manager.queryMemories(MemoryQuery(minImportance = 0.5f))
+        assertEquals(1, important.size)
+        assertEquals("High importance", important[0].summary)
     }
 
     @Test
-    fun `user profile starts empty`() {
-        val profile = memoryManager.getUserProfile()
-        assertEquals("Name should be empty initially", "", profile.name)
-        assertEquals("Location should be empty initially", "", profile.location)
+    fun `Find relevant memories for text`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.PREFERENCE, "User prefers Python programming", "Python preference", importance = 0.7f)
+        manager.storeMemory("s1", MemoryType.FACT, "User has 2 dogs", "Has 2 dogs", importance = 0.5f)
+
+        val relevant = manager.findRelevantMemories("I want to learn Python")
+        assertTrue(relevant.any { it.summary.contains("Python") })
+    }
+
+    // ─── Context Generation Tests ────────────────────────────
+
+    @Test
+    fun `Get context for session returns formatted string`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "Likes pizza", "Likes pizza", importance = 0.7f)
+        manager.storeMemory("s1", MemoryType.PREFERENCE, "Prefers Spanish", "Spanish preference", importance = 0.6f)
+
+        val context = manager.getContextForSession("s1", "en")
+        assertTrue(context.contains("Session Memory"))
+        assertTrue(context.contains("Likes pizza"))
     }
 
     @Test
-    fun `store and retrieve facts`() {
-        memoryManager.storeFact("El usuario tiene un perro")
-        val facts = memoryManager.getFacts()
-        assertTrue("Should contain stored fact", facts.contains("El usuario tiene un perro"))
+    fun `Get context for non-existent session returns empty`() {
+        manager.setConsent(true)
+        val context = manager.getContextForSession("nonexistent", "en")
+        assertEquals("", context)
     }
 
     @Test
-    fun `duplicate facts not stored`() {
-        memoryManager.storeFact("El usuario tiene un perro")
-        memoryManager.storeFact("El usuario tiene un perro")
-        val facts = memoryManager.getFacts()
-        assertEquals("Should not duplicate facts", 1, facts.count { it == "El usuario tiene un perro" })
+    fun `Get persistent memories returns cross-session facts`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "Name is Ana", "Name: Ana", importance = 0.9f)
+        manager.storeMemory("s2", MemoryType.PREFERENCE, "Likes tea", "Tea lover", importance = 0.7f)
+
+        val persistent = manager.getPersistentMemories("en")
+        assertTrue(persistent.contains("Name: Ana"))
+    }
+
+    // ─── Delete Tests ────────────────────────────────────────
+
+    @Test
+    fun `Delete specific memory`() {
+        manager.setConsent(true)
+        val entry = manager.storeMemory("s1", MemoryType.FACT, "Test", "Test memory", importance = 0.5f)
+        assertEquals(1, manager.getStats().totalMemories)
+
+        manager.deleteMemory(entry.id)
+        assertEquals(0, manager.getStats().totalMemories)
+    }
+
+    @Test
+    fun `Delete session memories`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "Session 1 fact", "S1 fact")
+        manager.storeMemory("s2", MemoryType.FACT, "Session 2 fact", "S2 fact")
+
+        manager.deleteSessionMemories("s1")
+        assertEquals(1, manager.getStats().totalMemories)
+    }
+
+    @Test
+    fun `Clear all memories`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "A", "A")
+        manager.storeMemory("s2", MemoryType.FACT, "B", "B")
+
+        manager.clearAllMemories()
+        assertEquals(0, manager.getStats().totalMemories)
+    }
+
+    // ─── Stats Tests ─────────────────────────────────────────
+
+    @Test
+    fun `Stats reflect stored memories`() {
+        manager.setConsent(true)
+        manager.storeMemory("s1", MemoryType.FACT, "A", "A", importance = 0.9f)
+        manager.storeMemory("s1", MemoryType.PREFERENCE, "B", "B", importance = 0.5f)
+
+        val stats = manager.getStats()
+        assertEquals(2, stats.totalMemories)
+        assertEquals(1, stats.byType[MemoryType.FACT])
+        assertEquals(1, stats.byType[MemoryType.PREFERENCE])
+        assertEquals(2, stats.totalSessions)
+        assertTrue(stats.newestMemory > 0)
+        assertTrue(stats.oldestMemory > 0)
+    }
+
+    @Test
+    fun `Empty stats for no memories`() {
+        val stats = manager.getStats()
+        assertEquals(0, stats.totalMemories)
+        assertTrue(stats.byType.isEmpty())
+    }
+
+    // ─── Keyword Extraction Tests ────────────────────────────
+
+    @Test
+    fun `Keywords extracted from bilingual content`() {
+        manager.setConsent(true)
+        // The keyword extraction should work for both English and Spanish
+        manager.storeMemory("s1", MemoryType.CONTEXT, "The user enjoys programming in Kotlin", "Kotlin programming")
+        manager.storeMemory("s1", MemoryType.CONTEXT, "Al usuario le gusta programar en Android", "Android programming")
+
+        val relevant = manager.findRelevantMemories("Kotlin Android programming")
+        assertTrue(relevant.size >= 1)
+    }
+
+    // ─── Memory Type Enum Tests ──────────────────────────────
+
+    @Test
+    fun `MemoryType has all expected values`() {
+        val types = MemoryType.entries
+        assertEquals(8, types.size)
+        assertTrue(types.contains(MemoryType.FACT))
+        assertTrue(types.contains(MemoryType.PREFERENCE))
+        assertTrue(types.contains(MemoryType.EVENT))
+        assertTrue(types.contains(MemoryType.CONTEXT))
+        assertTrue(types.contains(MemoryType.DECISION))
+        assertTrue(types.contains(MemoryType.REMINDER))
+        assertTrue(types.contains(MemoryType.PERSONAL))
+        assertTrue(types.contains(MemoryType.SKILL_LEARNED))
     }
 }
