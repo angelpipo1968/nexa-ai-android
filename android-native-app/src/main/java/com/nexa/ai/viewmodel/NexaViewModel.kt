@@ -1,4 +1,4 @@
-﻿package com.nexa.ai.viewmodel
+package com.nexa.ai.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -19,8 +19,10 @@ import com.nexa.ai.ml.EnhancedEmotionAnalyzer
 import com.nexa.ai.ml.OnDeviceMLEngine
 import com.nexa.ai.ml.OnDeviceInferenceManager
 import com.nexa.ai.ml.SmartRoutingManager
+import com.nexa.ai.ml.SmartRoutingManager.InferenceMode
 import com.nexa.ai.ml.UserProfileManager
 import com.nexa.ai.memory.EpisodicMemoryManager
+import com.nexa.ai.memory.MemoryStats
 import com.nexa.ai.sensors.NexaSensorManager
 import com.nexa.ai.ui.NexaStrings
 import com.nexa.ai.voice.NaturalConversationEngine
@@ -31,6 +33,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -55,7 +58,8 @@ class NexaViewModel @Inject constructor(
     private val webResultProcessor: WebResultProcessor,
     private val episodicMemoryManager: EpisodicMemoryManager,
     private val enhancedEmotionAnalyzer: EnhancedEmotionAnalyzer,
-    private val userProfileManager: UserProfileManager
+    private val userProfileManager: UserProfileManager,
+    private val localLLMManager: com.nexa.ai.offline.LocalLLMManager
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(NexaUiState())
@@ -199,11 +203,9 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
         // ─── NEW: Episodic Memory Context ───
         try {
-            val sessionId = _uiState.value.activeSessionId ?: ""
-            val persistentMemory = episodicMemoryManager.getPersistentMemories(_uiState.value.language.code)
-            val sessionMemory = episodicMemoryManager.getContextForSession(sessionId, _uiState.value.language.code)
-            if (persistentMemory.isNotBlank()) parts.add("\n\n$persistentMemory")
-            if (sessionMemory.isNotBlank()) parts.add("\n\n$sessionMemory")
+            val query = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
+            val memoryContext = episodicMemoryManager.buildMemoryContext(query)
+            if (memoryContext.isNotBlank()) parts.add("\n\nUSER PROFILE & MEMORIES:\n$memoryContext")
         } catch (_: Exception) {}
 
         // ─── NEW: Enhanced Emotion Analysis ───
@@ -373,11 +375,11 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 _uiState.update {
                     it.copy(
                         npuAvailable = caps.hasNPU,
-                        hasDownloadedModels = caps.downloadedModels.isNotEmpty(),
-                        inferenceMode = InferenceMode.HYBRID,
+                        hasDownloadedModels = caps.loadedModel != null,
+                        inferenceMode = InferenceMode.HYBRID.name,
                     )
                 }
-                android.util.Log.d("NexaVM", "Smart Router initialized — NPU: ${caps.hasNPU}, Models: ${caps.downloadedModels}")
+                android.util.Log.d("NexaVM", "Smart Router initialized — NPU: ${caps.hasNPU}, Model: ${caps.loadedModel}")
             } catch (e: Exception) {
                 android.util.Log.w("NexaVM", "Smart Router init failed: ${e.message}")
             }
@@ -387,7 +389,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     /** Switch inference mode (called from Settings UI). */
     fun setInferenceMode(mode: InferenceMode) {
         smartRouter.setMode(SmartRoutingManager.InferenceMode.valueOf(mode.name))
-        _uiState.update { it.copy(inferenceMode = mode) }
+        _uiState.update { it.copy(inferenceMode = mode.name) }
     }
 
     /** Get device AI capabilities for settings display. */
@@ -586,12 +588,19 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             val savedVoice = settingsStore.voiceType.first()
             val savedAccent = settingsStore.accentColor.first()
             val savedGroqKey = settingsStore.groqApiKey.first()
+            val savedUseLocalLLM = settingsStore.useLocalLLM.first()
+            val savedAllowSync = settingsStore.allowSync.first()
+            val savedMaxTokens = settingsStore.maxTokens.first()
+            
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
                 voiceType = savedVoice,
                 accentColor = savedAccent,
-                groqApiKey = savedGroqKey
+                groqApiKey = savedGroqKey,
+                useLocalLLM = savedUseLocalLLM,
+                allowSync = savedAllowSync,
+                maxTokens = savedMaxTokens
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
@@ -1243,8 +1252,28 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                     return@launch
                 }
 
+                // ─── LOCAL GGUF LLM OFFLINE ROUTING ───
+                val useLocalLLM = _uiState.value.useLocalLLM || !_uiState.value.isOnline
+                if (useLocalLLM) {
+                    android.util.Log.d("NexaVM", "Routing to LOCAL GGUF LLM (Offline-first)")
+                    val localResult = localLLMManager.generateText(content, _uiState.value.maxTokens)
+                    fullResponse = localResult
+                    updateActiveSession { s ->
+                        s.copy(
+                            messages = s.messages + Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = false),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(isThinking = false, currentProvider = "local-gguf")
+
+                    if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                        speak(fullResponse, assistantId)
+                    }
+                    return@launch
+                }
+
                 // ─── Smart Router: Decide online vs on-device ───
-                val routingDecision = smartRouter.routeChat(content)
+                val routingDecision = smartRouter.shouldUseOnDevice(content)
                 _uiState.update { it.copy(isOnDeviceActive = routingDecision.useOnDevice, routingReason = routingDecision.reason) }
 
                 if (routingDecision.useOnDevice) {
@@ -1281,11 +1310,19 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                 android.util.Log.d("NexaVM", "Routing to ONLINE: ${routingDecision.reason}")
                 val groqKey = _uiState.value.groqApiKey
                 val loc = _uiState.value.locationData
-                val messageFlow = if (groqKey.isNotBlank()) {
-                    repository.sendMessageDirect(allMessages, groqKey, language = _uiState.value.language.code)
-                } else {
-                    repository.sendMessageFree(allMessages, language = _uiState.value.language.code)
-                }
+                val baseUrl = BuildConfig.API_BASE_URL
+                val provider = if (groqKey.isNotBlank()) "groq" else null
+                val messageFlow = repository.sendMessage(
+                    messages = allMessages,
+                    baseUrl = baseUrl,
+                    provider = provider,
+                    language = _uiState.value.language.code,
+                    systemPrompt = advancedSystemPrompt,
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    city = loc.city,
+                    country = loc.country
+                )
 
                 messageFlow.collect { event ->
                     when (event) {
@@ -1339,6 +1376,16 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                             if (fullResponse.isNotBlank()) {
                                 viewModelScope.launch {
                                     try {
+                                        // ─── NEW: Store and extract episodic memories ───
+                                        try {
+                                            val sessionId = _uiState.value.activeSessionId ?: ""
+                                            episodicMemoryManager.extractMemoriesFromMessage(
+                                                role = "user",
+                                                content = content,
+                                                sessionId = sessionId
+                                            )
+                                        } catch (_: Exception) {}
+
                                         val voiceEmotion = voiceEnhancer.voiceState.value.voiceEmotion
                                         mlEngine.learnFromInteraction(
                                             userMessage = content,
@@ -1548,7 +1595,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
                         ?: "No se pudo analizar la imagen offline."
                 } else {
                     // Cloud vision via /api/vision (GLM-4.6V)
-                    val visionRepo = com.nexa.ai.data.VisionRepository()
+                    val visionRepo = com.nexa.ai.data.repository.VisionRepository()
                     val baseUrl = BuildConfig.API_BASE_URL
                     val response = visionRepo.analyzeImage(
                         baseUrl = baseUrl,
@@ -1658,6 +1705,41 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     fun setGroqApiKey(key: String) {
         _uiState.update { it.copy(groqApiKey = key.trim()) }
         viewModelScope.launch { settingsStore.setGroqApiKey(key.trim()) }
+    }
+
+    fun toggleLocalLLM(enabled: Boolean) {
+        _uiState.update { it.copy(useLocalLLM = enabled) }
+        viewModelScope.launch { settingsStore.setUseLocalLLM(enabled) }
+    }
+
+    fun toggleSync(enabled: Boolean) {
+        _uiState.update { it.copy(allowSync = enabled) }
+        viewModelScope.launch { settingsStore.setAllowSync(enabled) }
+    }
+
+    fun setMaxTokens(tokens: Int) {
+        _uiState.update { it.copy(maxTokens = tokens) }
+        viewModelScope.launch { settingsStore.setMaxTokens(tokens) }
+    }
+
+    fun downloadModel() {
+        _uiState.update { it.copy(isDownloadingModel = true, modelDownloadProgress = 0f) }
+        viewModelScope.launch {
+            // Simulated animated model download in background
+            for (i in 1..10) {
+                kotlinx.coroutines.delay(200)
+                _uiState.update { it.copy(modelDownloadProgress = i * 0.1f) }
+            }
+            // Actually call loading now that weights are present in assets
+            val loadSuccess = localLLMManager.loadModelFromAssets()
+            _uiState.update { 
+                it.copy(
+                    isDownloadingModel = false, 
+                    modelDownloadProgress = 1.0f,
+                    error = if (!loadSuccess) "No se pudo cargar el modelo offline GGUF" else null
+                )
+            }
+        }
     }
 
     fun deleteGroqApiKey() {

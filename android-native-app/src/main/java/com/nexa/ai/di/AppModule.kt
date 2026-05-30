@@ -65,4 +65,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSessionStore(application: Application): SessionStore = SessionStore(application)
+
+    @Provides
+    @Singleton
+    fun provideOnDeviceInferenceManager(
+        @ApplicationContext context: Context
+    ): com.nexa.ai.ml.OnDeviceInferenceManager = com.nexa.ai.ml.OnDeviceInferenceManager(context)
 }

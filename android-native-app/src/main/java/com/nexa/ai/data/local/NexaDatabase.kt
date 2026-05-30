@@ -91,7 +91,14 @@ data class SessionWithMessages(
         MessageEntity::class,
         PendingMessageEntity::class,
         CachedResponseEntity::class,
-        CachedSearchEntity::class
+        CachedSearchEntity::class,
+        VoiceProfileEntity::class,
+        EmotionEntity::class,
+        MemoryFactEntity::class,
+        LearningSignalEntity::class,
+        UserPreferenceEntity::class,
+        ActivityLogEntity::class,
+        SensorDataEntity::class
     ],
     version = 2,
     exportSchema = false
@@ -101,6 +108,13 @@ abstract class NexaDatabase : RoomDatabase() {
     abstract fun pendingMessageDao(): PendingMessageDao
     abstract fun cachedResponseDao(): CachedResponseDao
     abstract fun cachedSearchDao(): CachedSearchDao
+    abstract fun voiceProfileDao(): VoiceProfileDao
+    abstract fun emotionDao(): EmotionDao
+    abstract fun memoryFactDao(): MemoryFactDao
+    abstract fun learningSignalDao(): LearningSignalDao
+    abstract fun userPreferenceDao(): UserPreferenceDao
+    abstract fun activityLogDao(): ActivityLogDao
+    abstract fun sensorDataDao(): SensorDataDao
 
     companion object {
         @Volatile

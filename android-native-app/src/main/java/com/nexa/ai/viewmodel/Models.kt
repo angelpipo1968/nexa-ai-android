@@ -56,6 +56,7 @@ data class NexaUiState(
     val error: String? = null,
     val pendingAttachment: String? = null,
     val tinyfishApiKey: String = "",
+    val groqApiKey: String = "",
     // Speech
     val isListening: Boolean = false,
     val isSpeaking: Boolean = false,
@@ -111,6 +112,11 @@ data class NexaUiState(
     val isOnline: Boolean = true,
     // Offline
     val pendingMessageCount: Int = 0,
+    val useLocalLLM: Boolean = false,
+    val allowSync: Boolean = true,
+    val maxTokens: Int = 256,
+    val modelDownloadProgress: Float = 0f,
+    val isDownloadingModel: Boolean = false,
     // Update
     val updateInfo: UpdateInfo? = null,
     val showUpdateDialog: Boolean = false,
@@ -118,7 +124,11 @@ data class NexaUiState(
     val morningSummaryEnabled: Boolean = false,
     // On-Device ML
     val onDeviceReady: Boolean = false,
-    val inferenceMode: String = "HYBRID", // ONLINE, ON_DEVICE, HYBRID,
+    val inferenceMode: String = "HYBRID", // ONLINE, ON_DEVICE, HYBRID
+    val npuAvailable: Boolean = false,
+    val hasDownloadedModels: Boolean = false,
+    val isOnDeviceActive: Boolean = false,
+    val routingReason: String = "",
     // Memory & Bilingual
     val userProfileName: String = "",
     val bilingualModeEnabled: Boolean = false,

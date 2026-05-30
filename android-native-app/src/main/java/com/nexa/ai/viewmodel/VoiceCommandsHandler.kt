@@ -1,4 +1,4 @@
-﻿package com.nexa.ai.viewmodel
+package com.nexa.ai.viewmodel
 
 import android.content.Context
 import com.nexa.ai.iot.IoTManager
@@ -64,9 +64,8 @@ class VoiceCommandsHandler(
     ): VoiceCommandResult {
         val c = cmd.lowercase().trim()
 
-        // Helper to get localized string
         val s = { key: String -> NexaStrings.get(context, key, lang) }
-        val sf = { key: String, vararg args: Any -> NexaStrings.get(context, key, lang, *args) }
+        fun sf(key: String, vararg args: Any): String = NexaStrings.get(context, key, lang, *args)
 
         // Clear chat
         if (c.contains("limpiar chat") || c.contains("borra el chat") || c.contains("clear chat")) {
@@ -259,7 +258,7 @@ class VoiceCommandsHandler(
         }
     }
 
-    private fun detectVideoStyle(cmd: String): VideoGenerator.VideoStyles {
+    private fun detectVideoStyle(cmd: String): VideoGenerator.VideoStyle {
         return when {
             cmd.contains("anime") -> VideoGenerator.VideoStyles.ANIME
             cmd.contains("cinemat") -> VideoGenerator.VideoStyles.CINEMATIC

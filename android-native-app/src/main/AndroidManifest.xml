@@ -24,6 +24,7 @@
         android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
 
     <application
         android:name=".NexaApplication"
@@ -103,6 +104,22 @@
             android:name=".notification.MorningSummaryService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Google Play Compliant Android Auto & Automotive Service -->
+        <service
+            android:name=".automotive.NexaCarAppService"
+            android:exported="true"
+            android:permission="android.permission.BIND_CAR_APP">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.car.app.category"
+                android:value="MESSAGING" />
+            <meta-data
+                android:name="androidx.car.app.minCarApiLevel"
+                android:value="1" />
+        </service>
     </application>
 
 </manifest>
