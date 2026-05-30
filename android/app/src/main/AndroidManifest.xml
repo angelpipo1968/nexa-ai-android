@@ -12,6 +12,10 @@
 
     <!-- Cámara: Para escanear y enviar imágenes al modelo de visión IA -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <!-- Micrófono: Para entrada de voz/asistente de voz -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

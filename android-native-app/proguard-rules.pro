@@ -19,6 +19,10 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
+# Retrofit
+-keep class retrofit2.** { *; }
+-dontwarn retrofit2.**
+
 # Keep SSE event models
 -keep class com.nexa.ai.data.StreamEvent { *; }
 -keep class com.nexa.ai.data.StreamEvent$* { *; }
