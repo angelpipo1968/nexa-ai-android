@@ -76,6 +76,54 @@ class NexaViewModel @Inject constructor(
     // Voice command handler — extracted from this ViewModel to reduce complexity
     private val voiceCommandsHandler = VoiceCommandsHandler(iotManager, videoGenerator)
 
+    // BroadcastReceiver for Persistent background speech recognition service
+    private val speechReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent == null) return
+            when (intent.action) {
+                NexaSpeechService.ACTION_SPEECH_RESULT -> {
+                    val text = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
+                    speechManager.onSpeechResult?.invoke(text)
+                }
+                NexaSpeechService.ACTION_SPEECH_PARTIAL -> {
+                    val partialText = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
+                    speechManager.onSpeechPartial?.invoke(partialText)
+                }
+                NexaSpeechService.ACTION_SPEECH_STATE -> {
+                    val state = intent.getStringExtra(NexaSpeechService.EXTRA_STATE) ?: return
+                    when (state) {
+                        "listening" -> speechManager.onListeningStateChanged?.invoke(true)
+                        "idle" -> speechManager.onListeningStateChanged?.invoke(false)
+                        "speaking" -> speechManager.onSpeakingStateChanged?.invoke(true, _uiState.value.speakingMessageId)
+                        "barge_in" -> speechManager.onBargeInDetected?.invoke()
+                    }
+                }
+                NexaSpeechService.ACTION_SPEECH_ERROR -> {
+                    val errorKey = intent.getStringExtra(NexaSpeechService.EXTRA_ERROR_KEY) ?: return
+                    speechManager.onError?.invoke(errorKey)
+                }
+            }
+        }
+    }
+
+    private fun startSpeechService() {
+        try {
+            val intent = android.content.Intent(application, NexaSpeechService::class.java)
+            application.startService(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("NexaVM", "Failed to start NexaSpeechService: ${e.message}", e)
+        }
+    }
+
+    private fun stopSpeechService() {
+        try {
+            val intent = android.content.Intent(application, NexaSpeechService::class.java)
+            application.stopService(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("NexaVM", "Failed to stop NexaSpeechService: ${e.message}", e)
+        }
+    }
+
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
     private var voiceRetryCount = 0
@@ -271,6 +319,20 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
     init {
         setupSpeechCallbacks()
         speechManager.initialize()
+        
+        // Register persistent Speech Service receiver (API 33+ safe)
+        val filter = android.content.IntentFilter().apply {
+            addAction(NexaSpeechService.ACTION_SPEECH_RESULT)
+            addAction(NexaSpeechService.ACTION_SPEECH_PARTIAL)
+            addAction(NexaSpeechService.ACTION_SPEECH_STATE)
+            addAction(NexaSpeechService.ACTION_SPEECH_ERROR)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            application.registerReceiver(speechReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            application.registerReceiver(speechReceiver, filter)
+        }
+
         locationStore.initialize()
         restoreState()
         // Auto-request location on startup
@@ -302,8 +364,7 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
             } else {
                 // Activate voice mode on wake word
                 _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
-                speechManager.startVoiceAudioSession()
-                speechManager.startListening()
+                startSpeechService()
             }
         }
 
@@ -1464,22 +1525,15 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
-            speechManager.startVoiceAudioSession()
-            speechManager.startListening()
+            startSpeechService()
         } else {
-            speechManager.stopBargeInMonitor()
-            speechManager.stopListening()
-            speechManager.stopSpeaking()
-            speechManager.stopVoiceAudioSession()
+            stopSpeechService()
         }
     }
 
     fun stopVoiceMode() {
         _uiState.value = _uiState.value.copy(voiceMode = false)
-        speechManager.stopBargeInMonitor()
-        speechManager.stopListening()
-        speechManager.stopSpeaking()
-        speechManager.stopVoiceAudioSession()
+        stopSpeechService()
     }
 
     fun interruptVoice() {
@@ -1955,6 +2009,10 @@ ALWAYS: improve solutions, verify information, provide scalable architectures, t
 
     override fun onCleared() {
         super.onCleared()
+        try {
+            application.unregisterReceiver(speechReceiver)
+        } catch (_: Exception) {}
+        stopSpeechService()
         speechManager.destroy()
         voiceEnhancer.shutdown()
         sensorManager.stopListening()
