@@ -20,10 +20,32 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1+"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("field") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".field"
+            versionNameSuffix = "-field"
+            isDebuggable = false
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
 
@@ -128,4 +150,7 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-android-compiler:2.51.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+    // Android Car App Library (Android Auto & Automotive)
+    implementation("androidx.car.app:app:1.4.0")
 }

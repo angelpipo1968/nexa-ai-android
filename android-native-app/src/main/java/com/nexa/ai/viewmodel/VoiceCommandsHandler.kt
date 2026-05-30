@@ -1,33 +1,17 @@
 package com.nexa.ai.viewmodel
 
 import android.content.Context
+import com.nexa.ai.iot.IoTManager
+import com.nexa.ai.media.VideoGenerator
 import com.nexa.ai.ui.NexaStrings
-
-// ═══════════════════════════════════════
-//  STUBS FOR MISSING CLASSES
-// ═══════════════════════════════════════
-
-/** Stub for IoTManager while it is being implemented. */
-class IoTManager {
-    fun isIoTCommand(cmd: String): Boolean = false
-}
-
-/** Stub for VideoGenerator while it is being implemented. */
-class VideoGenerator {
-    enum class VideoStyles { ANIME, CINEMATIC, REALISTIC, ABSTRACT, VINTAGE, SCI_FI, NATURE }
-}
-
-/** Represents the result of processing a voice command. */
-sealed class VoiceCommandResult {
-    /** Command was handled, no further action needed. */
-    data class Handled(val spokenResponse: String) : VoiceCommandResult()
-    /** Command was not recognized, proceed with normal message sending. */
-    data object NotRecognized : VoiceCommandResult()
-}
 
 /**
  * VoiceCommandsHandler — Extracted from NexaViewModel.
  * Handles all voice command detection and execution in hands-free mode.
+ * This reduces the ViewModel from 1600+ lines by extracting ~200 lines of command matching.
+ *
+ * All user-facing strings are resolved through NexaStrings using string resource keys,
+ * supporting automatic i18n. Adding a new language only requires a new values-XX/strings.xml.
  */
 class VoiceCommandsHandler(
     private val iotManager: IoTManager,
@@ -35,8 +19,24 @@ class VoiceCommandsHandler(
 ) {
 
     /**
+     * Represents the result of processing a voice command.
+     */
+    sealed class VoiceCommandResult {
+        /** Command was handled, no further action needed. */
+        data class Handled(val spokenResponse: String) : VoiceCommandResult()
+        /** Command was not recognized, proceed with normal message sending. */
+        object NotRecognized : VoiceCommandResult()
+    }
+
+    /**
      * Try to handle the given voice command text.
      * Returns Handled if the command was recognized, NotRecognized otherwise.
+     *
+     * @param context Android context for string resolution
+     * @param cmd The voice-transcribed command text
+     * @param lang Current app language
+     * @param messages Current chat messages (for context)
+     * @param callbacks Lambda callbacks for actions
      */
     fun tryHandleCommand(
         context: Context,
@@ -64,9 +64,8 @@ class VoiceCommandsHandler(
     ): VoiceCommandResult {
         val c = cmd.lowercase().trim()
 
-        // Helpers to get localized strings
-        fun s(key: String) = NexaStrings.get(context, key, lang)
-        fun sf(key: String, arg: Any) = NexaStrings.get(context, key, lang, arg)
+        val s = { key: String -> NexaStrings.get(context, key, lang) }
+        fun sf(key: String, vararg args: Any): String = NexaStrings.get(context, key, lang, *args)
 
         // Clear chat
         if (c.contains("limpiar chat") || c.contains("borra el chat") || c.contains("clear chat")) {
@@ -160,6 +159,13 @@ class VoiceCommandsHandler(
             return VoiceCommandResult.Handled(s("voice_cmd_opening_settings"))
         }
 
+        // Change theme (generic)
+        if (c.contains("cambiar tema") || c.contains("change theme") ||
+            c.contains("cambiar color") || c.contains("change color")) {
+            // This needs current theme — handled by returning NotRecognized for now
+            // The ViewModel can intercept this specific case
+        }
+
         // Create image / generate image / create logo
         if (c.contains("crear imagen") || c.contains("create image") || c.contains("genera imagen") ||
             c.contains("generate image") || c.contains("crear logo") || c.contains("create logo") ||
@@ -169,7 +175,11 @@ class VoiceCommandsHandler(
                 .replace(Regex("(crear|genera|haz|create|generate|make|draw)\\s+(una |an |a )?(imagen|image|logo|dibujo|drawing|picture|foto|photo)"), "")
                 .replace(Regex("(de |of )"), "")
                 .trim()
-            val imagePrompt = if (prompt.isBlank()) s("voice_cmd_image_default") else sf("voice_cmd_image_prompt", prompt)
+            val imagePrompt = if (prompt.isNotBlank()) {
+                sf("voice_cmd_image_prompt", prompt)
+            } else {
+                s("voice_cmd_image_default")
+            }
             onSendMessage(imagePrompt)
             return VoiceCommandResult.Handled(s("voice_cmd_generating_image"))
         }
@@ -191,7 +201,7 @@ class VoiceCommandsHandler(
                 .replace(Regex("(de |of |about )"), "")
                 .trim()
             val style = detectVideoStyle(c)
-            val prompt = videoPrompt.ifBlank { s("voice_cmd_video_default") }
+            val prompt = if (videoPrompt.isNotBlank()) videoPrompt else s("voice_cmd_video_default")
             onGenerateVideo(prompt, style)
             return VoiceCommandResult.Handled(sf("voice_cmd_generating_video", prompt))
         }
@@ -248,7 +258,7 @@ class VoiceCommandsHandler(
         }
     }
 
-    private fun detectVideoStyle(cmd: String): VideoGenerator.VideoStyles {
+    private fun detectVideoStyle(cmd: String): VideoGenerator.VideoStyle {
         return when {
             cmd.contains("anime") -> VideoGenerator.VideoStyles.ANIME
             cmd.contains("cinemat") -> VideoGenerator.VideoStyles.CINEMATIC

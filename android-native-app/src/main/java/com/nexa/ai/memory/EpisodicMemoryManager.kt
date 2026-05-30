@@ -419,4 +419,30 @@ class EpisodicMemoryManager(context: Context) {
     fun clearAll() {
         prefs.edit().clear().apply()
     }
+
+    fun setConsent(consent: Boolean) {
+        prefs.edit().putBoolean("memory_consent", consent).apply()
+    }
+
+    fun hasConsent(): Boolean {
+        return prefs.getBoolean("memory_consent", false)
+    }
+
+    fun clearAllMemories() {
+        clearAll()
+    }
+
+    fun getStats(): MemoryStats {
+        return MemoryStats(
+            totalEntries = getMemories().size,
+            factsCount = getFacts().size,
+            profileComplete = getUserProfile().name.isNotBlank()
+        )
+    }
 }
+
+data class MemoryStats(
+    val totalEntries: Int,
+    val factsCount: Int,
+    val profileComplete: Boolean
+)

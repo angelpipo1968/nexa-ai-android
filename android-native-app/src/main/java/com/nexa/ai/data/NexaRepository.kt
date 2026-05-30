@@ -169,6 +169,10 @@ class NexaRepository @Inject constructor() {
             eventSource.cancel()
         }
     }.flowOn(Dispatchers.IO)
+
+    fun generateImageFree(prompt: String): String {
+        return "https://image.pollinations.ai/prompt/${android.net.Uri.encode(prompt)}"
+    }
 }
 
 sealed class StreamEvent {

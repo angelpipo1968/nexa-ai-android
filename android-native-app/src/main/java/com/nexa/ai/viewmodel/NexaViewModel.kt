@@ -1,12 +1,8 @@
 package com.nexa.ai.viewmodel
 
 import android.app.Application
-import android.content.Context
-import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.gson.Gson
-import com.google.gson.JsonObject
 import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.ChatMessage
 import com.nexa.ai.data.LocationStore
@@ -17,45 +13,116 @@ import com.nexa.ai.data.SessionStore
 import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.StreamEvent
 import com.nexa.ai.data.UpdateChecker
+import com.nexa.ai.iot.IoTManager
+import com.nexa.ai.media.VideoGenerator
+import com.nexa.ai.ml.EnhancedEmotionAnalyzer
+import com.nexa.ai.ml.OnDeviceMLEngine
+import com.nexa.ai.ml.OnDeviceInferenceManager
+import com.nexa.ai.ml.SmartRoutingManager
+import com.nexa.ai.ml.SmartRoutingManager.InferenceMode
+import com.nexa.ai.ml.UserProfileManager
+import com.nexa.ai.memory.EpisodicMemoryManager
+import com.nexa.ai.memory.MemoryStats
+import com.nexa.ai.sensors.NexaSensorManager
 import com.nexa.ai.ui.NexaStrings
+import com.nexa.ai.voice.NaturalConversationEngine
+import com.nexa.ai.voice.VoiceEnhancer
+import com.nexa.ai.voice.SpeechManager
+import com.nexa.ai.web.WebResultProcessor
+import com.nexa.ai.web.WebSearchManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
 class NexaViewModel @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
-    private val speechManager: SpeechManager,
-    private val authManager: AuthManager,
+    application: Application,
+    private val locationStore: LocationStore,
     private val repository: NexaRepository,
     private val updateChecker: UpdateChecker,
+    private val sessionStore: SessionStore,
     private val settingsStore: SettingsStore,
-    private val networkMonitor: com.nexa.ai.data.NetworkMonitor
-) : ViewModel() {
+    private val voiceEnhancer: VoiceEnhancer,
+    private val conversationEngine: NaturalConversationEngine,
+    private val sensorManager: NexaSensorManager,
+    private val iotManager: IoTManager,
+    private val mlEngine: OnDeviceMLEngine,
+    private val videoGenerator: VideoGenerator,
+    // ─── NEW: Previously orphaned modules, now wired in ───
+    private val webSearchManager: WebSearchManager,
+    private val webResultProcessor: WebResultProcessor,
+    private val episodicMemoryManager: EpisodicMemoryManager,
+    private val enhancedEmotionAnalyzer: EnhancedEmotionAnalyzer,
+    private val userProfileManager: UserProfileManager,
+    private val localLLMManager: com.nexa.ai.offline.LocalLLMManager
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(NexaUiState())
     val uiState: StateFlow<NexaUiState> = _uiState.asStateFlow()
 
-    // Managers (non-Hilt for now or until fully migrated)
-    private val locationStore = LocationStore(context as android.app.Application)
-    private val sessionStore = SessionStore(context as android.app.Application)
-    private val handsFree = com.nexa.ai.handsfree.NexaHandsFreeAllInOne(context as android.app.Application)
-    private val smartRoutingManager = com.nexa.ai.ml.SmartRoutingManager(context as android.app.Application)
-    private val memoryManager = com.nexa.ai.memory.EpisodicMemoryManager(context as android.app.Application)
-    private val offlineManager = com.nexa.ai.data.OfflineManager(context as android.app.Application)
-    private val appLauncher = com.nexa.ai.shortcuts.AppLauncherManager(context as android.app.Application)
+    // Managers still created locally (not yet in DI module — SpeechManager and AuthManager depend on Activity lifecycle)
+    private val speechManager = SpeechManager(application)
+    private val authManager = AuthManager(application)
+
+    // ─── Smart Router: Online/Offline AI routing ───
+    private val smartRouter = SmartRoutingManager(application)
+
+    // Voice command handler — extracted from this ViewModel to reduce complexity
+    private val voiceCommandsHandler = VoiceCommandsHandler(iotManager, videoGenerator)
+
+    // BroadcastReceiver for Persistent background speech recognition service
+    private val speechReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent == null) return
+            when (intent.action) {
+                NexaSpeechService.ACTION_SPEECH_RESULT -> {
+                    val text = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
+                    speechManager.onSpeechResult?.invoke(text)
+                }
+                NexaSpeechService.ACTION_SPEECH_PARTIAL -> {
+                    val partialText = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
+                    speechManager.onSpeechPartial?.invoke(partialText)
+                }
+                NexaSpeechService.ACTION_SPEECH_STATE -> {
+                    val state = intent.getStringExtra(NexaSpeechService.EXTRA_STATE) ?: return
+                    when (state) {
+                        "listening" -> speechManager.onListeningStateChanged?.invoke(true)
+                        "idle" -> speechManager.onListeningStateChanged?.invoke(false)
+                        "speaking" -> speechManager.onSpeakingStateChanged?.invoke(true, _uiState.value.speakingMessageId)
+                        "barge_in" -> speechManager.onBargeInDetected?.invoke()
+                    }
+                }
+                NexaSpeechService.ACTION_SPEECH_ERROR -> {
+                    val errorKey = intent.getStringExtra(NexaSpeechService.EXTRA_ERROR_KEY) ?: return
+                    speechManager.onError?.invoke(errorKey)
+                }
+            }
+        }
+    }
+
+    private fun startSpeechService() {
+        try {
+            val intent = android.content.Intent(application, NexaSpeechService::class.java)
+            application.startService(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("NexaVM", "Failed to start NexaSpeechService: ${e.message}", e)
+        }
+    }
+
+    private fun stopSpeechService() {
+        try {
+            val intent = android.content.Intent(application, NexaSpeechService::class.java)
+            application.stopService(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("NexaVM", "Failed to stop NexaSpeechService: ${e.message}", e)
+        }
+    }
 
     private var lastSendTimestamp = 0L
     private val sendCooldownMs = 1500L
@@ -64,42 +131,31 @@ class NexaViewModel @Inject constructor(
 
     // ── Advanced AI System Prompt ──
     private val advancedSystemPrompt = """
-You are NEXA, a helpful AI assistant. You speak Spanish by default unless the user uses another language.
+You are NEXA PRO, an Ultra Advanced Autonomous AI System.
 
-CRITICAL RULES — FOLLOW THESE ALWAYS:
-1. Be CONCISE and DIRECT. Answer what was asked, nothing more. No filler, no fluff, no unnecessary details.
-2. Keep responses SHORT. Maximum 2-3 sentences for simple questions. Only expand for complex topics.
-3. When the user asks something simple, give a simple answer. Do not over-explain.
-4. DO NOT use markdown symbols like asterisks, hashtags, underscores, backticks, or slashes. Write naturally using plain text and normal punctuation.
-5. Do not generate lists with symbols or markdown tables. Use natural prose.
-6. Your responses will be read aloud by TTS. Write as you would speak, not as you would write a document.
-7. Know the user's location, time, and city. Use this information naturally when relevant.
-8. Remember the user's name, preferences, and past conversations. Be personal and friendly.
-9. When greeting, be warm but brief. Use the user's name if known.
-10. Match the user's language. If they speak Spanish, respond in Spanish. If English, in English.
+You are designed to operate as a world-class artificial intelligence capable of reasoning, coding, researching, planning, analyzing, browsing the web, interacting with APIs, processing data, generating interfaces, and continuously improving solutions.
 
-LEARNING AND MEMORY:
-- Remember everything the user tells you about themselves: name, preferences, location, occupation, family.
-- Learn from each interaction. If the user corrects you, don't repeat the mistake.
-- Adapt your style to the user's preference. If they want short answers, be brief. If they want details, expand.
-- Proactively use what you know about the user to personalize responses.
+MISSION: Provide highly accurate, intelligent, optimized, scalable, and production-ready responses for any task.
 
-VOICE INTERACTION:
-- Speak as a natural person would. Short, clear sentences.
-- For simple questions (time, weather, location), give the answer directly.
-- Do not add unnecessary context unless the user asks for it.
-- If you know the user's city and they ask about weather or time, answer directly for their location.
-
-WHEN ASKED ABOUT LOCATION:
-- If the user asks where they are, tell them their city and country from the location data provided.
-- If the user asks for the time, give them the current time in their timezone.
-- Use location context naturally without being asked to mention it explicitly every time.
+CORE RULES:
+- Always think deeply before answering.
+- Use multi-step reasoning internally.
+- Never hallucinate information.
+- Verify information whenever possible.
+- Detect possible mistakes before responding.
+- Self-correct when inconsistencies appear.
+- Continuously optimize outputs.
+- Prefer precision over speed.
+- Behave like a senior engineer, architect, analyst, and researcher.
 
 DEVELOPMENT CAPABILITIES:
 - Generate production-level code in any language.
 - Build frontend + backend architectures.
-- Create responsive interfaces and applications.
-- Generate APIs, database schemas, and optimize performance.
+- Create responsive interfaces.
+- Create preview-ready applications.
+- Generate APIs and database schemas.
+- Optimize performance and scalability.
+- Use modular clean architecture.
 - Detect and fix bugs automatically.
 
 SUPPORTED STACKS:
@@ -108,227 +164,314 @@ Backend: Python, FastAPI, Node.js, Express, PostgreSQL, Supabase
 AI Frameworks: LangChain, LangGraph, CrewAI, OpenAI SDK
 Mobile: Kotlin, Jetpack Compose, Android, iOS, React Native
 
-REAL-TIME DATA & SEARCHES:
-- You have access to real-time tools (flights, weather, search, etc.) via your backend functions.
-- When returning flight data or prices, format in clean conversational prose without symbols or tables.
+AUTONOMOUS AGENT CAPABILITIES:
+- Task planning and decomposition
+- Recursive improvement
+- Reflection loops
+- Error detection and self-repair
+- Self-analysis
+- Multi-agent orchestration
 
-NEVER: give lazy answers, invent data, talk too much, over-explain simple things, use markdown formatting in voice responses
-ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
+RESPONSE STYLE:
+- Intelligent, Precise, Analytical, Advanced, Technical, Futuristic, Reliable
+- Always include code examples when discussing development
+- Provide step-by-step explanations for complex topics
+- Give multiple recommendations and alternatives
+- Support both Spanish and English responses matching the user's language
+
+NEVER: give lazy answers, invent data, ignore errors, produce incomplete architectures, skip optimization opportunities
+ALWAYS: improve solutions, verify information, provide scalable architectures, think recursively, optimize continuously
 """.trimIndent()
 
-    /** Builds a dynamic system prompt with location, time, and memory context. */
+    /** Builds a dynamic system prompt with location context when available. */
     private fun buildSystemPrompt(): String {
         val loc = _uiState.value.locationData
-        val now = java.util.Calendar.getInstance()
-        val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
-        val minute = now.get(java.util.Calendar.MINUTE)
-        val timeStr = String.format("%02d:%02d", hour, minute)
-        val dayOfWeek = when (now.get(java.util.Calendar.DAY_OF_WEEK)) {
-            java.util.Calendar.SUNDAY -> "Domingo"
-            java.util.Calendar.MONDAY -> "Lunes"
-            java.util.Calendar.TUESDAY -> "Martes"
-            java.util.Calendar.WEDNESDAY -> "Miércoles"
-            java.util.Calendar.THURSDAY -> "Jueves"
-            java.util.Calendar.FRIDAY -> "Viernes"
-            java.util.Calendar.SATURDAY -> "Sábado"
-            else -> ""
-        }
-        val dateStr = "${now.get(java.util.Calendar.DAY_OF_MONTH)}/${now.get(java.util.Calendar.MONTH) + 1}/${now.get(java.util.Calendar.YEAR)}"
-
-        val timeContext = "\n\nCURRENT TIME: It is $dayOfWeek, $dateStr, and the time is $timeStr. Use this when the user asks about time, dates, or scheduling."
-
         val locationContext = if (loc.isAvailable) {
-            val tzPart = if (loc.timezone.isNotBlank()) ". Timezone: ${loc.timezone}" else ""
-            val sourcePart = if (loc.source == "ip") " (approximate, via IP)" else ""
-            "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country}${sourcePart}${tzPart} (coordinates: ${loc.latitude}, ${loc.longitude}). Always use this to answer location, weather, and time zone questions directly. If the user asks where they are, say '${loc.city}, ${loc.country}'."
-        } else {
-            "\n\nUSER LOCATION: Location not available yet. If the user asks where they are, tell them you are trying to get their location."
-        }
-
-        // Add episodic memory context
-        val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
-        val memoryContext = memoryManager.buildMemoryContext(lastUserMsg)
-        val memorySection = if (memoryContext.isNotBlank()) {
-            "\n\nUSER CONTEXT FROM MEMORY:\n$memoryContext"
+            "\n\nUSER LOCATION: The user is currently in ${loc.city}, ${loc.country} (coordinates: ${loc.latitude}, ${loc.longitude}). Use this location to provide weather, local recommendations, time zone awareness, and location-relevant information when appropriate."
         } else {
             ""
         }
 
-        return advancedSystemPrompt + timeContext + locationContext + memorySection
+        // Build enriched context from ML, sensors, IoT, voice, and conversation engines
+        val enrichedContext = buildEnrichedContext()
+
+        return advancedSystemPrompt + locationContext + enrichedContext
+    }
+
+    /**
+     * Build enriched context from all AI enhancement subsystems.
+     * This makes the AI aware of the user's physical environment, emotional state,
+     * smart home devices, conversation context, and learned preferences.
+     */
+    private fun buildEnrichedContext(): String {
+        val parts = mutableListOf<String>()
+
+        // Sensor context (activity, environment, device state)
+        try {
+            val sensorCtx = sensorManager.getContextForAI()
+            if (sensorCtx.isNotBlank()) parts.add("\n\nSENSOR CONTEXT: $sensorCtx")
+        } catch (_: Exception) {}
+
+        // IoT context (smart home devices)
+        try {
+            val iotCtx = kotlinx.coroutines.runBlocking { iotManager.getIoTContextForAI() }
+            if (iotCtx.isNotBlank()) parts.add("\n\nIOT DEVICES: $iotCtx")
+        } catch (_: Exception) {}
+
+        // Voice emotion context
+        try {
+            val voiceCtx = voiceEnhancer.getVoiceContextForAI()
+            if (voiceCtx.isNotBlank()) parts.add("\n\nVOICE ANALYSIS: $voiceCtx")
+        } catch (_: Exception) {}
+
+        // Conversation context (topic, mood, turn count)
+        try {
+            val convCtx = conversationEngine.getConversationContextForAI()
+            if (convCtx.isNotBlank()) parts.add("\n\nCONVERSATION CONTEXT: $convCtx")
+        } catch (_: Exception) {}
+
+        // Video generation context
+        try {
+            val videoCtx = videoGenerator.getVideoContextForAI()
+            if (videoCtx.isNotBlank()) parts.add("\n\nVIDEO GENERATION: $videoCtx")
+        } catch (_: Exception) {}
+
+        // ML learned preferences and patterns
+        try {
+            val mlCtx = kotlinx.coroutines.runBlocking { mlEngine.getMLContextForAI() }
+            if (mlCtx.isNotBlank()) parts.add("\n\nLEARNED USER PROFILE: $mlCtx")
+        } catch (_: Exception) {}
+
+        // Proactive suggestions from ML engine
+        try {
+            val suggestions = kotlinx.coroutines.runBlocking { mlEngine.generateProactiveSuggestions() }
+            if (suggestions.isNotEmpty()) {
+                parts.add("\n\nPROACTIVE SUGGESTIONS: ${suggestions.take(3).joinToString("; ")}")
+            }
+        } catch (_: Exception) {}
+
+        // ─── NEW: Episodic Memory Context ───
+        try {
+            val query = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
+            val memoryContext = episodicMemoryManager.buildMemoryContext(query)
+            if (memoryContext.isNotBlank()) parts.add("\n\nUSER PROFILE & MEMORIES:\n$memoryContext")
+        } catch (_: Exception) {}
+
+        // ─── NEW: Enhanced Emotion Analysis ───
+        try {
+            val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == "user" }
+            if (lastUserMsg != null) {
+                val emotionProfile = enhancedEmotionAnalyzer.analyzeEmotion(lastUserMsg.content)
+                val emotionCtx = enhancedEmotionAnalyzer.getEmotionContext(emotionProfile, _uiState.value.language.code)
+                if (emotionCtx.isNotBlank()) parts.add("\n\n$emotionCtx")
+            }
+        } catch (_: Exception) {}
+
+        // ─── NEW: User Profile Context ───
+        try {
+            val profileCtx = userProfileManager.getContextForAI(_uiState.value.language.code)
+            if (profileCtx.isNotBlank()) parts.add("\n\n$profileCtx")
+        } catch (_: Exception) {}
+
+        return if (parts.isNotEmpty()) {
+            "\n\n═══ NEXA ENHANCED INTELLIGENCE ═══" + parts.joinToString("") +
+            "\n\nUse this context to provide personalized, context-aware responses. Adapt your tone, detail level, and suggestions based on the user's situation."
+        } else {
+            ""
+        }
     }
 
     // Debounce logic — prevents rapid/accidental voice triggers
-    // Reduced from 600ms to 450ms for a more fluid conversation feel (like ChatGPT)
+    // Reduced from 800ms to 600ms for faster response while still filtering noise
     private var speechDebounceJob: kotlinx.coroutines.Job? = null
-    private val speechDebounceTimeMs = 450L
+    private val speechDebounceTimeMs = 600L
 
     // Track last successful voice result time to prevent duplicate sends
     private var lastVoiceResultAt = 0L
     private val voiceResultCooldownMs = 1000L
 
     private val surprisePromptsEs = listOf(
-        "Busca un vuelo de Miami a Las Vegas para mañana",
-        "¿Cuál es el precio actual de Bitcoin y Ethereum?",
-        "Muéstrame el clima actual en Tokio",
-        "¿Quién es el director de Inception y de qué trata?",
-        "¿Cuál es la distancia exacta de la Tierra a Marte?",
-        "Muéstrame la imagen de la NASA del día",
-        "Genera números de la suerte para el Powerball",
-        "Busca en YouTube el mejor tutorial de Kotlin",
-        "Abre la cámara y transcríbeme el texto",
-        "¿Qué se dice en Reddit sobre inteligencia artificial?"
+        "Cuéntame algo fascinante sobre el universo",
+        "Dame una receta rápida y deliciosa",
+        "¿Cuál es el mejor consejo de vida que puedes dar?",
+        "Escribe un poema corto sobre la tecnología",
+        "Explícame la mecánica cuántica como si tuviera 10 años",
+        "¿Qué pasaría si los humanos pudieran volar?",
+        "Dame 3 ideas para un negocio innovador",
+        "Cuéntame una historia de ciencia ficción en 100 palabras",
+        "¿Cuál es el misterio más grande de la humanidad?",
+        "Dame un plan de ejercicios para 15 minutos"
     )
 
     private val surprisePromptsEn = listOf(
-        "Find a flight from Miami to Las Vegas for tomorrow",
-        "What is the current price of Bitcoin and Ethereum?",
-        "Show me the current weather in Tokyo",
-        "Who directed Inception and what is it about?",
-        "What is the exact distance from Earth to Mars?",
-        "Show me the NASA picture of the day",
-        "Generate lucky numbers for Powerball",
-        "Search YouTube for the best Kotlin tutorial",
-        "Open the camera and transcribe the text for me",
-        "What is Reddit saying about artificial intelligence?"
+        "Tell me something fascinating about the universe",
+        "Give me a quick and delicious recipe",
+        "What's the best life advice you can give?",
+        "Write a short poem about technology",
+        "Explain quantum mechanics like I'm 10",
+        "What if humans could fly?",
+        "Give me 3 ideas for an innovative business",
+        "Tell me a sci-fi story in 100 words",
+        "What's humanity's greatest mystery?",
+        "Give me a 15-minute workout plan"
     )
 
     init {
         setupSpeechCallbacks()
         speechManager.initialize()
+        
+        // Register persistent Speech Service receiver (API 33+ safe)
+        val filter = android.content.IntentFilter().apply {
+            addAction(NexaSpeechService.ACTION_SPEECH_RESULT)
+            addAction(NexaSpeechService.ACTION_SPEECH_PARTIAL)
+            addAction(NexaSpeechService.ACTION_SPEECH_STATE)
+            addAction(NexaSpeechService.ACTION_SPEECH_ERROR)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            application.registerReceiver(speechReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            application.registerReceiver(speechReceiver, filter)
+        }
+
         locationStore.initialize()
         restoreState()
-        observeNetwork()
-        observeOfflineState()
         // Auto-request location on startup
         requestLocation()
-
-        // Initialize Hands-Free
-        handsFree.initialize()
-        handsFree.onUserSaid = { text -> sendMessage(text) }
-        handsFree.onError = { error -> _uiState.update { it.copy(error = error) } }
-
-        // Initialize on-device ML engine
-        viewModelScope.launch {
-            val initialized = smartRoutingManager.initialize()
-            if (initialized) {
-                android.util.Log.i("NexaVM", "On-device ML engine initialized — hybrid mode available")
-                _uiState.update { it.copy(onDeviceReady = true) }
-            }
-        }
-
-        // Initialize notification channels
-        com.nexa.ai.notification.NexaNotificationManager.createChannels(context)
-
-        // ── Auto-greeting on app launch ──
-        // Waits for location + session to be ready, then sends a personalized greeting
-        triggerAutoGreeting()
+        // Initialize ML & AI Enhancement subsystems
+        initializeEnhancementSystems()
+        // Initialize Smart Router for online/offline AI
+        initializeSmartRouter()
     }
 
-    // Track if greeting has been sent this session to avoid duplicates
-    private var hasGreetedThisSession = false
+    // ═══════════════════════════════════════
+    //  ML & AI ENHANCEMENT INITIALIZATION
+    // ═══════════════════════════════════════
 
-    /**
-     * Sends an automatic personalized greeting when the app opens.
-     * Uses: time of day, user name (from memory), and city (from GPS).
-     * Only triggers once per app launch.
-     */
-    private fun triggerAutoGreeting() {
-        if (hasGreetedThisSession) return
+    private fun initializeEnhancementSystems() {
+        // Start sensor monitoring
+        try { sensorManager.startListening() } catch (_: Exception) {}
+
+        // Initialize IoT demo devices
         viewModelScope.launch {
-            // Wait a bit for location and state to be ready
-            kotlinx.coroutines.delay(2000)
-
-            if (hasGreetedThisSession) return@launch
-            hasGreetedThisSession = true
-
-            val profile = memoryManager.getUserProfile()
-            val loc = _uiState.value.locationData
-            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-            val lang = _uiState.value.language
-
-            // Build time-of-day greeting
-            val timeGreeting = when {
-                hour in 5..11 -> if (lang == AppLanguage.SPANISH) "Buenos días" else "Good morning"
-                hour in 12..17 -> if (lang == AppLanguage.SPANISH) "Buenas tardes" else "Good afternoon"
-                hour in 18..21 -> if (lang == AppLanguage.SPANISH) "Buenas noches" else "Good evening"
-                else -> if (lang == AppLanguage.SPANISH) "Hola" else "Hello"
-            }
-
-            // Build name part
-            val namePart = if (profile.name.isNotBlank()) {
-                if (lang == AppLanguage.SPANISH) ", ${profile.name}" else ", ${profile.name}"
-            } else ""
-
-            // Build location part
-            val locationPart = if (loc.isAvailable && loc.city.isNotBlank()) {
-                if (lang == AppLanguage.SPANISH) ". Estás en ${loc.city}" else ". You are in ${loc.city}"
-            } else ""
-
-            val greeting = if (lang == AppLanguage.SPANISH) {
-                "$timeGreeting$namePart$locationPart. ¿En qué te puedo ayudar?"
-            } else {
-                "$timeGreeting$namePart$locationPart. How can I help you?"
-            }
-
-            // Add greeting as an assistant message (not as a user→AI round trip)
-            val greetingMsg = Message(id = "greeting-${System.currentTimeMillis()}", role = "assistant", content = greeting)
-            updateActiveSession { s ->
-                s.copy(messages = s.messages + greetingMsg, updatedAt = System.currentTimeMillis())
-            }
-
-            // Speak the greeting if auto-speak is on
-            if (_uiState.value.autoSpeak) {
-                kotlinx.coroutines.delay(500)
-                speak(greeting, greetingMsg.id)
-            }
-
-            // Update user interaction count in memory
-            memoryManager.updateProfile { it.copy(lastInteraction = System.currentTimeMillis()) }
+            try { iotManager.initDemoDevices() } catch (_: Exception) {}
         }
+
+        // Voice enhancer: wake word detection
+        voiceEnhancer.onWakeWordDetected = {
+            if (_uiState.value.voiceMode) {
+                android.util.Log.d("NexaVM", "Wake word detected!")
+                // Already in voice mode, just acknowledge
+            } else {
+                // Activate voice mode on wake word
+                _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
+                startSpeechService()
+            }
+        }
+
+        // Voice enhancer: IoT voice command detection
+        voiceEnhancer.onIoTVoiceCommand = { commandText ->
+            viewModelScope.launch {
+                try {
+                    val result = iotManager.processVoiceCommand(commandText)
+                    speak(result)
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Voice enhancer: language detection
+        voiceEnhancer.onLanguageDetected = { language, confidence ->
+            if (confidence > 0.7f) {
+                val detectedLang = when (language) {
+                    "en" -> AppLanguage.ENGLISH
+                    "es" -> AppLanguage.SPANISH
+                    else -> null
+                }
+                if (detectedLang != null && detectedLang != _uiState.value.language) {
+                    android.util.Log.d("NexaVM", "Auto-detected language: $language ($confidence)")
+                    // Don't auto-switch, just log for now — user may be bilingual
+                }
+            }
+        }
+
+        // Sensor manager: context changes
+        sensorManager.onContextChanged = { oldContext, newContext ->
+            android.util.Log.d("NexaVM", "Context changed: $oldContext → $newContext")
+        }
+
+        // Sensor manager: activity changes
+        sensorManager.onActivityChanged = { activity ->
+            android.util.Log.d("NexaVM", "Activity detected: $activity")
+            // Adapt voice settings based on activity
+            when (activity) {
+                "driving" -> {
+                    speechManager.setVolumeBoost(true)
+                    speechManager.setSpeechRate(0.9f)
+                }
+                "still" -> {
+                    speechManager.setSpeechRate(1.0f)
+                }
+                "running", "walking" -> {
+                    speechManager.setVolumeBoost(true)
+                    speechManager.setSpeechRate(1.1f)
+                }
+            }
+        }
+
+        // Sensor manager: battery low
+        sensorManager.onBatteryLow = {
+            // Reduce background activity when battery is low
+            voiceEnhancer.stopWakeWordDetection()
+            android.util.Log.d("NexaVM", "Battery low — reducing background activity")
+        }
+    }
+
+    // ═══════════════════════════════════════
+    //  SMART ROUTER INITIALIZATION
+    // ═══════════════════════════════════════
+
+    private fun initializeSmartRouter() {
+        viewModelScope.launch {
+            try {
+                smartRouter.initialize()
+                val caps = smartRouter.getDeviceCapabilities()
+                _uiState.update {
+                    it.copy(
+                        npuAvailable = caps.hasNPU,
+                        hasDownloadedModels = caps.loadedModel != null,
+                        inferenceMode = InferenceMode.HYBRID.name,
+                    )
+                }
+                android.util.Log.d("NexaVM", "Smart Router initialized — NPU: ${caps.hasNPU}, Model: ${caps.loadedModel}")
+            } catch (e: Exception) {
+                android.util.Log.w("NexaVM", "Smart Router init failed: ${e.message}")
+            }
+        }
+    }
+
+    /** Switch inference mode (called from Settings UI). */
+    fun setInferenceMode(mode: InferenceMode) {
+        smartRouter.setMode(SmartRoutingManager.InferenceMode.valueOf(mode.name))
+        _uiState.update { it.copy(inferenceMode = mode.name) }
+    }
+
+    /** Get device AI capabilities for settings display. */
+    fun getDeviceCapabilities(): OnDeviceInferenceManager.DeviceCapabilities {
+        return smartRouter.getDeviceCapabilities()
+    }
+
+    /** Get the on-device inference manager for model downloads. */
+    fun getOnDeviceManager(): OnDeviceInferenceManager {
+        return smartRouter.getOnDeviceManager()
     }
 
     // ═══════════════════════════════════════
     //  INITIALIZATION
     // ═══════════════════════════════════════
 
-    private fun observeNetwork() {
-        viewModelScope.launch {
-            networkMonitor.isOnline.collect { isOnline ->
-                _uiState.update { it.copy(isOnline = isOnline) }
-                // Update SmartRoutingManager with network status
-                smartRoutingManager.updateNetworkStatus(isOnline)
-                if (!isOnline) {
-                    _uiState.update { it.copy(error = NexaStrings.get("no_internet", _uiState.value.language)) }
-                }
-            }
-        }
-    }
-
-    private fun observeOfflineState() {
-        viewModelScope.launch {
-            offlineManager.pendingCount.collect { count ->
-                _uiState.update { it.copy(pendingMessageCount = count) }
-            }
-        }
-        viewModelScope.launch {
-            offlineManager.isOnline.collect { online ->
-                if (online) {
-                    // Network restored — flush pending messages
-                    val pending = offlineManager.flushPendingMessages()
-                    for ((sessionId, content) in pending) {
-                        if (sessionId == _uiState.value.activeSessionId) {
-                            sendMessage(content)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private fun setupSpeechCallbacks() {
         speechManager.onListeningStateChanged = { isListening ->
             _uiState.update { it.copy(isListening = isListening) }
-            if (isListening) voiceRetryCount = 0 // ¡Reiniciamos el contador si empieza a escuchar bien!
+            if (isListening) voiceRetryCount = 0 // Reset the counter if it starts listening properly!
         }
         
         speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
@@ -350,10 +493,12 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                     // Start actual speech recognition if not already listening
                     if (!_uiState.value.isListening && !_uiState.value.isThinking) {
                         viewModelScope.launch {
-                            // ═══ v5.3 SEAMLESS TRANSITION IMPROVEMENT ═══
-                            // Reduced from 450ms to 150ms. 
-                            // Using a much shorter gap to make it feel like "one" session.
-                            kotlinx.coroutines.delay(150)
+                            // ═══ v5.1 BUG 3 FIX ═══
+                            // Increased from 300ms to 700ms — on Samsung/Xiaomi/OPPO
+                            // devices the audio system needs more time to switch from
+                            // TTS output to mic input. 300ms caused SpeechRecognizer
+                            // errors and restart loops.
+                            kotlinx.coroutines.delay(700)
                             if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                                 !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                                 speechManager.startListening()
@@ -373,7 +518,10 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                 _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
                 // Start actual speech recognition now
                 viewModelScope.launch {
-                    kotlinx.coroutines.delay(80)
+                    // ═══ v5.1 FIX ═══
+                    // Increased from 80ms to 200ms — gives audio system
+                    // more time to stabilize after stopping TTS output
+                    kotlinx.coroutines.delay(200)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening) {
                         speechManager.startListening()
                     }
@@ -429,12 +577,12 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                 voiceRetryCount++
 
                 if (voiceRetryCount >= maxVoiceRetries) {
-                    // Si falla muchas veces, apagamos modo voz para no volver loco al usuario
+                    // If it fails too many times, turn off voice mode to avoid annoying the user
                     _uiState.update { it.copy(voiceMode = false) }
                     speechManager.stopListening()
                     stopVoiceMode()
                 } else {
-                    // Reintento normal con backoff exponencial
+                    // Normal retry with exponential backoff
                     val delayMs = (2000L * (1 + voiceRetryCount / 3)).coerceAtMost(5000L)
                     viewModelScope.launch {
                         kotlinx.coroutines.delay(delayMs)
@@ -457,10 +605,10 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    // ═══ v5.3 FAST RE-ARM ═══
-                    // Reduced from 2000ms to 400ms for near-instant re-listening
-                    // if the user stops talking and the recognizer times out.
-                    kotlinx.coroutines.delay(400)
+                    // ═══ v5.1 BUG 3 FIX ═══
+                    // Increased back to 2000ms — 1500ms was too aggressive
+                    // and caused rapid restart loops on some devices
+                    kotlinx.coroutines.delay(2000)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
@@ -501,11 +649,20 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
             val savedLanguage = settingsStore.language.first()
             val savedVoice = settingsStore.voiceType.first()
             val savedAccent = settingsStore.accentColor.first()
+            val savedGroqKey = settingsStore.groqApiKey.first()
+            val savedUseLocalLLM = settingsStore.useLocalLLM.first()
+            val savedAllowSync = settingsStore.allowSync.first()
+            val savedMaxTokens = settingsStore.maxTokens.first()
+            
             _uiState.value = _uiState.value.copy(
                 themeMode = savedTheme,
                 language = savedLanguage,
                 voiceType = savedVoice,
-                accentColor = savedAccent
+                accentColor = savedAccent,
+                groqApiKey = savedGroqKey,
+                useLocalLLM = savedUseLocalLLM,
+                allowSync = savedAllowSync,
+                maxTokens = savedMaxTokens
             )
             speechManager.setLanguage(savedLanguage)
             speechManager.setVoiceType(savedVoice)
@@ -579,6 +736,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
 
     fun openUpdatePage() {
         val info = _uiState.value.updateInfo ?: return
+        val context = getApplication<Application>()
         _uiState.value = _uiState.value.copy(showUpdateDialog = false)
         updateChecker.downloadAndInstall(context, info.downloadUrl, info.versionName)
     }
@@ -799,7 +957,11 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
             activeSessionId = newActive
         )
 
-        persistSessions()
+        if (updated.isEmpty()) {
+            createNewSession()
+        } else {
+            persistSessions()
+        }
     }
 
     private fun updateActiveSession(transform: (ChatSession) -> ChatSession) {
@@ -828,7 +990,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         if (now - lastSendTimestamp < sendCooldownMs) return
         lastSendTimestamp = now
 
-        // Callar la IA y apagar micrófono antes de enviar
+        // Mute the AI and turn off the microphone before sending
         if (_uiState.value.voiceMode) {
             speechManager.stopListening()
             speechManager.stopSpeaking()
@@ -867,7 +1029,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
             }
             if (cmd.contains("cambiar a español") || cmd.contains("switch to spanish") || cmd.contains("habla español") || cmd.contains("speak spanish")) {
                 setLanguage(AppLanguage.SPANISH)
-                speak("Idioma cambiado a español")
+                speak(if (lang == AppLanguage.SPANISH) "Idioma cambiado a español" else "Language switched to Spanish")
                 return
             }
             // New voice command: change voice
@@ -985,6 +1147,35 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                 sendMessage(webPrompt)
                 return
             }
+            // Voice command: generate video
+            if (cmd.contains("crear video") || cmd.contains("create video") || cmd.contains("genera video") ||
+                cmd.contains("generate video") || cmd.contains("haz un video") || cmd.contains("make a video") ||
+                cmd.contains("animar") || cmd.contains("animate") || cmd.contains("video de")) {
+                val videoPrompt = cmd
+                    .replace(Regex("(crear|genera|haz|create|generate|make|animate|animar)\\s+(un |a )?(video|animacion|animation)"), "")
+                    .replace(Regex("(de |of |about )"), "")
+                    .trim()
+                val style = when {
+                    cmd.contains("anime") -> com.nexa.ai.media.VideoGenerator.VideoStyles.ANIME
+                    cmd.contains("cinemat") -> com.nexa.ai.media.VideoGenerator.VideoStyles.CINEMATIC
+                    cmd.contains("realist") -> com.nexa.ai.media.VideoGenerator.VideoStyles.REALISTIC
+                    cmd.contains("abstract") -> com.nexa.ai.media.VideoGenerator.VideoStyles.ABSTRACT
+                    cmd.contains("vintage") || cmd.contains("retro") -> com.nexa.ai.media.VideoGenerator.VideoStyles.VINTAGE
+                    cmd.contains("ciencia ficcion") || cmd.contains("sci-fi") || cmd.contains("futurist") -> com.nexa.ai.media.VideoGenerator.VideoStyles.SCI_FI
+                    cmd.contains("naturaleza") || cmd.contains("nature") -> com.nexa.ai.media.VideoGenerator.VideoStyles.NATURE
+                    else -> com.nexa.ai.media.VideoGenerator.VideoStyles.CINEMATIC
+                }
+                val prompt = if (videoPrompt.isNotBlank()) videoPrompt else
+                    if (lang == AppLanguage.SPANISH) "Un video creativo e impresionante" else "A creative and impressive video"
+                videoGenerator.generateVideo(
+                    com.nexa.ai.media.VideoGenerator.VideoRequest(
+                        prompt = prompt,
+                        style = style
+                    )
+                )
+                speak(if (lang == AppLanguage.SPANISH) "Generando video: $prompt" else "Generating video: $prompt")
+                return
+            }
             // Voice command: share last response
             if (cmd.contains("compartir") || cmd.contains("share") || cmd.contains("enviar")) {
                 val lastMsg = _uiState.value.messages.lastOrNull { it.role == "assistant" }
@@ -1014,130 +1205,36 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                 sendMessage(codePrompt)
                 return
             }
-            // Voice command: remember this / store fact
-            if (cmd.contains("recuerda") || cmd.contains("recordar") || cmd.contains("remember this") || cmd.contains("memoriza")) {
-                val fact = cmd
-                    .replace(Regex("(recuerda|recordar|remember this|memoriza|que)\\s+"), "")
-                    .trim()
-                if (fact.isNotBlank()) {
-                    memoryManager.storeFact(fact)
-                    memoryManager.storeMemory(com.nexa.ai.memory.EpisodicMemoryManager.MemoryEntry(
-                        content = fact,
-                        category = com.nexa.ai.memory.EpisodicMemoryManager.MemoryCategory.GENERAL,
-                        importance = 0.8f
-                    ))
-                    speak(if (lang == AppLanguage.SPANISH) "Lo recordaré: $fact" else "I'll remember that: $fact")
-                } else {
-                    speak(if (lang == AppLanguage.SPANISH) "¿Qué quieres que recuerde?" else "What should I remember?")
-                }
-                return
-            }
-            // Voice command: what do you know about me
-            if (cmd.contains("qué sabes de mí") || cmd.contains("what do you know about me") || cmd.contains("quién soy")) {
-                val profile = memoryManager.getUserProfile()
-                val memories = memoryManager.getMemories().take(5)
-                val response = buildString {
-                    if (profile.name.isNotBlank()) append("Te llamas ${profile.name}. ")
-                    if (profile.occupation.isNotBlank()) append("Eres ${profile.occupation}. ")
-                    if (profile.location.isNotBlank()) append("Vives en ${profile.location}. ")
-                    if (memories.isNotEmpty()) {
-                        append("Recuerdo: ")
-                        memories.forEach { append("${it.content}. ") }
-                    }
-                    if (isEmpty()) append(if (lang == AppLanguage.SPANISH) "Aún no tengo mucha información sobre ti. ¡Cuéntame más!" else "I don't have much info about you yet. Tell me more!")
-                }
-                speak(response)
-                return
-            }
-            // Voice command: open app
-            if (cmd.contains("abre") || cmd.contains("open") || cmd.contains("abrir")) {
-                val appName = cmd
-                    .replace(Regex("(abre|open|abrir)\\s+"), "")
-                    .trim()
-                if (appName.isNotBlank()) {
-                    val opened = appLauncher.openApp(appName)
-                    speak(if (lang == AppLanguage.SPANISH) {
-                        if (opened) "Abriendo $appName" else "No encontré la aplicación $appName"
-                    } else {
-                        if (opened) "Opening $appName" else "Couldn't find app $appName"
-                    })
-                }
-                return
-            }
-            // Voice command: set alarm
-            if (cmd.contains("alarma") || cmd.contains("alarm")) {
-                val timeRegex = Regex("(\\d{1,2}):(\\d{2})")
-                val match = timeRegex.find(cmd)
-                if (match != null) {
-                    val hour = match.groupValues[1].toInt()
-                    val minute = match.groupValues[2].toInt()
-                    appLauncher.setAlarm(hour, minute)
-                    speak(if (lang == AppLanguage.SPANISH) "Alarma configurada a las $hour:$minute" else "Alarm set for $hour:$minute")
-                } else {
-                    // Try extracting just a number
-                    val numRegex = Regex("(\\d{1,2})")
-                    val numMatch = numRegex.find(cmd.replace(Regex("(alarma|alarm)"), ""))
-                    if (numMatch != null) {
-                        val hour = numMatch.groupValues[1].toInt()
-                        appLauncher.setAlarm(hour, 0)
-                        speak(if (lang == AppLanguage.SPANISH) "Alarma configurada a las $hour" else "Alarm set for $hour")
-                    } else {
-                        speak(if (lang == AppLanguage.SPANISH) "¿A qué hora quieres la alarma?" else "What time for the alarm?")
+            // Voice command: IoT / Smart Home control
+            if (iotManager.isIoTCommand(cmd)) {
+                viewModelScope.launch {
+                    try {
+                        val result = iotManager.processVoiceCommand(cmd)
+                        speak(result)
+                    } catch (e: Exception) {
+                        speak(if (lang == AppLanguage.SPANISH) "Error al procesar comando de casa inteligente" else "Error processing smart home command")
                     }
                 }
                 return
             }
-            // Voice command: call
-            if (cmd.contains("llama a") || cmd.contains("llamar a") || cmd.contains("call")) {
-                val contact = cmd
-                    .replace(Regex("(llama a|llamar a|call)\\s+"), "")
-                    .trim()
-                if (contact.isNotBlank()) {
-                    // Try to extract a phone number, otherwise open dialer
-                    val phoneRegex = Regex("\\+?\\d[\\d\\s-]{6,}")
-                    val phoneMatch = phoneRegex.find(contact)
-                    if (phoneMatch != null) {
-                        appLauncher.makeCall(phoneMatch.value)
-                    } else {
-                        // Open dialer with name (user will select contact)
-                        appLauncher.makeCall("")
+            // Voice command: Good morning / Good night routines
+            if (cmd.contains("buenos días") || cmd.contains("good morning") || cmd.contains("buenas noches") || cmd.contains("good night")) {
+                val routineId = when {
+                    cmd.contains("buenos días") || cmd.contains("good morning") -> "routine_good_morning"
+                    cmd.contains("buenas noches") || cmd.contains("good night") -> "routine_good_night"
+                    else -> null
+                }
+                if (routineId != null) {
+                    viewModelScope.launch {
+                        try {
+                            val result = iotManager.executeRoutine(routineId)
+                            speak(result)
+                        } catch (e: Exception) {
+                            speak(if (lang == AppLanguage.SPANISH) "No pude ejecutar la rutina" else "Could not execute the routine")
+                        }
                     }
-                    speak(if (lang == AppLanguage.SPANISH) "Llamando a $contact" else "Calling $contact")
+                    return
                 }
-                return
-            }
-            // Voice command: remind me / reminder
-            if (cmd.contains("recuérdame") || cmd.contains("recuerdame") || cmd.contains("remind me") || cmd.contains("recordatorio")) {
-                val reminderText = cmd
-                    .replace(Regex("(recuérdame|recuerdame|remind me|recordatorio)\\s+"), "")
-                    .trim()
-                    .replace(Regex("(a las|at)\\s+\\d{1,2}(:\\d{2})?"), "")
-                    .trim()
-                if (reminderText.isNotBlank()) {
-                    // Parse time - for now use a simple approach: 1 minute from now for demo
-                    val id = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
-                    val timeMillis = System.currentTimeMillis() + 60000 // 1 min from now
-                    com.nexa.ai.notification.NexaNotificationManager.createChannels(context)
-                    com.nexa.ai.notification.NexaNotificationManager.scheduleReminder(context, reminderText, timeMillis, id)
-                    speak(if (lang == AppLanguage.SPANISH) "Recordatorio guardado: $reminderText" else "Reminder saved: $reminderText")
-                }
-                return
-            }
-            // Voice command: timer
-            if (cmd.contains("temporizador") || cmd.contains("timer") || cmd.contains("cuenta atrás")) {
-                val minuteRegex = Regex("(\\d+)\\s*(minutos?|minutes?|mins?)")
-                val minMatch = minuteRegex.find(cmd)
-                val secondsRegex = Regex("(\\d+)\\s*(segundos?|seconds?|secs?)")
-                val secMatch = secondsRegex.find(cmd)
-                val totalSeconds = (minMatch?.groupValues?.get(1)?.toIntOrNull()?.times(60) ?: 0) +
-                                   (secMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0)
-                if (totalSeconds > 0) {
-                    appLauncher.setTimer(totalSeconds)
-                    speak(if (lang == AppLanguage.SPANISH) "Temporizador de $totalSeconds segundos" else "Timer set for $totalSeconds seconds")
-                } else {
-                    speak(if (lang == AppLanguage.SPANISH) "¿Cuánto tiempo para el temporizador?" else "How long for the timer?")
-                }
-                return
             }
         }
 
@@ -1151,22 +1248,12 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         val userMsg = Message(role = "user", content = fullContent, attachmentName = attachmentName)
         val assistantId = "a-${System.currentTimeMillis()}"
 
-        var session = _uiState.value.activeSession
-        if (session == null) {
-            val newSession = ChatSession()
-            val updatedSessions = listOf(newSession) + _uiState.value.sessions
-            _uiState.value = _uiState.value.copy(
-                sessions = updatedSessions,
-                activeSessionId = newSession.id
-            )
-            session = newSession
-        }
-
-        val isFirstMessage = session.messages.isEmpty()
+        val session = _uiState.value.activeSession
+        val isFirstMessage = session?.messages?.isEmpty() == true
         val title = if (isFirstMessage) {
             content.take(30) + if (content.length > 30) "..." else ""
         } else {
-            session.title.ifEmpty { NexaStrings.get("new_chat", _uiState.value.language) }
+            session?.title ?: NexaStrings.get("new_chat", _uiState.value.language)
         }
 
         updateActiveSession { s ->
@@ -1179,104 +1266,127 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
 
         _uiState.value = _uiState.value.copy(inputText = "", isThinking = true, error = null, pendingAttachment = null)
 
-        // Offline-first: If no network, queue the message
-        if (!networkMonitor.isOnline.value) {
-            val sessionId = _uiState.value.activeSessionId ?: ""
-            viewModelScope.launch {
-                val queued = offlineManager.enqueueIfOffline(sessionId, content)
-                if (queued) {
-                    // Add a system message indicating offline queue
-                    updateActiveSession { s ->
-                        s.copy(
-                            messages = s.messages + Message(
-                                id = "offline-${System.currentTimeMillis()}",
-                                role = "assistant",
-                                content = if (_uiState.value.language == AppLanguage.SPANISH)
-                                    "Sin conexión a internet. Tu mensaje se enviará cuando vuelva la conexión."
-                                else
-                                    "No internet connection. Your message will be sent when connectivity is restored."
-                            ),
-                            updatedAt = System.currentTimeMillis()
-                        )
-                    }
-                    _uiState.value = _uiState.value.copy(isThinking = false)
-                    return@launch
-                }
-            }
-        }
-
-        // Extract and store episodic memories from user message
-        viewModelScope.launch(Dispatchers.IO) {
-            val extractedMemories = memoryManager.extractMemoriesFromMessage("user", content, _uiState.value.activeSessionId ?: "")
-            if (extractedMemories.isNotEmpty()) {
-                android.util.Log.d("NexaVM", "Extracted ${extractedMemories.size} memories from user message")
-                // Update user profile name in UI state if detected
-                val profile = memoryManager.getUserProfile()
-                if (profile.name.isNotBlank() && profile.name != _uiState.value.userProfileName) {
-                    _uiState.update { it.copy(userProfileName = profile.name) }
-                }
-            }
-        }
-
-        fetchAiResponse(assistantId)
-    }
-
-    private fun fetchAiResponse(assistantId: String) {
         viewModelScope.launch {
             try {
-                // v5.2: Refresh location before sending to ensure accurate GPS data
-                refreshLocationIfNeeded()
-
-                // ── Smart routing: check if we should use on-device inference ──
-                val content = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
-                val routingDecision = smartRoutingManager.shouldUseOnDevice(
-                    query = content,
-                    hasImage = _uiState.value.pendingAttachment != null
-                )
-                android.util.Log.d("NexaVM", "Routing decision: useOnDevice=${routingDecision.useOnDevice}, reason=${routingDecision.reason}")
-
-                if (routingDecision.useOnDevice && smartRoutingManager.getOnDeviceManager().isReady) {
-                    // Try on-device inference first
-                    val onDeviceResult = smartRoutingManager.generateOnDevice(
-                        prompt = content,
-                        systemPrompt = buildSystemPrompt()
-                    )
-                    if (onDeviceResult != null) {
-                        // Use on-device result
-                        updateActiveSession { s ->
-                            s.copy(
-                                messages = s.messages + Message(id = assistantId, role = "assistant", content = onDeviceResult),
-                                updatedAt = System.currentTimeMillis()
-                            )
-                        }
-                        _uiState.value = _uiState.value.copy(isThinking = false)
-                        if (_uiState.value.autoSpeak && onDeviceResult.isNotBlank()) {
-                            speak(onDeviceResult, assistantId)
-                        }
-                        return@launch
-                    }
-                    // Fall through to cloud inference if on-device failed
-                }
-
                 val allMessages = _uiState.value.messages.map { ChatMessage(it.role, it.content) }
                 var fullResponse = ""
 
-                // Send GPS location data to the API server so it can use
-                // real GPS coordinates instead of IP-based geolocation (which
-                // returns the CDN server location, not the user's location)
-                val loc = _uiState.value.locationData
-                val lat = if (loc.isAvailable) loc.latitude else null
-                val lon = if (loc.isAvailable) loc.longitude else null
-                val userCity = if (loc.isAvailable && loc.city.isNotBlank()) loc.city else null
-                val userCountry = if (loc.isAvailable && loc.country.isNotBlank()) loc.country else null
+                // ─── Check if user is requesting an image generation ───
+                val imageKeywords = listOf(
+                    "genera una imagen", "genera imagen", "crear imagen", "crea imagen",
+                    "crea una imagen", "generate image", "create image", "draw me",
+                    "haz una imagen", "haz imagen", "make an image",
+                    "genera un logo", "crear logo", "crea logo", "create logo",
+                    "dibuja", "draw", "dibujar", "genera una foto", "crear una foto",
+                    "genera foto", "crea foto", "make a picture", "create a picture",
+                    "imagen de", "imagen de un", "imagen de una", "picture of", "image of"
+                )
+                val lowerContent = content.lowercase()
+                val isImageRequest = imageKeywords.any { lowerContent.contains(it) }
 
-                repository.sendMessage(allMessages, BuildConfig.API_BASE_URL,
+                if (isImageRequest) {
+                    android.util.Log.d("NexaVM", "Image generation request detected")
+                    // Extract just the description, remove trigger keywords
+                    val imagePrompt = content
+                        .replace(Regex("(?i)(genera|crea|haz|create|make|draw|dibujar)\\s+(una |an |a )?(imagen|image|logo|dibujo|drawing|picture|foto|photo)\\s*(de |of )?"), "")
+                        .replace(Regex("(?i)(imagen|image|picture)\\s+(de |of )+"), "")
+                        .trim()
+                    val finalPrompt = if (imagePrompt.isNotBlank()) imagePrompt else "creative artistic image"
+                    val imageUrl = repository.generateImageFree(finalPrompt)
+                    val lang = _uiState.value.language
+                    val imageResponse = if (lang == AppLanguage.SPANISH) {
+                        "¡Aquí tienes tu imagen!\n\n![Imagen generada](${imageUrl})"
+                    } else {
+                        "Here's your image!\n\n![Generated image](${imageUrl})"
+                    }
+                    fullResponse = imageResponse
+                    updateActiveSession { s ->
+                        s.copy(
+                            messages = s.messages + Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = false),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(isThinking = false, currentProvider = "pollinations-image")
+
+                    if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                        speak(if (lang == AppLanguage.SPANISH) "He generado tu imagen." else "I've generated your image.", assistantId)
+                    }
+                    return@launch
+                }
+
+                // ─── LOCAL GGUF LLM OFFLINE ROUTING ───
+                val useLocalLLM = _uiState.value.useLocalLLM || !_uiState.value.isOnline
+                if (useLocalLLM) {
+                    android.util.Log.d("NexaVM", "Routing to LOCAL GGUF LLM (Offline-first)")
+                    val localResult = localLLMManager.generateText(content, _uiState.value.maxTokens)
+                    fullResponse = localResult
+                    updateActiveSession { s ->
+                        s.copy(
+                            messages = s.messages + Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = false),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(isThinking = false, currentProvider = "local-gguf")
+
+                    if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                        speak(fullResponse, assistantId)
+                    }
+                    return@launch
+                }
+
+                // ─── Smart Router: Decide online vs on-device ───
+                val routingDecision = smartRouter.shouldUseOnDevice(content)
+                _uiState.update { it.copy(isOnDeviceActive = routingDecision.useOnDevice, routingReason = routingDecision.reason) }
+
+                if (routingDecision.useOnDevice) {
+                    // ─── ON-DEVICE INFERENCE ───
+                    android.util.Log.d("NexaVM", "Routing to ON-DEVICE: ${routingDecision.reason}")
+                    val onDeviceResult = smartRouter.getOnDeviceManager().generateText(
+                        prompt = content,
+                        systemPrompt = advancedSystemPrompt,
+                        maxTokens = 1024,
+                    )
+
+                    if (onDeviceResult != null) {
+                        fullResponse = onDeviceResult
+                        updateActiveSession { s ->
+                            s.copy(
+                                messages = s.messages + Message(id = assistantId, role = "assistant", content = fullResponse, isStreaming = false),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        }
+                        _uiState.value = _uiState.value.copy(isThinking = false, currentProvider = "on-device")
+
+                        if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                            speak(fullResponse, assistantId)
+                        }
+                        return@launch
+                    } else {
+                        // On-device failed, fallback to online
+                        android.util.Log.w("NexaVM", "On-device inference failed, falling back to cloud")
+                        _uiState.update { it.copy(isOnDeviceActive = false, routingReason = "Fallback a Cloud (on-device falló)") }
+                    }
+                }
+
+                // ─── ONLINE INFERENCE ───
+                android.util.Log.d("NexaVM", "Routing to ONLINE: ${routingDecision.reason}")
+                val groqKey = _uiState.value.groqApiKey
+                val loc = _uiState.value.locationData
+                val baseUrl = BuildConfig.API_BASE_URL
+                val provider = if (groqKey.isNotBlank()) "groq" else null
+                val messageFlow = repository.sendMessage(
+                    messages = allMessages,
+                    baseUrl = baseUrl,
+                    provider = provider,
                     language = _uiState.value.language.code,
-                    systemPrompt = buildSystemPrompt(),
-                    latitude = lat,
-                    longitude = lon,
-                    city = userCity,
-                    country = userCountry).collect { event ->
+                    systemPrompt = advancedSystemPrompt,
+                    latitude = loc.latitude,
+                    longitude = loc.longitude,
+                    city = loc.city,
+                    country = loc.country
+                )
+
+                messageFlow.collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
                             fullResponse += event.text
@@ -1324,20 +1434,64 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                             }
                             _uiState.value = _uiState.value.copy(isThinking = false)
 
-                            // Cache the response for offline access
-                            val sessionId = _uiState.value.activeSessionId ?: ""
-                            if (sessionId.isNotBlank() && fullResponse.isNotBlank()) {
-                                val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
+                            // ML Learning: learn from this interaction
+                            if (fullResponse.isNotBlank()) {
                                 viewModelScope.launch {
-                                    offlineManager.cacheResponse(sessionId, lastUserMsg, fullResponse, _uiState.value.currentProvider ?: "")
+                                    try {
+                                        // ─── NEW: Store and extract episodic memories ───
+                                        try {
+                                            val sessionId = _uiState.value.activeSessionId ?: ""
+                                            episodicMemoryManager.extractMemoriesFromMessage(
+                                                role = "user",
+                                                content = content,
+                                                sessionId = sessionId
+                                            )
+                                        } catch (_: Exception) {}
+
+                                        val voiceEmotion = voiceEnhancer.voiceState.value.voiceEmotion
+                                        mlEngine.learnFromInteraction(
+                                            userMessage = content,
+                                            aiResponse = fullResponse,
+                                            emotionDetected = voiceEmotion
+                                        )
+                                        // Update conversation context
+                                        conversationEngine.updateContext(
+                                            userMessage = content,
+                                            aiResponse = fullResponse,
+                                            emotion = voiceEmotion
+                                        )
+
+                                        // ─── NEW: Store episodic memory ───
+                                        try {
+                                            val sessionId = _uiState.value.activeSessionId ?: ""
+                                            val emotionProfile = enhancedEmotionAnalyzer.analyzeEmotion(content)
+                                            episodicMemoryManager.storeMemory(
+                                                sessionId = sessionId,
+                                                type = com.nexa.ai.memory.MemoryType.CONTEXT,
+                                                content = "User: $content\nAI: ${fullResponse.take(200)}",
+                                                summary = "${content.take(80)} → ${fullResponse.take(80)}",
+                                                importance = if (emotionProfile.confidence > 0.3f) 0.7f else 0.4f,
+                                                emotion = emotionProfile.primaryEmotion.name.lowercase()
+                                            )
+                                        } catch (_: Exception) {}
+
+                                        // ─── NEW: Update user profile ───
+                                        try {
+                                            userProfileManager.recordInteraction(
+                                                message = content,
+                                                topic = extractTopic(content),
+                                                isVoiceMode = _uiState.value.voiceMode
+                                            )
+                                        } catch (_: Exception) {}
+                                    } catch (_: Exception) {}
                                 }
                             }
 
                             if (_uiState.value.autoSpeak && fullResponse.isNotBlank()) {
-                                // v5.2: Reduced "breathing" delay from 500ms to 250ms for snappier replies
+                                // Add a tiny "breathing" delay before speaking in voice mode
                                 if (_uiState.value.voiceMode) {
                                     viewModelScope.launch {
-                                        kotlinx.coroutines.delay(250)
+                                        kotlinx.coroutines.delay(500)
                                         speak(fullResponse, assistantId)
                                     }
                                 } else {
@@ -1356,23 +1510,6 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         }
     }
 
-    fun regenerateResponse() {
-        val session = _uiState.value.activeSession ?: return
-        val messages = session.messages.toMutableList()
-        if (messages.isEmpty()) return
-
-        // Remove last assistant message if it exists
-        if (messages.last().role == "assistant") {
-            messages.removeAt(messages.size - 1)
-        }
-
-        updateActiveSession { it.copy(messages = messages) }
-
-        val assistantId = "a-${System.currentTimeMillis()}"
-        _uiState.value = _uiState.value.copy(isThinking = true, error = null)
-        fetchAiResponse(assistantId)
-    }
-
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
@@ -1388,59 +1525,15 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
-            // v5.2: Pause NexaHandsFreeAllInOne to prevent TTS/STT conflict
-            handsFree.pause()
-            speechManager.startVoiceAudioSession()
-            speechManager.startListening()
+            startSpeechService()
         } else {
-            speechManager.stopBargeInMonitor()
-            speechManager.stopListening()
-            speechManager.stopSpeaking()
-            speechManager.stopVoiceAudioSession()
-            // v5.2: Resume NexaHandsFreeAllInOne
-            handsFree.resume()
+            stopSpeechService()
         }
     }
 
     fun stopVoiceMode() {
         _uiState.value = _uiState.value.copy(voiceMode = false)
-        speechManager.stopBargeInMonitor()
-        speechManager.stopListening()
-        speechManager.stopSpeaking()
-        speechManager.stopVoiceAudioSession()
-    }
-
-    /** Alterna el modo manos libres */
-    fun toggleHandsFree() {
-        val activating = !_uiState.value.handsFreeEnabled
-        _uiState.update { it.copy(handsFreeEnabled = activating) }
-
-        if (activating) {
-            // AL ACTIVAR: Iniciar sesión de audio completa para manos libres
-            _uiState.update { it.copy(voiceMode = true, autoSpeak = true) }
-            // v5.2: Pause NexaHandsFreeAllInOne to prevent TTS/STT conflict
-            handsFree.pause()
-            // CRITICAL FIX: startVoiceAudioSession() must be called to configure:
-            // - Audio focus, MODE_NORMAL, speaker routing, Bluetooth SCO, proximity sensor
-            // Without this, hands-free audio goes to earpiece with low volume
-            speechManager.startVoiceAudioSession()
-            speechManager.startListening()
-            val lang = _uiState.value.language
-            speak(if (lang == AppLanguage.SPANISH) "Modo manos libres activado" else "Hands-free mode activated")
-        } else {
-            // AL DESACTIVAR: Detener todo y liberar recursos de audio
-            speechManager.stopBargeInMonitor()
-            speechManager.stopSpeaking()
-            speechManager.stopListening()
-            // CRITICAL FIX: stopVoiceAudioSession() must be called to release:
-            // - Audio focus, speaker routing, Bluetooth SCO, proximity sensor
-            speechManager.stopVoiceAudioSession()
-            _uiState.update { it.copy(voiceMode = false) }
-            // v5.2: Resume NexaHandsFreeAllInOne
-            handsFree.resume()
-            val lang = _uiState.value.language
-            speak(if (lang == AppLanguage.SPANISH) "Modo manos libres desactivado" else "Hands-free mode deactivated")
-        }
+        stopSpeechService()
     }
 
     fun interruptVoice() {
@@ -1471,32 +1564,11 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
                 _uiState.update { it.copy(locationData = location, isLocating = false) }
                 if (location.isAvailable) {
                     android.util.Log.d("NexaVM", "Location obtained: ${location.city}, ${location.country} (${location.latitude}, ${location.longitude})")
-                } else {
-                    android.util.Log.w("NexaVM", "Location not available after request")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NexaVM", "Location error: ${e.message}", e)
                 _uiState.update { it.copy(isLocating = false) }
             }
-        }
-    }
-
-    /**
-     * v5.2: Refresh location before sending a message to ensure
-     * the AI always has the most current user position.
-     * Called automatically before each AI request in fetchAiResponse.
-     */
-    private suspend fun refreshLocationIfNeeded() {
-        if (!locationStore.hasLocationPermission()) return
-        try {
-            val location = locationStore.getCurrentLocation()
-            if (location.isAvailable) {
-                _uiState.update { it.copy(locationData = location) }
-                android.util.Log.d("NexaVM", "Location refreshed: ${location.city}, ${location.country}")
-            }
-        } catch (e: Exception) {
-            // Don't block message sending if location refresh fails
-            android.util.Log.w("NexaVM", "Location refresh failed (non-blocking): ${e.message}")
         }
     }
 
@@ -1537,115 +1609,81 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         _uiState.update { it.copy(requestCameraCapture = false) }
     }
 
-    private val visionClient = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
-        .build()
-
-    private val visionGson = Gson()
-
-    fun sendVisionRequest(base64Image: String, mimeType: String = "image/jpeg") {
+    fun sendVisionRequest(base64Image: String) {
         val lang = _uiState.value.language
-        val prompt = if (lang == AppLanguage.SPANISH)
-            "Analiza esta imagen y describe lo que ves en detalle. Incluye objetos, personas, texto, colores, escena y cualquier información relevante. Responde en español de forma clara y concisa."
+        val question = if (lang == AppLanguage.SPANISH)
+            "Analiza esta imagen y describe lo que ves en detalle. Incluye objetos, personas, texto, colores, escena y cualquier información relevante."
         else
-            "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information. Respond clearly and concisely."
+            "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information."
 
         _uiState.update { it.copy(cameraImageUri = null) }
 
-        val assistantId = "a-${System.currentTimeMillis()}"
+        // Create user message with vision indicator
         val userMsg = Message(
             role = "user",
-            content = "[📷 Imagen adjunta]"
+            content = if (lang == AppLanguage.SPANISH) "[Imagen analizada]" else "[Image analyzed]",
         )
+        val assistantId = "a-${System.currentTimeMillis()}"
 
         updateActiveSession { s ->
-            s.copy(messages = s.messages + userMsg, updatedAt = System.currentTimeMillis())
+            s.copy(
+                messages = s.messages + userMsg,
+                updatedAt = System.currentTimeMillis()
+            )
         }
 
-        _uiState.update { it.copy(isThinking = true, error = null) }
+        _uiState.value = _uiState.value.copy(isThinking = true, error = null)
 
         viewModelScope.launch {
             try {
-                val responseText = withContext(Dispatchers.IO) {
-                    performVisionRequest(BuildConfig.API_BASE_URL, base64Image, prompt, mimeType)
+                var result = ""
+
+                // Smart routing: try on-device first if offline, otherwise use cloud
+                val smartRouter = SmartRoutingManager(getApplication())
+                val visionDecision = smartRouter.routeVision()
+
+                if (visionDecision.useOnDevice) {
+                    // On-device vision via Nexa SDK
+                    val onDevice = smartRouter.getOnDeviceManager()
+                    result = onDevice.analyzeImage(base64Image, question)
+                        ?: visionDecision.fallbackMessage
+                        ?: "No se pudo analizar la imagen offline."
+                } else {
+                    // Cloud vision via /api/vision (GLM-4.6V)
+                    val visionRepo = com.nexa.ai.data.repository.VisionRepository()
+                    val baseUrl = BuildConfig.API_BASE_URL
+                    val response = visionRepo.analyzeImage(
+                        baseUrl = baseUrl,
+                        image = base64Image,
+                        mimeType = "image/jpeg",
+                        question = question,
+                    )
+                    result = response.response
+                    _uiState.update { it.copy(currentProvider = "vision:${response.provider}") }
                 }
 
-                if (responseText != null) {
+                if (result.isNotBlank()) {
+                    val assistantMsg = Message(id = assistantId, role = "assistant", content = result)
                     updateActiveSession { s ->
-                        s.copy(
-                            messages = s.messages + Message(
-                                id = assistantId,
-                                role = "assistant",
-                                content = responseText
-                            ),
-                            updatedAt = System.currentTimeMillis()
-                        )
+                        s.copy(messages = s.messages + assistantMsg, updatedAt = System.currentTimeMillis())
                     }
 
-                    if (_uiState.value.autoSpeak && responseText.isNotBlank()) {
-                        speak(responseText, assistantId)
+                    if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                        speak(result, assistantId)
                     }
                 } else {
-                    _uiState.update {
-                        it.copy(
-                            error = NexaStrings.get("connection_error", lang),
-                            isThinking = false
-                        )
-                    }
-                    return@launch
+                    _uiState.update { it.copy(error = if (lang == AppLanguage.SPANISH) "No se pudo analizar la imagen" else "Could not analyze image") }
                 }
             } catch (e: Exception) {
-                Log.e("NexaVM", "Vision request failed: ${e.message}", e)
+                android.util.Log.e("NexaVM", "Vision error: ${e.message}")
                 _uiState.update {
                     it.copy(
-                        error = "${NexaStrings.get("connection_error", lang)}: ${e.localizedMessage ?: NexaStrings.get("unknown", lang)}",
+                        error = if (lang == AppLanguage.SPANISH) "Error al analizar imagen: ${e.message}" else "Vision error: ${e.message}",
                         isThinking = false
                     )
                 }
             } finally {
                 _uiState.update { it.copy(isThinking = false) }
-            }
-        }
-    }
-
-    private fun performVisionRequest(baseUrl: String, base64Image: String, question: String, mimeType: String = "image/jpeg"): String? {
-        val jsonBody = JsonObject().apply {
-            addProperty("image", base64Image)
-            addProperty("mimeType", mimeType)
-            addProperty("question", question)
-        }
-
-        val request = Request.Builder()
-            .url("$baseUrl/api/vision")
-            .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-
-        visionClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                Log.e("NexaVM", "Vision API error: ${response.code} - ${response.body?.string()}")
-                return null
-            }
-
-            val responseBody = response.body?.string() ?: return null
-            return try {
-                val json = visionGson.fromJson(responseBody, JsonObject::class.java)
-                if (json.has("response")) {
-                    json.get("response").asString
-                } else if (json.has("description")) {
-                    json.get("description").asString
-                } else if (json.has("text")) {
-                    json.get("text").asString
-                } else if (json.has("content")) {
-                    json.get("content").asString
-                } else {
-                    // Fallback: return the raw response
-                    json.toString()
-                }
-            } catch (e: Exception) {
-                Log.e("NexaVM", "Failed to parse vision response: ${e.message}")
-                responseBody
             }
         }
     }
@@ -1719,6 +1757,51 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
         viewModelScope.launch { settingsStore.setAccentColor(color.value.toLong()) }
     }
 
+    fun setGroqApiKey(key: String) {
+        _uiState.update { it.copy(groqApiKey = key.trim()) }
+        viewModelScope.launch { settingsStore.setGroqApiKey(key.trim()) }
+    }
+
+    fun toggleLocalLLM(enabled: Boolean) {
+        _uiState.update { it.copy(useLocalLLM = enabled) }
+        viewModelScope.launch { settingsStore.setUseLocalLLM(enabled) }
+    }
+
+    fun toggleSync(enabled: Boolean) {
+        _uiState.update { it.copy(allowSync = enabled) }
+        viewModelScope.launch { settingsStore.setAllowSync(enabled) }
+    }
+
+    fun setMaxTokens(tokens: Int) {
+        _uiState.update { it.copy(maxTokens = tokens) }
+        viewModelScope.launch { settingsStore.setMaxTokens(tokens) }
+    }
+
+    fun downloadModel() {
+        _uiState.update { it.copy(isDownloadingModel = true, modelDownloadProgress = 0f) }
+        viewModelScope.launch {
+            // Simulated animated model download in background
+            for (i in 1..10) {
+                kotlinx.coroutines.delay(200)
+                _uiState.update { it.copy(modelDownloadProgress = i * 0.1f) }
+            }
+            // Actually call loading now that weights are present in assets
+            val loadSuccess = localLLMManager.loadModelFromAssets()
+            _uiState.update { 
+                it.copy(
+                    isDownloadingModel = false, 
+                    modelDownloadProgress = 1.0f,
+                    error = if (!loadSuccess) "No se pudo cargar el modelo offline GGUF" else null
+                )
+            }
+        }
+    }
+
+    fun deleteGroqApiKey() {
+        _uiState.update { it.copy(groqApiKey = "") }
+        viewModelScope.launch { settingsStore.deleteGroqApiKey() }
+    }
+
     fun previewVoice() {
         val lang = _uiState.value.language
         val text = if (lang == AppLanguage.SPANISH) "Hola, esta es una vista previa de mi voz." else "Hello, this is a preview of my voice."
@@ -1726,6 +1809,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
     }
 
     fun exportSettings() {
+        val context = getApplication<Application>()
         viewModelScope.launch {
             try {
                 val settings = mapOf(
@@ -1749,6 +1833,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
     }
 
     fun importSettings() {
+        val context = getApplication<Application>()
         viewModelScope.launch {
             try {
                 val file = java.io.File(context.getExternalFilesDir(null), "nexa_settings_backup.json")
@@ -1780,6 +1865,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
     }
 
     fun copyToClipboard(text: String) {
+        val context = getApplication<Application>()
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("NEXA PRO", text)
         clipboard.setPrimaryClip(clip)
@@ -1787,6 +1873,7 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
     }
 
     fun shareText(text: String) {
+        val context = getApplication<Application>()
         val intent = android.content.Intent().apply {
             action = android.content.Intent.ACTION_SEND
             putExtra(android.content.Intent.EXTRA_TEXT, text)
@@ -1800,6 +1887,8 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
     }
 
     fun exportToPdf(message: Message) {
+        val context = getApplication<Application>()
+
         try {
             val content = message.content.trim()
             if (content.isEmpty()) {
@@ -1912,15 +2001,89 @@ ALWAYS: be concise, be accurate, be helpful, remember the user, speak naturally
 
         } catch (e: Exception) {
             android.util.Log.e("NEXA", "PDF Error: ${e.message}", e)
-            android.widget.Toast.makeText(context, "Error al generar PDF: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+            val lang = _uiState.value.language
+            val errorMsg = if (lang == AppLanguage.SPANISH) "Error al generar PDF: ${e.localizedMessage}" else "Error generating PDF: ${e.localizedMessage}"
+            android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onCleared() {
         super.onCleared()
+        try {
+            application.unregisterReceiver(speechReceiver)
+        } catch (_: Exception) {}
+        stopSpeechService()
         speechManager.destroy()
-        handsFree.release()
-        offlineManager.destroy()
-        smartRoutingManager.shutdown()
+        voiceEnhancer.shutdown()
+        sensorManager.stopListening()
+        webSearchManager.clearCache()
+    }
+
+    // ═══════════════════════════════════════
+    //  NEW: WEB SEARCH INTEGRATION
+    // ═══════════════════════════════════════
+
+    /**
+     * Perform a web search and return processed results.
+     * Called automatically when the AI needs real-time information.
+     */
+    suspend fun performWebSearch(query: String): com.nexa.ai.web.ProcessedResult {
+        return webResultProcessor.searchAndProcess(
+            query = query,
+            language = _uiState.value.language.code
+        )
+    }
+
+    /**
+     * Search the web for current news on a topic.
+     */
+    suspend fun searchNews(query: String): List<com.nexa.ai.web.NewsResult> {
+        return webSearchManager.searchNews(query)
+    }
+
+    /**
+     * Fact-check a claim using web search.
+     */
+    suspend fun factCheck(claim: String): Triple<Float, String, List<com.nexa.ai.web.SearchResult>> {
+        return webSearchManager.factCheck(claim)
+    }
+
+    // ═══════════════════════════════════════
+    //  NEW: MEMORY & PROFILE HELPERS
+    // ═══════════════════════════════════════
+
+    /** Enable episodic memory (requires user consent). */
+    fun enableMemory() {
+        episodicMemoryManager.setConsent(true)
+    }
+
+    /** Disable episodic memory. */
+    fun disableMemory() {
+        episodicMemoryManager.setConsent(false)
+    }
+
+    /** Check if memory is enabled. */
+    fun isMemoryEnabled(): Boolean = episodicMemoryManager.hasConsent()
+
+    /** Get memory statistics. */
+    fun getMemoryStats(): com.nexa.ai.memory.MemoryStats = episodicMemoryManager.getStats()
+
+    /** Clear all episodic memories. */
+    fun clearAllMemories() {
+        episodicMemoryManager.clearAllMemories()
+    }
+
+    /** Extract a simple topic from a user message for profiling. */
+    private fun extractTopic(message: String): String {
+        val keywords = message.lowercase()
+            .split(Regex("\\W+"))
+            .filter { it.length > 4 }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(3)
+            .map { it.key }
+        return keywords.joinToString(" ")
     }
 }

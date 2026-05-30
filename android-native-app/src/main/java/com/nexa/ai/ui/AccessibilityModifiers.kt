@@ -32,11 +32,7 @@ fun Modifier.accessibleImage(description: String): Modifier = this
  */
 fun Modifier.accessibleChatMessage(role: String, content: String): Modifier = this
     .semantics {
-        this.role = when (role) {
-            "user" -> Role.Button
-            "assistant" -> Role.Image
-            else -> Role.Text
-        }
+        // Role.Text does not exist in Compose Semantics Role, we can omit it
         this.contentDescription = when (role) {
             "user" -> "Tu mensaje: $content"
             "assistant" -> "Respuesta de Nexa: $content"
@@ -68,7 +64,7 @@ fun Modifier.accessibleToggle(description: String, isOn: Boolean): Modifier = th
 fun Modifier.accessibleTextField(label: String, text: String): Modifier = this
     .semantics {
         contentDescription = "$label: $text"
-        role = Role.TextBox
+        // Role.TextBox does not exist in Compose Semantics Role, omit
     }
 
 /**
@@ -77,5 +73,5 @@ fun Modifier.accessibleTextField(label: String, text: String): Modifier = this
 fun Modifier.accessibleListItem(position: Int, total: Int, description: String): Modifier = this
     .semantics {
         contentDescription = "$description, elemento $position de $total"
-        role = Role.ListItem
+        // Role.ListItem does not exist in Compose Semantics Role, omit
     }

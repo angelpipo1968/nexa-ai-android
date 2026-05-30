@@ -81,6 +81,14 @@ class SmartRoutingManager @Inject constructor(
         }
     }
 
+    /**
+     * Manually override the routing mode.
+     */
+    fun setMode(mode: InferenceMode) {
+        _currentMode.value = mode
+        Log.i(TAG, "Manual override — switching to $mode mode")
+    }
+
     // ─── Routing Decision ────────────────────────
 
     /**
@@ -168,6 +176,13 @@ class SmartRoutingManager @Inject constructor(
                 confidence = 0.7f,
             )
         }
+    }
+
+    /**
+     * Determine if a vision task should run on-device or on cloud.
+     */
+    fun routeVision(): RoutingDecision {
+        return shouldUseOnDevice("", hasImage = true)
     }
 
     // ─── Query Analysis ──────────────────────────
