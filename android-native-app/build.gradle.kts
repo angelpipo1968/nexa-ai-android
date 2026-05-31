@@ -8,28 +8,34 @@ plugins {
 
 android {
     namespace = "com.nexa.ai"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexa.ai"
         minSdk = 31
-        targetSdk = 35
-        versionCode = 44
-        versionName = "4.4"
-
+        targetSdk = 36
+        versionCode = 52
+        versionName = "5.2"
         buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
+        
+        // Enable multidex for Android < 14 compatibility
+        multiDexEnabled = true
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1+"
+    signingConfigs {
+        create("release") {
+            storeFile = file("../android/nexa-release.keystore")
+            storePassword = "NexaAI2024!Release"
+            keyAlias = "nexa"
+            keyPassword = "NexaAI2024!Release"
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         create("field") {
@@ -40,12 +46,11 @@ android {
         }
     }
 
+    // DISABLE ABI SPLITS — single universal APK
+    // splits.abi is disabled to prevent 14+ .dex files packaging bug on Android 16
     splits {
         abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a")
-            isUniversalApk = false
+            isEnable = false
         }
     }
 
@@ -68,23 +73,31 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
         jniLibs {
-            useLegacyPackaging = true
+            useLegacyPackaging = false  // FIX: useLegacyPackaging=true causes OOM on Android 16
         }
+    }
+    
+    // FIX: Limit dex files to prevent Android 16 packaging error
+    dexOptions {
+        preDexLibraries = false
+        maxProcessCount = 4
     }
 }
 
 dependencies {
     // Core
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-ktx:1.16.0")  // Updated for API 36
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+    // Multidex for large method count
+    implementation("androidx.multidex:multidex:2.0.1")
 
-    // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    // Compose — updated BOM for API 36
+    implementation(platform("androidx.compose:compose-bom:2025.04.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -108,16 +121,16 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // CameraX
-    implementation("androidx.camera:camera-core:1.3.2")
-    implementation("androidx.camera:camera-camera2:1.3.2")
-    implementation("androidx.camera:camera-lifecycle:1.3.2")
-    implementation("androidx.camera:camera-view:1.3.2")
+    // CameraX — updated for API 36
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
 
     // Encrypted SharedPreferences
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // ExoPlayer (para reproducir videos generados)
+    // ExoPlayer (video)
     implementation("androidx.media3:media3-exoplayer:1.3.0")
     implementation("androidx.media3:media3-ui:1.3.0")
 
@@ -133,24 +146,19 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito:mockito-core:5.11.0")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-
-    // Qualcomm Nexa SDK — On-device AI inference (Snapdragon NPU)
-    implementation("ai.nexa:core:0.0.24")
-
-    // ML Kit — On-device AI basics (language detection, translation)
-    implementation("com.google.mlkit:language-id:17.0.0")
-    implementation("com.google.mlkit:translate:17.0.3")
-
     // Hilt
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-android-compiler:2.51.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("com.google.accompanist:accompanist-permissions:0.36.0")
 
-    // Android Car App Library (Android Auto & Automotive)
+    // Android Auto
     implementation("androidx.car.app:app:1.4.0")
+
+    // Nexa SDK
+    implementation("ai.nexa:core:0.0.24")
+
+    // ML Kit
+    implementation("com.google.mlkit:language-id:17.0.0")
+    implementation("com.google.mlkit:translate:17.0.3")
 }

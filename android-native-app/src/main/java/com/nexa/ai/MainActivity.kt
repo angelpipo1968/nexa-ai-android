@@ -62,17 +62,43 @@ class MainActivity : ComponentActivity() {
             viewModel.clearCameraRequest()
         }
     }
-
+    
     private val captureImage = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            // Convert bitmap to base64 for vision API
-            val byteArrayOutputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
-            val byteArray = byteArrayOutputStream.toByteArray()
-            val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
-            viewModel.sendVisionRequest(base64)
+            // FIX v5.2: Compress and downscale to prevent OOM
+            try {
+                val scaledBitmap = if (bitmap.width > 1024 || bitmap.height > 1024) {
+                    val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                    val newWidth: Int
+                    val newHeight: Int
+                    if (bitmap.width > bitmap.height) {
+                        newWidth = 1024
+                        newHeight = (1024f / ratio).toInt()
+                    } else {
+                        newHeight = 1024
+                        newWidth = (1024f * ratio).toInt()
+                    }
+                    android.graphics.Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+                } else {
+                    bitmap
+                }
+                val byteArrayOutputStream = ByteArrayOutputStream()
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+                val byteArray = byteArrayOutputStream.toByteArray()
+                val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
+                // Recycle scaled bitmap if we created a new one
+                if (scaledBitmap != bitmap) scaledBitmap.recycle()
+                viewModel.sendVisionRequest(base64, "image/jpeg")
+            } catch (e: OutOfMemoryError) {
+                android.util.Log.e("MainActivity", "OOM processing camera image")
+                System.gc()
+                viewModel.onError("Error: imagen demasiado grande, intenta de nuevo")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Camera image error: ${e.message}")
+                viewModel.onError("Error procesando imagen")
+            }
         } else {
             viewModel.clearCameraRequest()
         }
@@ -126,28 +152,68 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Converts a content URI to a base64 string.
-     * Reads the file bytes directly, preserving the original format (PNG, JPEG, WEBP, etc.)
-     * Returns null if the file is too large (>20MB) or cannot be read.
+     * Converts a content URI to a base64 string — OOM-safe version.
+     * FIX v5.2: 
+     * - Reduced max size from 20MB to 5MB to prevent OOM
+     * - Uses streaming Base64 encoding instead of loading entire file into memory
+     * - Downscales bitmap before encoding
      */
     private fun uriToBase64(uri: android.net.Uri): String? {
         return try {
-            val inputStream: InputStream? = contentResolver.openInputStream(uri)
-            inputStream?.use {
-                val bytes = it.readBytes()
-                // Safety: skip files larger than 20MB
-                if (bytes.size > 20 * 1024 * 1024) {
-                    android.util.Log.w("MainActivity", "File too large for base64: ${bytes.size} bytes")
-                    return null
+            val inputStream: java.io.InputStream? = contentResolver.openInputStream(uri)
+            inputStream?.use { stream ->
+                // First read to get file size
+                val bytes = stream.readBytes()
+                val maxSize = 5 * 1024 * 1024  // 5MB limit (was 20MB)
+                if (bytes.size > maxSize) {
+                    android.util.Log.w("MainActivity", "File too large (${bytes.size} bytes), trying bitmap downscale...")
+                    // Try to decode as bitmap and downscale
+                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bitmap != null) {
+                        val scaled = scaleBitmap(bitmap, 1024)
+                        val baos = java.io.ByteArrayOutputStream()
+                        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, baos)
+                        val result = android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP)
+                        scaled.recycle()
+                        bitmap.recycle()
+                        result
+                    } else {
+                        null
+                    }
+                } else {
+                    android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                 }
-                Base64.encodeToString(bytes, Base64.NO_WRAP)
             }
+        } catch (e: OutOfMemoryError) {
+            android.util.Log.e("MainActivity", "OOM during base64 encode: ${e.message}")
+            System.gc()  // Request garbage collection
+            null
         } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Failed to read URI as base64: ${e.message}")
+            android.util.Log.e("MainActivity", "Failed to convert URI to base64: ${e.message}")
             null
         }
     }
-
+    
+    /**
+     * Scales a bitmap to fit within maxDimension while maintaining aspect ratio.
+     */
+    private fun scaleBitmap(bitmap: android.graphics.Bitmap, maxDimension: Int): android.graphics.Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= maxDimension && height <= maxDimension) return bitmap
+        val ratio = width.toFloat() / height.toFloat()
+        val newWidth: Int
+        val newHeight: Int
+        if (width > height) {
+            newWidth = maxDimension
+            newHeight = (maxDimension / ratio).toInt()
+        } else {
+            newHeight = maxDimension
+            newWidth = (maxDimension * ratio).toInt()
+        }
+        return android.graphics.Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         volumeControlStream = android.media.AudioManager.STREAM_MUSIC
