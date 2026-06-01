@@ -77,11 +77,7 @@ android {
         }
     }
     
-    // FIX: Limit dex files to prevent Android 16 packaging error
-    dexOptions {
-        preDexLibraries = false
-        maxProcessCount = 4
-    }
+    // dexOptions removed — obsolete since AGP 8.0+; the build system handles DEX optimization automatically
 }
 
 dependencies {
