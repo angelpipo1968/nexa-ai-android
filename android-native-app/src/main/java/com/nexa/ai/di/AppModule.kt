@@ -7,8 +7,15 @@ import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.SessionStore
+import com.nexa.ai.iot.IoTManager
+import com.nexa.ai.media.VideoGenerator
+import com.nexa.ai.memory.EpisodicMemoryManager
+import com.nexa.ai.ml.OnDeviceMLEngine
+import com.nexa.ai.sensors.NexaSensorManager
 import com.nexa.ai.viewmodel.AuthManager
+import com.nexa.ai.voice.NaturalConversationEngine
 import com.nexa.ai.voice.SpeechManager
+import com.nexa.ai.voice.VoiceEnhancer
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -71,4 +78,55 @@ object AppModule {
     fun provideOnDeviceInferenceManager(
         @ApplicationContext context: Context
     ): com.nexa.ai.ml.OnDeviceInferenceManager = com.nexa.ai.ml.OnDeviceInferenceManager(context)
+
+    // ─── Voice subsystem providers ───────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideVoiceEnhancer(application: Application): VoiceEnhancer = VoiceEnhancer(application)
+
+    @Provides
+    @Singleton
+    fun provideNaturalConversationEngine(application: Application): NaturalConversationEngine =
+        NaturalConversationEngine(application)
+
+    // ─── IoT provider ────────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideIoTManager(application: Application): IoTManager = IoTManager(application)
+
+    // ─── Media provider ──────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideVideoGenerator(application: Application): VideoGenerator = VideoGenerator(application)
+
+    // ─── ML provider ─────────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideOnDeviceMLEngine(application: Application): OnDeviceMLEngine = OnDeviceMLEngine(application)
+
+    // ─── Memory provider ─────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideEpisodicMemoryManager(@ApplicationContext context: Context): EpisodicMemoryManager =
+        EpisodicMemoryManager(context)
+
+    // ─── Sensor provider ─────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideNexaSensorManager(application: Application): NexaSensorManager = NexaSensorManager(application)
+
+    // Note: The following classes are already Hilt-injectable via @Inject constructor
+    // and do NOT need @Provides methods:
+    // - VoiceUseCase (@Singleton @Inject constructor)
+    // - ChatUseCase (@Singleton @Inject constructor)
+    // - LocalLLMManager (@Singleton @Inject constructor)
+    // - NexaRepository (@Singleton @Inject constructor)
+    // - ContextProvider (@Singleton @Inject constructor)
+    // - ResponseSanitizer (@Singleton @Inject constructor)
 }

@@ -109,9 +109,10 @@ export const NEXA_CODE_PROMPT = `Eres NEXA, experto programador. Cuando te pidan
 
 Lenguajes que dominas: JavaScript/TypeScript, Python, React, Next.js, HTML/CSS, Node.js, SQL, Go, Rust, y más.`;
 
+// @internal — not imported externally
 export const NEXA_REASONING_PREFIX = `Voy a pensar paso a paso sobre esto...
 
-Razonamiento:`;;
+Razonamiento:`;
 
 export function getSystemPrompt(mode: 'default' | 'vision' | 'code' = 'default'): string {
     switch (mode) {

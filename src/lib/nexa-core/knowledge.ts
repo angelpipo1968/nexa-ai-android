@@ -20,6 +20,7 @@ export async function searchWikipedia(query: string): Promise<string> {
 }
 
 // 2. DICCIONARIO
+// @internal — not imported externally
 export async function getDictionaryDefinition(word: string): Promise<string> {
     try {
         const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`; // Nota: Esta API es mayormente en inglés
@@ -56,6 +57,7 @@ Moneda: ${(Object.values(c.currencies || {})[0] as any)?.name || 'N/A'}`;
 }
 
 // 4. VOCABULARIO MODERNO (Urban Dictionary)
+// @internal — not imported externally
 export async function searchSlang(word: string): Promise<string> {
     try {
         const url = `https://api.urbandictionary.com/v0/define?term=${encodeURIComponent(word)}`;

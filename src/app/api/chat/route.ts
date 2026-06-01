@@ -367,7 +367,7 @@ export async function POST(req: NextRequest) {
 
     // --- Rate Limiting ---
     const identifier = getIdentifier(req);
-    const rateLimitResult = checkRateLimit(identifier, RATE_LIMITS.chat);
+    const rateLimitResult = await checkRateLimit(identifier, RATE_LIMITS.chat);
     if (!rateLimitResult.allowed) {
         return NextResponse.json(
             { error: 'Demasiadas solicitudes. Intentá de nuevo en unos segundos.', retryAfterMs: rateLimitResult.retryAfterMs },

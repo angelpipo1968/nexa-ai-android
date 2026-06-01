@@ -170,7 +170,7 @@ textarea::placeholder, input::placeholder { color: #3a3a60; }
     }
     .nexa-msg-bubble {
         max-width: 80% !important;
-        padding: '16px 22px' !important;
+        padding: 16px 22px !important;
     }
 }
 

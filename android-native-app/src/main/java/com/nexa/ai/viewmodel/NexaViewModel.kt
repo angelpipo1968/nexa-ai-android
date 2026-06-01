@@ -94,30 +94,39 @@ class NexaViewModel @Inject constructor(
     private val voiceCommandsHandler = VoiceCommandsHandler(iotManager, videoGenerator)
 
     // BroadcastReceiver for Persistent background speech recognition service
+    // FIX: Only update UI state from broadcasts — do NOT re-invoke SpeechManager callbacks.
+    // SpeechManager handles its own callbacks directly. Re-invoking them from broadcasts
+    // caused double processing (broadcast -> callback -> same logic again).
     private val speechReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
             if (intent == null) return
             when (intent.action) {
                 NexaSpeechService.ACTION_SPEECH_RESULT -> {
+                    // Only update UI — SpeechManager.onSpeechResult handles the actual logic
                     val text = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
-                    speechManager.onSpeechResult?.invoke(text)
+                    _uiState.update { it.copy(inputText = text) }
                 }
                 NexaSpeechService.ACTION_SPEECH_PARTIAL -> {
+                    // Only update UI partial text display
                     val partialText = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
-                    speechManager.onSpeechPartial?.invoke(partialText)
+                    _uiState.update { it.copy(inputText = partialText) }
                 }
                 NexaSpeechService.ACTION_SPEECH_STATE -> {
+                    // Only update UI state flags — do NOT call SpeechManager callbacks
                     val state = intent.getStringExtra(NexaSpeechService.EXTRA_STATE) ?: return
                     when (state) {
-                        "listening" -> speechManager.onListeningStateChanged?.invoke(true)
-                        "idle" -> speechManager.onListeningStateChanged?.invoke(false)
-                        "speaking" -> speechManager.onSpeakingStateChanged?.invoke(true, _uiState.value.speakingMessageId)
-                        "barge_in" -> speechManager.onBargeInDetected?.invoke()
+                        "listening" -> _uiState.update { it.copy(isListening = true) }
+                        "idle" -> _uiState.update { it.copy(isListening = false) }
+                        "speaking" -> _uiState.update { it.copy(isSpeaking = true) }
+                        "barge_in" -> {
+                            _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
+                        }
                     }
                 }
                 NexaSpeechService.ACTION_SPEECH_ERROR -> {
                     val errorKey = intent.getStringExtra(NexaSpeechService.EXTRA_ERROR_KEY) ?: return
-                    speechManager.onError?.invoke(errorKey)
+                    val lang = _uiState.value.language
+                    _uiState.update { it.copy(error = NexaStrings.get(errorKey, lang)) }
                 }
             }
         }
@@ -186,6 +195,12 @@ class NexaViewModel @Inject constructor(
             val q = _uiState.value.messages.lastOrNull { it.role == "user" }?.content ?: ""
             val m = episodicMemoryManager.buildMemoryContext(q)
             if (m.isNotBlank()) parts.add("MEM: $m")
+        } catch (_: Exception) {}
+
+        // 3. Voice conversation context (topic, mood, phase)
+        try {
+            val voiceCtx = voiceUseCase.getConversationContext()
+            if (voiceCtx.isNotBlank()) parts.add(voiceCtx)
         } catch (_: Exception) {}
 
         // NOTE: IoT, Video, Emotion, Profile contexts disabled to save memory
@@ -287,6 +302,13 @@ class NexaViewModel @Inject constructor(
                         if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
                             speak(last.ai, assistantMsg.id)
                         }
+
+                        // ✅ UPDATE CONVERSATION CONTEXT: Track topic, mood, and turn after AI response
+                        voiceUseCase.updateConversationAfterResponse(
+                            userMessage = chatState.messages.lastOrNull()?.user ?: "",
+                            aiResponse = last.ai,
+                            emotion = voiceEnhancer.voiceState.value.voiceEmotion
+                        )
                     }
                 }
             }
@@ -942,6 +964,84 @@ class NexaViewModel @Inject constructor(
             speechManager.stopSpeaking()
         }
 
+        // ✅ Voice command handler: try to handle commands before AI processing
+        if (_uiState.value.voiceMode) {
+            val commandResult = voiceCommandsHandler.tryHandleCommand(
+                context = getApplication(),
+                cmd = content,
+                lang = _uiState.value.language,
+                messages = _uiState.value.messages,
+                onClearChat = { clearChat() },
+                onExportPdf = { /* Export handled by UI */ },
+                onStopVoiceMode = { stopVoiceMode() },
+                onSetLanguage = { setLanguage(it) },
+                onSetVoiceType = { setVoiceType(it) },
+                onCreateSession = { createNewSession() },
+                onRepeatLast = {
+                    val lastAssistant = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                    if (lastAssistant != null) speak(lastAssistant.content)
+                },
+                onSpeakLast = {
+                    val lastAssistant = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                    if (lastAssistant != null) speak(lastAssistant.content)
+                },
+                onSpeak = { speak(it) },
+                onStopSpeaking = { speechManager.stopSpeaking() },
+                onShowHelp = { _uiState.update { it.copy(showVoiceCommandsHelp = true) } },
+                onReadLast = {
+                    val lastAssistant = _uiState.value.messages.lastOrNull { it.role == "assistant" }
+                    if (lastAssistant != null) speak(lastAssistant.content)
+                },
+                onSetThemeMode = { setThemeMode(it) },
+                onOpenSettings = { /* Settings handled by UI */ },
+                onSendMessage = { sendMessage(it) },
+                onShareLast = { /* Share handled by UI */ },
+                onCameraCapture = { /* Camera handled by UI */ },
+                onGenerateVideo = { prompt, style ->
+                    viewModelScope.launch {
+                        try { videoGenerator.generateVideo(VideoGenerator.VideoRequest(prompt = prompt, style = style)) } catch (_: Exception) {}
+                    }
+                }
+            )
+            when (commandResult) {
+                is VoiceCommandsHandler.VoiceCommandResult.Handled -> {
+                    if (commandResult.spokenResponse.isNotBlank()) {
+                        speak(commandResult.spokenResponse)
+                    }
+                    // Process voice input through conversation engine for context tracking
+                    voiceUseCase.processVoiceInput(content)
+                    return
+                }
+                is VoiceCommandsHandler.VoiceCommandResult.NotRecognized -> {
+                    // Not a command, proceed with normal AI processing
+                }
+            }
+
+            // Also handle async IoT commands
+            if (voiceCommandsHandler.isIoTCommand(content)) {
+                viewModelScope.launch {
+                    try {
+                        val result = iotManager.processVoiceCommand(content)
+                        speak(result)
+                    } catch (_: Exception) {}
+                }
+                voiceUseCase.processVoiceInput(content)
+                return
+            }
+
+            // Handle routines (buenos días, buenas noches)
+            voiceCommandsHandler.getRoutineId(content)?.let { routineId ->
+                viewModelScope.launch {
+                    try {
+                        val result = iotManager.executeRoutine(routineId)
+                        speak(result)
+                    } catch (_: Exception) {}
+                }
+                voiceUseCase.processVoiceInput(content)
+                return
+            }
+        }
+
         // Existing voice command parsing (clear chat, export PDF, etc.) – keep as needed
         when {
             content.equals("clear chat", ignoreCase = true) -> {
@@ -999,15 +1099,25 @@ class NexaViewModel @Inject constructor(
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud
             _uiState.value = _uiState.value.copy(autoSpeak = true)
+            // Start SpeechManager audio session for proper hands-free audio routing
+            speechManager.startVoiceAudioSession()
             startSpeechService()
+            // Start voice session tracking via VoiceUseCase
+            voiceUseCase.startVoiceSession()
         } else {
+            // Stop SpeechManager audio session and release audio routing
+            speechManager.stopVoiceAudioSession()
             stopSpeechService()
+            // Reset voice session state
+            voiceUseCase.stopVoiceSession()
         }
     }
 
     fun stopVoiceMode() {
         _uiState.value = _uiState.value.copy(voiceMode = false)
+        speechManager.stopVoiceAudioSession()
         stopSpeechService()
+        voiceUseCase.stopVoiceSession()
     }
 
     fun interruptVoice() {

@@ -56,6 +56,27 @@ interface SettingsProps {
     locale: string;
     onLocaleChange: (l: string) => void;
     activeProvider?: string;
+    // Setting values (controlled from parent)
+    stream?: boolean;
+    onStreamChange?: (v: boolean) => void;
+    sounds?: boolean;
+    onSoundsChange?: (v: boolean) => void;
+    notif?: boolean;
+    onNotifChange?: (v: boolean) => void;
+    glowEffect?: boolean;
+    onGlowEffectChange?: (v: boolean) => void;
+    particleEffect?: boolean;
+    onParticleEffectChange?: (v: boolean) => void;
+    holoEffect?: boolean;
+    onHoloEffectChange?: (v: boolean) => void;
+    fontSize?: 'sm' | 'md' | 'lg';
+    onFontSizeChange?: (v: 'sm' | 'md' | 'lg') => void;
+    animSpeed?: 'slow' | 'normal' | 'fast';
+    onAnimSpeedChange?: (v: 'slow' | 'normal' | 'fast') => void;
+    autoSend?: boolean;
+    onAutoSendChange?: (v: boolean) => void;
+    voice?: string;
+    onVoiceChange?: (v: string) => void;
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
@@ -71,7 +92,17 @@ const PROVIDER_NAMES: Record<string, string> = {
 // ═══════════════════════════════════════════
 
 export function SettingsPanel({ 
-    isOpen, onClose, theme, onThemeChange, locale, onLocaleChange, activeProvider = 'groq' 
+    isOpen, onClose, theme, onThemeChange, locale, onLocaleChange, activeProvider = 'groq',
+    stream: streamProp, onStreamChange,
+    sounds: soundsProp, onSoundsChange,
+    notif: notifProp, onNotifChange,
+    glowEffect: glowEffectProp, onGlowEffectChange,
+    particleEffect: particleEffectProp, onParticleEffectChange,
+    holoEffect: holoEffectProp, onHoloEffectChange,
+    fontSize: fontSizeProp, onFontSizeChange,
+    animSpeed: animSpeedProp, onAnimSpeedChange,
+    autoSend: autoSendProp, onAutoSendChange,
+    voice: voiceProp, onVoiceChange,
 }: SettingsProps) {
     const [page, setPage] = useState<Page>('main');
     const [user, setUser] = useState<any>(null);
@@ -82,16 +113,62 @@ export function SettingsPanel({
     const [aLoad, setALoad] = useState(false);
     const [aErr, setAErr] = useState('');
     const [aOk, setAOk] = useState('');
-    const [voice, setVoice] = useState('Katerina');
-    const [notif, setNotif] = useState(true);
-    const [autoSend, setAutoSend] = useState(true);
-    const [stream, setStream] = useState(true);
-    const [sounds, setSounds] = useState(true);
-    const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
-    const [animSpeed, setAnimSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
-    const [glowEffect, setGlowEffect] = useState(true);
-    const [particleEffect, setParticleEffect] = useState(true);
-    const [holoEffect, setHoloEffect] = useState(true);
+
+    // Local fallbacks for uncontrolled usage
+    const [localVoice, setLocalVoice] = useState('Katerina');
+    const [localNotif, setLocalNotif] = useState(true);
+    const [localAutoSend, setLocalAutoSend] = useState(true);
+    const [localStream, setLocalStream] = useState(true);
+    const [localSounds, setLocalSounds] = useState(true);
+    const [localFontSize, setLocalFontSize] = useState<'sm' | 'md' | 'lg'>('md');
+    const [localAnimSpeed, setLocalAnimSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
+    const [localGlowEffect, setLocalGlowEffect] = useState(true);
+    const [localParticleEffect, setLocalParticleEffect] = useState(true);
+    const [localHoloEffect, setLocalHoloEffect] = useState(true);
+
+    // Resolved values: use prop if provided, else local state
+    const voice = voiceProp ?? localVoice;
+    const notif = notifProp ?? localNotif;
+    const autoSend = autoSendProp ?? localAutoSend;
+    const stream = streamProp ?? localStream;
+    const sounds = soundsProp ?? localSounds;
+    const fontSize = fontSizeProp ?? localFontSize;
+    const animSpeed = animSpeedProp ?? localAnimSpeed;
+    const glowEffect = glowEffectProp ?? localGlowEffect;
+    const particleEffect = particleEffectProp ?? localParticleEffect;
+    const holoEffect = holoEffectProp ?? localHoloEffect;
+
+    // Handlers: call parent callback + persist to localStorage
+    const handleStreamChange = (v: boolean) => { setLocalStream(v); onStreamChange?.(v); localStorage.setItem('nexa_stream', String(v)); };
+    const handleSoundsChange = (v: boolean) => { setLocalSounds(v); onSoundsChange?.(v); localStorage.setItem('nexa_sounds', String(v)); };
+    const handleNotifChange = (v: boolean) => { setLocalNotif(v); onNotifChange?.(v); localStorage.setItem('nexa_notif', String(v)); };
+    const handleGlowEffectChange = (v: boolean) => { setLocalGlowEffect(v); onGlowEffectChange?.(v); localStorage.setItem('nexa_glowEffect', String(v)); };
+    const handleParticleEffectChange = (v: boolean) => { setLocalParticleEffect(v); onParticleEffectChange?.(v); localStorage.setItem('nexa_particleEffect', String(v)); };
+    const handleHoloEffectChange = (v: boolean) => { setLocalHoloEffect(v); onHoloEffectChange?.(v); localStorage.setItem('nexa_holoEffect', String(v)); };
+    const handleFontSizeChange = (v: 'sm' | 'md' | 'lg') => { setLocalFontSize(v); onFontSizeChange?.(v); localStorage.setItem('nexa_fontSize', v); };
+    const handleAnimSpeedChange = (v: 'slow' | 'normal' | 'fast') => { setLocalAnimSpeed(v); onAnimSpeedChange?.(v); localStorage.setItem('nexa_animSpeed', v); };
+    const handleAutoSendChange = (v: boolean) => { setLocalAutoSend(v); onAutoSendChange?.(v); localStorage.setItem('nexa_autosend', String(v)); };
+    const handleVoiceChange = (v: string) => { setLocalVoice(v); onVoiceChange?.(v); localStorage.setItem('nexa_voice', v); };
+
+    // Read persisted settings from localStorage on mount
+    useEffect(() => {
+        try {
+            const ls = localStorage;
+            if (ls.getItem('nexa_stream') !== null) setLocalStream(ls.getItem('nexa_stream') === 'true');
+            if (ls.getItem('nexa_sounds') !== null) setLocalSounds(ls.getItem('nexa_sounds') === 'true');
+            if (ls.getItem('nexa_notif') !== null) setLocalNotif(ls.getItem('nexa_notif') === 'true');
+            if (ls.getItem('nexa_glowEffect') !== null) setLocalGlowEffect(ls.getItem('nexa_glowEffect') === 'true');
+            if (ls.getItem('nexa_particleEffect') !== null) setLocalParticleEffect(ls.getItem('nexa_particleEffect') === 'true');
+            if (ls.getItem('nexa_holoEffect') !== null) setLocalHoloEffect(ls.getItem('nexa_holoEffect') === 'true');
+            const fs = ls.getItem('nexa_fontSize');
+            if (fs === 'sm' || fs === 'md' || fs === 'lg') setLocalFontSize(fs);
+            const as = ls.getItem('nexa_animSpeed');
+            if (as === 'slow' || as === 'normal' || as === 'fast') setLocalAnimSpeed(as);
+            if (ls.getItem('nexa_autosend') !== null) setLocalAutoSend(ls.getItem('nexa_autosend') === 'true');
+            const v = ls.getItem('nexa_voice');
+            if (v) setLocalVoice(v);
+        } catch {}
+    }, []);
 
     const sb = getSupabase();
 
@@ -409,21 +486,21 @@ export function SettingsPanel({
                                 icon={Zap} iconColor={C.accent}
                                 label="Streaming en vivo"
                                 desc="Respuestas en tiempo real"
-                                right={<Toggle value={stream} onChange={setStream} />}
+                                right={<Toggle value={stream} onChange={handleStreamChange} />}
                             />
                             <Divider />
                             <SettingRow
                                 icon={Radio} iconColor={C.yellow}
                                 label="Efectos de sonido"
                                 desc="Sonidos al enviar y recibir"
-                                right={<Toggle value={sounds} onChange={setSounds} />}
+                                right={<Toggle value={sounds} onChange={handleSoundsChange} />}
                             />
                             <Divider />
                             <SettingRow
                                 icon={Bell} iconColor={C.orange}
                                 label="Notificaciones"
                                 desc={notif ? 'Activadas' : 'Desactivadas'}
-                                right={<Toggle value={notif} onChange={setNotif} />}
+                                right={<Toggle value={notif} onChange={handleNotifChange} />}
                             />
                         </Card>
                     </div>
@@ -436,35 +513,35 @@ export function SettingsPanel({
                                 icon={Sparkles} iconColor={C.accent}
                                 label="Efecto holográfico"
                                 desc="Brillo y reflejos en la interfaz"
-                                right={<Toggle value={holoEffect} onChange={setHoloEffect} />}
+                                right={<Toggle value={holoEffect} onChange={handleHoloEffectChange} />}
                             />
                             <Divider />
                             <SettingRow
                                 icon={Waves} iconColor={C.purple}
                                 label="Efecto de partículas"
                                 desc="Partículas animadas de fondo"
-                                right={<Toggle value={particleEffect} onChange={setParticleEffect} />}
+                                right={<Toggle value={particleEffect} onChange={handleParticleEffectChange} />}
                             />
                             <Divider />
                             <SettingRow
                                 icon={Zap} iconColor={C.blue}
                                 label="Efecto de brillo"
                                 desc="Glow neón en elementos activos"
-                                right={<Toggle value={glowEffect} onChange={setGlowEffect} />}
+                                right={<Toggle value={glowEffect} onChange={handleGlowEffectChange} />}
                             />
                             <Divider />
                             <SettingRow
                                 icon={Type} iconColor={C.pink}
                                 label="Tamaño de texto"
                                 value={fontSize === 'sm' ? 'Pequeño' : fontSize === 'md' ? 'Mediano' : 'Grande'}
-                                onClick={() => setFontSize(fontSize === 'sm' ? 'md' : fontSize === 'md' ? 'lg' : 'sm')}
+                                onClick={() => handleFontSizeChange(fontSize === 'sm' ? 'md' : fontSize === 'md' ? 'lg' : 'sm')}
                             />
                             <Divider />
                             <SettingRow
                                 icon={Activity} iconColor={C.cyan}
                                 label="Velocidad de animación"
                                 value={animSpeed === 'slow' ? 'Lenta' : animSpeed === 'normal' ? 'Normal' : 'Rápida'}
-                                onClick={() => setAnimSpeed(animSpeed === 'slow' ? 'normal' : animSpeed === 'normal' ? 'fast' : 'slow')}
+                                onClick={() => handleAnimSpeedChange(animSpeed === 'slow' ? 'normal' : animSpeed === 'normal' ? 'fast' : 'slow')}
                             />
                         </Card>
                     </div>
@@ -477,7 +554,7 @@ export function SettingsPanel({
                                 icon={Send} iconColor={C.accent}
                                 label="Auto-enviar con voz"
                                 desc="Enviar al dejar de hablar"
-                                right={<Toggle value={autoSend} onChange={setAutoSend} />}
+                                right={<Toggle value={autoSend} onChange={handleAutoSendChange} />}
                             />
                         </Card>
                     </div>
@@ -520,7 +597,7 @@ export function SettingsPanel({
                             <SettingRow
                                 icon={Info} iconColor={C.blue}
                                 label="Versión"
-                                value="NEXA v3.0"
+                                value="NEXA v4.0"
                                 badge="ULTRA"
                             />
                             <Divider />
@@ -533,7 +610,7 @@ export function SettingsPanel({
                             <SettingRow
                                 icon={Cpu} iconColor={C.purple}
                                 label="Motor"
-                                value="Next.js 16 + Turbopack"
+                                value="Next.js 15 + Turbopack"
                             />
                             <Divider />
                             <SettingRow
@@ -678,7 +755,7 @@ export function SettingsPanel({
                             </div>
                             {maleVoices.map((v, i) => (
                                 <React.Fragment key={v.id}>
-                                    <button onClick={() => setVoice(v.id)} style={{
+                                    <button onClick={() => handleVoiceChange(v.id)} style={{
                                         width: '100%', display: 'flex', alignItems: 'center',
                                         gap: 12, padding: '13px 14px',
                                         background: voice === v.id ? `${v.color}10` : 'transparent',
@@ -716,7 +793,7 @@ export function SettingsPanel({
                             </div>
                             {femaleVoices.map((v, i) => (
                                 <React.Fragment key={v.id}>
-                                    <button onClick={() => setVoice(v.id)} style={{
+                                    <button onClick={() => handleVoiceChange(v.id)} style={{
                                         width: '100%', display: 'flex', alignItems: 'center',
                                         gap: 12, padding: '13px 14px',
                                         background: voice === v.id ? `${v.color}10` : 'transparent',

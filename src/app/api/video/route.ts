@@ -71,7 +71,7 @@ export async function GET() {
     const providers = getVideoProviders();
     return NextResponse.json({
         service: 'NEXA Video Generation API',
-        version: '1.0.0',
+        version: '4.0.0',
         providers,
         endpoints: {
             generate: 'POST { action: "generate", prompt, duration?, aspectRatio?, style?, provider? }',

@@ -3,6 +3,7 @@
  * Analiza, repara y optimiza código fuente.
  */
 
+// @internal — not imported externally
 export interface AuditResult {
     analysis: string;
     fixes: string;
@@ -44,6 +45,7 @@ export async function auditCode(code: string, language: string = 'auto'): Promis
     }
 }
 
+// @internal — not imported externally
 export async function translateCode(code: string, from: string, to: string): Promise<string> {
     const groqKey = process.env.GROQ_API_KEY;
     try {

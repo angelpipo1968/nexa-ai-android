@@ -1,3 +1,4 @@
+// SECURITY: API keys in localStorage are accessible to XSS attacks. Consider moving to httpOnly cookies.
 /**
  * NEXA AI — Admin API Keys Route
  * 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSystemPrompt } from '@/lib/nexa-core/prompts';
-import { createRateLimiter, getIdentifier } from '@/lib/rate-limiter';
+import { createRateLimiter, getIdentifier } from '@/lib/nexa-core/rate-limiter';
 import { codeGenSchema } from '@/lib/validation';
 
 const limiter = createRateLimiter();

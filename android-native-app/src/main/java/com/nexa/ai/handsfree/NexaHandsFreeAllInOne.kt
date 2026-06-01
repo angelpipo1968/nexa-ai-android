@@ -24,7 +24,22 @@ import javax.inject.Singleton
  * 🎙️ NEXA HANDS-FREE ALL-IN-ONE
  * Voz + Memoria + Emociones + Bilingüe en un solo archivo.
  * Inyecta con Hilt y listo.
+ *
+ * @deprecated This class is superseded by the VoiceUseCase + SpeechManager + VoiceEnhancer
+ *             architecture. It is retained only for backward compatibility. New code should
+ *             use VoiceUseCase for voice session management, SpeechManager for TTS/STT,
+ *             VoiceEnhancer for wake word/emotion/language detection, and
+ *             NaturalConversationEngine for conversation context tracking.
+ *             This class will be removed in a future release.
  */
+@Deprecated(
+    message = "Superseded by VoiceUseCase + SpeechManager + VoiceEnhancer architecture. " +
+              "Use VoiceUseCase for voice sessions, SpeechManager for TTS/STT.",
+    replaceWith = ReplaceWith(
+        "VoiceUseCase(voiceEnhancer, conversationEngine, speechManager)",
+        "com.nexa.ai.viewmodel.usecase.VoiceUseCase"
+    )
+)
 @Singleton
 class NexaHandsFreeAllInOne @Inject constructor(
     @ApplicationContext private val context: Context

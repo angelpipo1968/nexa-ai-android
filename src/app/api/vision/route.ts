@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     try {
         // Rate limiting
         const identifier = getIdentifier(req);
-        const rateLimit = checkRateLimit(identifier, RATE_LIMITS.vision);
+        const rateLimit = await checkRateLimit(identifier, RATE_LIMITS.vision);
 
         if (!rateLimit.allowed) {
             logger.warn(`Vision rate limit exceeded for ${identifier}`, 'vision', { requestId });

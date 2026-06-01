@@ -167,6 +167,17 @@ export function NexaApp() {
     const [voiceIndex, setVoiceIndex] = useState(0);
     const [lang, setLang] = useState('es');
 
+    // Settings from SettingsPanel (Persisted)
+    const [streamMode, setStreamMode] = useState(true);
+    const [soundsEnabled, setSoundsEnabled] = useState(true);
+    const [notifEnabled, setNotifEnabled] = useState(true);
+    const [glowEffect, setGlowEffect] = useState(true);
+    const [particleEffect, setParticleEffect] = useState(true);
+    const [holoEffect, setHoloEffect] = useState(true);
+    const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
+    const [animSpeed, setAnimSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
+    const [voiceName, setVoiceName] = useState('Katerina');
+
 
     // System
     const [conn, setConn] = useState<'ok' | 'err' | 'check'>('check');
@@ -307,6 +318,15 @@ export function NexaApp() {
         const savedGender = localStorage.getItem('nexa_gender');
         const savedVoiceIdx = localStorage.getItem('nexa_voice_idx');
         const savedLang = localStorage.getItem('nexa_lang');
+        const savedStream = localStorage.getItem('nexa_stream');
+        const savedSounds = localStorage.getItem('nexa_sounds');
+        const savedNotif = localStorage.getItem('nexa_notif');
+        const savedGlow = localStorage.getItem('nexa_glowEffect');
+        const savedParticle = localStorage.getItem('nexa_particleEffect');
+        const savedHolo = localStorage.getItem('nexa_holoEffect');
+        const savedFontSize = localStorage.getItem('nexa_fontSize');
+        const savedAnimSpeed = localStorage.getItem('nexa_animSpeed');
+        const savedVoiceName = localStorage.getItem('nexa_voice');
 
         if (savedPreset && THEME_PRESETS[savedPreset]) {
             setThemePreset(savedPreset);
@@ -320,6 +340,15 @@ export function NexaApp() {
         if (savedGender) setVoiceGender(savedGender as any);
         if (savedVoiceIdx) setVoiceIndex(parseInt(savedVoiceIdx));
         if (savedLang) setLang(savedLang);
+        if (savedStream !== null) setStreamMode(savedStream === 'true');
+        if (savedSounds !== null) setSoundsEnabled(savedSounds === 'true');
+        if (savedNotif !== null) setNotifEnabled(savedNotif === 'true');
+        if (savedGlow !== null) setGlowEffect(savedGlow === 'true');
+        if (savedParticle !== null) setParticleEffect(savedParticle === 'true');
+        if (savedHolo !== null) setHoloEffect(savedHolo === 'true');
+        if (savedFontSize === 'sm' || savedFontSize === 'md' || savedFontSize === 'lg') setFontSize(savedFontSize);
+        if (savedAnimSpeed === 'slow' || savedAnimSpeed === 'normal' || savedAnimSpeed === 'fast') setAnimSpeed(savedAnimSpeed);
+        if (savedVoiceName) setVoiceName(savedVoiceName);
 
         const loadVoices = () => {
             if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -342,8 +371,17 @@ export function NexaApp() {
         localStorage.setItem('nexa_gender', voiceGender);
         localStorage.setItem('nexa_voice_idx', voiceIndex.toString());
         localStorage.setItem('nexa_lang', lang);
+        localStorage.setItem('nexa_stream', streamMode.toString());
+        localStorage.setItem('nexa_sounds', soundsEnabled.toString());
+        localStorage.setItem('nexa_notif', notifEnabled.toString());
+        localStorage.setItem('nexa_glowEffect', glowEffect.toString());
+        localStorage.setItem('nexa_particleEffect', particleEffect.toString());
+        localStorage.setItem('nexa_holoEffect', holoEffect.toString());
+        localStorage.setItem('nexa_fontSize', fontSize);
+        localStorage.setItem('nexa_animSpeed', animSpeed);
+        localStorage.setItem('nexa_voice', voiceName);
         document.documentElement.style.setProperty('--nexa-accent', accent);
-    }, [accent, themePreset, themeName, autoSpeak, autoSend, voiceGender, voiceIndex, lang]);
+    }, [accent, themePreset, themeName, autoSpeak, autoSend, voiceGender, voiceIndex, lang, streamMode, soundsEnabled, notifEnabled, glowEffect, particleEffect, holoEffect, fontSize, animSpeed, voiceName]);
 
     // ═══════════════════════════════════════════
     //  SUPABASE
@@ -494,7 +532,7 @@ export function NexaApp() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     messages: [...msgs, userMsg].map(m => ({ role: m.role, content: m.content })),
-                    stream: true 
+                    stream: streamMode 
                 }),
                 signal: controller.signal,
             });
@@ -1281,6 +1319,26 @@ export function NexaApp() {
                 locale={lang} 
                 onLocaleChange={(l: any) => setLang(l)} 
                 activeProvider={activeProvider}
+                stream={streamMode}
+                onStreamChange={setStreamMode}
+                sounds={soundsEnabled}
+                onSoundsChange={setSoundsEnabled}
+                notif={notifEnabled}
+                onNotifChange={setNotifEnabled}
+                glowEffect={glowEffect}
+                onGlowEffectChange={setGlowEffect}
+                particleEffect={particleEffect}
+                onParticleEffectChange={setParticleEffect}
+                holoEffect={holoEffect}
+                onHoloEffectChange={setHoloEffect}
+                fontSize={fontSize}
+                onFontSizeChange={setFontSize}
+                animSpeed={animSpeed}
+                onAnimSpeedChange={setAnimSpeed}
+                autoSend={autoSend}
+                onAutoSendChange={setAutoSend}
+                voice={voiceName}
+                onVoiceChange={setVoiceName}
             />
 
             <style>{`textarea::-webkit-scrollbar { width: 0px; }`}</style>
