@@ -93,7 +93,7 @@ const PROVIDERS = {
     }
 };
 
-const FALLBACK_ORDER = ['openrouter', 'groq', 'zai', 'anthropic', 'gemini', 'deepseek', 'openai', 'ollama', 'dify'];
+const FALLBACK_ORDER = ['ollama', 'openrouter', 'groq', 'zai', 'anthropic', 'gemini', 'deepseek', 'openai', 'dify'];
 
 // ─── Key Rotation: Soporte para múltiples keys separadas por coma ───
 function getKeyList(envValue: string | undefined, envKey?: string): string[] {
