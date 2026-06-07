@@ -9,17 +9,27 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.doublePreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+
+private val Context.locationDataStore: DataStore<Preferences> by preferencesDataStore(name = "nexa_location")
 
 /**
  * Provides device geolocation using FusedLocationProviderClient with
@@ -33,6 +43,8 @@ import kotlin.coroutines.resume
  * - Improved Geocoder with fallback coordinates when address resolution fails
  * - Added retry logic with exponential backoff
  * - Caches last known location for faster subsequent requests
+ * v5.3 improvements:
+ * - Persists location and timestamp to DataStore for cross-session availability
  */
 class LocationStore(private val context: Context) {
 
@@ -42,22 +54,34 @@ class LocationStore(private val context: Context) {
         val address: String = "",
         val city: String = "",
         val country: String = "",
-        val timezone: String = "",
-        val isp: String = "",
-        val source: String = "", // "gps", "network", "ip", "nominatim"
+        val timestamp: Long = 0L,
         val isAvailable: Boolean = false
     )
+
+    private val KEY_LATITUDE = doublePreferencesKey("location_latitude")
+    private val KEY_LONGITUDE = doublePreferencesKey("location_longitude")
+    private val KEY_ADDRESS = stringPreferencesKey("location_address")
+    private val KEY_CITY = stringPreferencesKey("location_city")
+    private val KEY_COUNTRY = stringPreferencesKey("location_country")
+    private val KEY_TIMESTAMP = longPreferencesKey("location_timestamp")
 
     private var fusedClient: FusedLocationProviderClient? = null
     private var locationManager: LocationManager? = null
     private var cachedLocation: LocationData? = null
 
-    // v5.2: Track when location was last fetched for auto-refresh logic
-    private var lastLocationTime: Long = 0L
-    // Refresh location if older than 5 minutes (300000ms)
-    private val locationStaleThresholdMs = 300_000L
+    val locationData: Flow<LocationData> = context.locationDataStore.data.map { prefs ->
+        LocationData(
+            latitude = prefs[KEY_LATITUDE] ?: 0.0,
+            longitude = prefs[KEY_LONGITUDE] ?: 0.0,
+            address = prefs[KEY_ADDRESS] ?: "",
+            city = prefs[KEY_CITY] ?: "",
+            country = prefs[KEY_COUNTRY] ?: "",
+            timestamp = prefs[KEY_TIMESTAMP] ?: 0L,
+            isAvailable = prefs[KEY_LATITUDE] != null
+        )
+    }
 
-    fun initialize() {
+    suspend fun initialize() {
         try {
             fusedClient = LocationServices.getFusedLocationProviderClient(context)
         } catch (e: Exception) {
@@ -68,6 +92,8 @@ class LocationStore(private val context: Context) {
         } catch (e: Exception) {
             android.util.Log.e("LocationStore", "LocationManager init failed: ${e.message}", e)
         }
+        // Load cached location from DataStore
+        cachedLocation = locationData.first()
     }
 
     /**
@@ -98,13 +124,14 @@ class LocationStore(private val context: Context) {
      * Gets the current location with address.
      * Requires ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION permission.
      * v4.0: Added timeout, retry logic, LocationManager fallback, and caching.
+     * v5.3: Persists location to DataStore for future use.
      */
     @SuppressLint("MissingPermission")
     suspend fun getCurrentLocation(): LocationData {
         // Check permissions first
         if (!hasLocationPermission()) {
             android.util.Log.w("LocationStore", "No location permission granted")
-            return LocationData(isAvailable = false)
+            return locationData.first()
         }
 
         // Try with timeout to prevent hanging
@@ -113,25 +140,31 @@ class LocationStore(private val context: Context) {
         }
 
         if (result != null && result.isAvailable) {
-            cachedLocation = result
-            lastLocationTime = System.currentTimeMillis()
-            return result
+            val locationWithTimestamp = result.copy(timestamp = System.currentTimeMillis())
+            cachedLocation = locationWithTimestamp
+            saveLocationToDataStore(locationWithTimestamp)
+            return locationWithTimestamp
         }
 
-        // Return cached location if available and not too stale
+        // Return cached location if available
         val cached = cachedLocation
         if (cached != null && cached.isAvailable) {
-            val age = System.currentTimeMillis() - lastLocationTime
-            if (age < locationStaleThresholdMs) {
-                android.util.Log.d("LocationStore", "Using cached location: ${cached.city}, ${cached.country} (age: ${age/1000}s)")
-                return cached
-            } else {
-                android.util.Log.d("LocationStore", "Cached location is stale (${age/1000}s old), but no fresh location available")
-                return cached  // Still return stale cache rather than nothing
-            }
+            android.util.Log.d("LocationStore", "Using cached location: ${cached.city}, ${cached.country}")
+            return cached
         }
 
-        return LocationData(isAvailable = false)
+        return locationData.first()
+    }
+
+    private suspend fun saveLocationToDataStore(location: LocationData) {
+        context.locationDataStore.edit { prefs ->
+            prefs[KEY_LATITUDE] = location.latitude
+            prefs[KEY_LONGITUDE] = location.longitude
+            prefs[KEY_ADDRESS] = location.address
+            prefs[KEY_CITY] = location.city
+            prefs[KEY_COUNTRY] = location.country
+            prefs[KEY_TIMESTAMP] = location.timestamp
+        }
     }
 
     /**
@@ -143,32 +176,25 @@ class LocationStore(private val context: Context) {
     private suspend fun getLocationWithRetry(): LocationData {
         // Attempt 1: FusedLocation high accuracy
         var location = tryGetFusedLocation(Priority.PRIORITY_HIGH_ACCURACY)
-        if (location != null) return resolveAddress(location, "gps")
+        if (location != null) return resolveAddress(location)
 
         // Attempt 2: FusedLocation balanced power
         location = tryGetFusedLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
-        if (location != null) return resolveAddress(location, "network")
+        if (location != null) return resolveAddress(location)
 
         // Attempt 3: FusedLocation last known
         location = tryGetFusedLastLocation()
-        if (location != null) return resolveAddress(location, "gps")
+        if (location != null) return resolveAddress(location)
 
         // Attempt 4: Request a fresh GPS fix via LocationManager updates
         location = requestFreshLocation()
-        if (location != null) return resolveAddress(location, "network")
+        if (location != null) return resolveAddress(location)
 
         // Attempt 5: LocationManager last known location
         location = tryGetLocationManagerLastLocation()
-        if (location != null) return resolveAddress(location, "network")
+        if (location != null) return resolveAddress(location)
 
-        // Attempt 6: IP-based geolocation fallback (works without GPS permission)
-        val ipLocation = tryGetIpLocation()
-        if (ipLocation != null) {
-            android.util.Log.d("LocationStore", "Using IP-based location: ${ipLocation.city}, ${ipLocation.country}")
-            return ipLocation
-        }
-
-        android.util.Log.w("LocationStore", "All location attempts failed (including IP fallback)")
+        android.util.Log.w("LocationStore", "All location attempts failed")
         return LocationData(isAvailable = false)
     }
 
@@ -319,65 +345,18 @@ class LocationStore(private val context: Context) {
      * with CountDownLatch. Now runs Geocoder on IO dispatcher.
      * Handles both API 33+ async and legacy sync APIs.
      * Fallback: If Geocoder fails, still returns coordinates.
-     * v6.0: Added source parameter to track where the location came from.
      */
-    private suspend fun resolveAddress(location: Location, source: String = "gps"): LocationData =
+    private suspend fun resolveAddress(location: Location): LocationData =
         withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val geocoder = Geocoder(context, Locale.getDefault())
-        var address = ""
-        var city = ""
-        var country = ""
+            val geocoder = Geocoder(context, Locale.getDefault())
+            var address = ""
+            var city = ""
+            var country = ""
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val result = suspendCancellableCoroutine<Pair<String, String>?> { cont ->
-                    geocoder.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
-                        override fun onGeocode(addresses: MutableList<Address>) {
-                            val addr = addresses.firstOrNull()
-                            val result = if (addr != null) {
-                                val addrLine = addr.getAddressLine(0) ?: ""
-                                val cityVal = addr.locality ?: addr.subAdminArea ?: ""
-                                val countryVal = addr.countryName ?: ""
-                                Pair("$addrLine|$cityVal|$countryVal", "")
-                            } else null
-                            cont.resume(result)
-                        }
-                        override fun onError(errorMessage: String?) {
-                            android.util.Log.w("LocationStore", "Geocoder error: $errorMessage")
-                            cont.resume(null)
-                        }
-                    })
-                    cont.invokeOnCancellation { cont.resume(null) }
-                }
-                if (result != null) {
-                    val parts = result.first.split("|")
-                    if (parts.size >= 3) {
-                        address = parts[0]
-                        city = parts[1]
-                        country = parts[2]
-                    }
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                val addr = addresses?.firstOrNull()
-                if (addr != null) {
-                    address = addr.getAddressLine(0) ?: ""
-                    city = addr.locality ?: addr.subAdminArea ?: ""
-                    country = addr.countryName ?: ""
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("LocationStore", "Geocoder failed: ${e.message}")
-        }
-
-        // v5.1: If Geocoder couldn't resolve address, try English locale as fallback
-        if (city.isBlank() && country.isBlank()) {
             try {
-                val geocoderEn = Geocoder(context, Locale.US)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     val result = suspendCancellableCoroutine<Pair<String, String>?> { cont ->
-                        geocoderEn.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
+                        geocoder.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
                             override fun onGeocode(addresses: MutableList<Address>) {
                                 val addr = addresses.firstOrNull()
                                 val result = if (addr != null) {
@@ -389,6 +368,7 @@ class LocationStore(private val context: Context) {
                                 cont.resume(result)
                             }
                             override fun onError(errorMessage: String?) {
+                                android.util.Log.w("LocationStore", "Geocoder error: $errorMessage")
                                 cont.resume(null)
                             }
                         })
@@ -397,170 +377,112 @@ class LocationStore(private val context: Context) {
                     if (result != null) {
                         val parts = result.first.split("|")
                         if (parts.size >= 3) {
-                            if (address.isBlank()) address = parts[0]
-                            if (city.isBlank()) city = parts[1]
-                            if (country.isBlank()) country = parts[2]
+                            address = parts[0]
+                            city = parts[1]
+                            country = parts[2]
                         }
                     }
                 } else {
                     @Suppress("DEPRECATION")
-                    val addresses = geocoderEn.getFromLocation(location.latitude, location.longitude, 1)
+                    val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                     val addr = addresses?.firstOrNull()
                     if (addr != null) {
-                        if (address.isBlank()) address = addr.getAddressLine(0) ?: ""
-                        if (city.isBlank()) city = addr.locality ?: addr.subAdminArea ?: ""
-                        if (country.isBlank()) country = addr.countryName ?: ""
+                        address = addr.getAddressLine(0) ?: ""
+                        city = addr.locality ?: addr.subAdminArea ?: ""
+                        country = addr.countryName ?: ""
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("LocationStore", "Geocoder EN fallback failed: ${e.message}")
+                android.util.Log.w("LocationStore", "Geocoder failed: ${e.message}")
             }
-        }
 
-        // v5.1: Final fallback — use Nominatim reverse geocoding API if Geocoder failed
-        if (city.isBlank() && country.isBlank()) {
-            try {
-                val nominatimUrl = java.net.URL(
-                    "https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json&zoom=10&addressdetails=1"
-                )
-                val connection = nominatimUrl.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                
-                val responseCode = connection.responseCode
-                if (responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    val json = org.json.JSONObject(response)
-                    val addressObj = json.optJSONObject("address")
-                    if (addressObj != null) {
-                        city = addressObj.optString("city", addressObj.optString("town", addressObj.optString("village", "")))
-                        country = addressObj.optString("country", "")
-                        if (address.isBlank()) {
-                            address = json.optString("display_name", "")
+            // v5.1: If Geocoder couldn't resolve address, try English locale as fallback
+            if (city.isBlank() && country.isBlank()) {
+                try {
+                    val geocoderEn = Geocoder(context, Locale.US)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val result = suspendCancellableCoroutine<Pair<String, String>?> { cont ->
+                            geocoderEn.getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
+                                override fun onGeocode(addresses: MutableList<Address>) {
+                                    val addr = addresses.firstOrNull()
+                                    val result = if (addr != null) {
+                                        val addrLine = addr.getAddressLine(0) ?: ""
+                                        val cityVal = addr.locality ?: addr.subAdminArea ?: ""
+                                        val countryVal = addr.countryName ?: ""
+                                        Pair("$addrLine|$cityVal|$countryVal", "")
+                                    } else null
+                                    cont.resume(result)
+                                }
+                                override fun onError(errorMessage: String?) {
+                                    cont.resume(null)
+                                }
+                            })
+                            cont.invokeOnCancellation { cont.resume(null) }
+                        }
+                        if (result != null) {
+                            val parts = result.first.split("|")
+                            if (parts.size >= 3) {
+                                if (address.isBlank()) address = parts[0]
+                                if (city.isBlank()) city = parts[1]
+                                if (country.isBlank()) country = parts[2]
+                            }
+                        }
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val addresses = geocoderEn.getFromLocation(location.latitude, location.longitude, 1)
+                        val addr = addresses?.firstOrNull()
+                        if (addr != null) {
+                            if (address.isBlank()) address = addr.getAddressLine(0) ?: ""
+                            if (city.isBlank()) city = addr.locality ?: addr.subAdminArea ?: ""
+                            if (country.isBlank()) country = addr.countryName ?: ""
                         }
                     }
+                } catch (e: Exception) {
+                    android.util.Log.w("LocationStore", "Geocoder EN fallback failed: ${e.message}")
                 }
-                connection.disconnect()
-            } catch (e: Exception) {
-                android.util.Log.w("LocationStore", "Nominatim fallback failed: ${e.message}")
             }
-        }
 
-        android.util.Log.d("LocationStore", "Location resolved: $city, $country (${location.latitude}, ${location.longitude}) source=$source")
+            // v5.1: Final fallback — use Nominatim reverse geocoding API if Geocoder failed
+            if (city.isBlank() && country.isBlank()) {
+                try {
+                    val nominatimUrl = java.net.URL(
+                        "https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json&zoom=10&addressdetails=1"
+                    )
+                    val connection = nominatimUrl.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
+                    connection.connectTimeout = 5000
+                    connection.readTimeout = 5000
 
-        LocationData(
-            latitude = location.latitude,
-            longitude = location.longitude,
-            address = address,
-            city = city,
-            country = country,
-            source = source,
-            isAvailable = true  // v4.0: Even without address, coordinates are available
-        )
-    }
-
-    /**
-     * v6.0: IP-based geolocation fallback.
-     * Uses free IP geolocation APIs to determine the user's approximate location
-     * when GPS is not available (no permission, indoor, or GPS disabled).
-     * Accuracy: city-level (good enough for weather, time zone, and general context).
-     * 
-     * Sources tried:
-     * 1. ip-api.com (free, no key needed, includes timezone and ISP)
-     * 2. ipapi.co (backup)
-     */
-    private suspend fun tryGetIpLocation(): LocationData? =
-        withContext(kotlinx.coroutines.Dispatchers.IO) {
-            // Try ip-api.com first (most reliable, includes timezone)
-            try {
-                val url = java.net.URL("http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query")
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-
-                val responseCode = connection.responseCode
-                if (responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    val json = org.json.JSONObject(response)
-
-                    if (json.optString("status") == "success") {
-                        val city = json.optString("city", "")
-                        val country = json.optString("country", "")
-                        val lat = json.optDouble("lat", 0.0)
-                        val lon = json.optDouble("lon", 0.0)
-                        val timezone = json.optString("timezone", "")
-                        val isp = json.optString("isp", "")
-                        val query = json.optString("query", "")
-
-                        if (city.isNotBlank() || country.isNotBlank()) {
-                            android.util.Log.d("LocationStore", "IP location resolved: $city, $country (IP: $query, ISP: $isp)")
-                            connection.disconnect()
-                            return@withContext LocationData(
-                                latitude = lat,
-                                longitude = lon,
-                                address = "$city, $country",
-                                city = city,
-                                country = country,
-                                timezone = timezone,
-                                isp = isp,
-                                source = "ip",
-                                isAvailable = true
-                            )
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        val response = connection.inputStream.bufferedReader().readText()
+                        val json = org.json.JSONObject(response)
+                        val addressObj = json.optJSONObject("address")
+                        if (addressObj != null) {
+                            city = addressObj.optString("city", addressObj.optString("town", addressObj.optString("village", "")))
+                            country = addressObj.optString("country", "")
+                            if (address.isBlank()) {
+                                address = json.optString("display_name", "")
+                            }
                         }
                     }
+                    connection.disconnect()
+                } catch (e: Exception) {
+                    android.util.Log.w("LocationStore", "Nominatim fallback failed: ${e.message}")
                 }
-                connection.disconnect()
-            } catch (e: Exception) {
-                android.util.Log.w("LocationStore", "ip-api.com failed: ${e.message}")
             }
 
-            // Fallback: ipapi.co
-            try {
-                val url = java.net.URL("https://ipapi.co/json/")
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "NexaAssistant/1.0")
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
+            android.util.Log.d("LocationStore", "Location resolved: $city, $country (${location.latitude}, ${location.longitude})")
 
-                val responseCode = connection.responseCode
-                if (responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    val json = org.json.JSONObject(response)
-
-                    val city = json.optString("city", "")
-                    val country = json.optString("country_name", "")
-                    val lat = json.optDouble("latitude", 0.0)
-                    val lon = json.optDouble("longitude", 0.0)
-                    val timezone = json.optString("timezone", "")
-                    val isp = json.optString("org", "")
-
-                    if (city.isNotBlank() || country.isNotBlank()) {
-                        android.util.Log.d("LocationStore", "IP location resolved (ipapi.co): $city, $country")
-                        connection.disconnect()
-                        return@withContext LocationData(
-                            latitude = lat,
-                            longitude = lon,
-                            address = "$city, $country",
-                            city = city,
-                            country = country,
-                            timezone = timezone,
-                            isp = isp,
-                            source = "ip",
-                            isAvailable = true
-                        )
-                    }
-                }
-                connection.disconnect()
-            } catch (e: Exception) {
-                android.util.Log.w("LocationStore", "ipapi.co failed: ${e.message}")
-            }
-
-            null
+            LocationData(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                address = address,
+                city = city,
+                country = country,
+                isAvailable = true  // v4.0: Even without address, coordinates are available
+            )
         }
 
     fun destroy() {

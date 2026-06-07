@@ -261,7 +261,14 @@ class NexaViewModel @Inject constructor(
             application.registerReceiver(speechReceiver, filter)
         }
 
-        locationStore.initialize()
+        // Initialize LocationStore and collect location updates
+        viewModelScope.launch {
+            locationStore.initialize()
+            // Observe location changes
+            locationStore.locationData.collect { locationData ->
+                _uiState.update { it.copy(locationData = locationData) }
+            }
+        }
         restoreState()
         // Auto-request location on startup
         requestLocation()
