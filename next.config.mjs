@@ -1,3 +1,5 @@
+const isCapacitorStaticExport = process.env.CAPACITOR_STATIC_EXPORT === '1';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
@@ -5,6 +7,7 @@ const nextConfig = {
         unoptimized: true,
     },
     compress: true,
+    ...(isCapacitorStaticExport ? { output: 'export' } : {}),
 };
 
 export default nextConfig;

@@ -28,6 +28,10 @@ keystore.properties
 # Node (Vercel backend)
 node_modules/
 .vercel/
+.local-config/
+.local-cache/
+.local-share/
+.local-state/
 
 # Next.js build
 .next/
@@ -59,6 +63,9 @@ nexa-inference-zig/zig-out/
 android/keystore.properties
 android/nexa-release.keystore
 android/app/nexa-release.keystore
+android/.idea/
+android/release-keystore/
+android/release-keystore-backup/
 *.keystore
 src/app.orig/
 out/

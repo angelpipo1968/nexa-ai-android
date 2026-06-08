@@ -2,12 +2,36 @@
 # Build script for Capacitor Android APK
 # This script temporarily modifies the project for static export, builds, syncs, and restores
 
-set -e
+set -euo pipefail
 echo "🔧 NEXA AI — Capacitor Android Build Script"
 echo "============================================="
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
+
+export XDG_CONFIG_HOME="$PROJECT_DIR/.local-config"
+export XDG_CACHE_HOME="$PROJECT_DIR/.local-cache"
+export XDG_DATA_HOME="$PROJECT_DIR/.local-share"
+export XDG_STATE_HOME="$PROJECT_DIR/.local-state"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
+
+LOCAL_JAVA_HOME="$PROJECT_DIR/../.android-studio-local/android-studio/jbr"
+if [ -d "$LOCAL_JAVA_HOME" ]; then
+    export JAVA_HOME="$LOCAL_JAVA_HOME"
+    export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
+run_node22() {
+    npx -y node@22 "$@"
+}
+
+restore_project() {
+    rm -rf src/app/api
+    [ -d src/api-backup ] && mv src/api-backup src/app/api
+    [ -d src/preview-backup ] && mv src/preview-backup src/app/preview
+}
+
+trap restore_project EXIT
 
 # Step 1: Save original files
 echo "📦 Step 1: Backing up API routes and preview..."
@@ -21,7 +45,7 @@ rm -rf .next out
 
 # Step 3: Build Next.js static export
 echo "⚡ Step 3: Building Next.js static export..."
-npm run build
+CAPACITOR_STATIC_EXPORT=1 run_node22 ./node_modules/next/dist/bin/next build
 
 # Step 4: Verify index.html exists
 if [ ! -f out/index.html ]; then
@@ -33,13 +57,12 @@ echo "✅ index.html generated successfully"
 
 # Step 5: Sync with Capacitor
 echo "📱 Step 5: Syncing with Capacitor..."
-npx cap sync android
+run_node22 ./node_modules/@capacitor/cli/bin/capacitor sync android
 
 # Step 6: Restore original files
 echo "♻️ Step 6: Restoring API routes and preview..."
-rm -rf src/app/api
-[ -d src/api-backup ] && mv src/api-backup src/app/api
-[ -d src/preview-backup ] && mv src/preview-backup src/app/preview
+restore_project
+trap - EXIT
 
 # Step 7: Build Android APK
 echo "🏗️ Step 7: Building Android APK..."
