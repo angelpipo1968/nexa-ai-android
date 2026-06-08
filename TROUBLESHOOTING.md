@@ -1,6 +1,6 @@
 # 🛠️ Checklist de Diagnóstico y Problemas Comunes - NEXA PRO AI
 
-Esta guía contiene los pasos prácticos para diagnosticar, depurar y resolver problemas en los diferentes componentes de la arquitectura híbrida de **Nexa OS** (Next.js, Hermes Express Server, WebSocket Lark Client y Dify).
+Esta guía contiene los pasos prácticos para diagnosticar, depurar y resolver problemas en los diferentes componentes de la arquitectura híbrida de **Nexa OS** (Next.js, Nexas Express Server, WebSocket Lark Client y Dify).
 
 ---
 
@@ -53,10 +53,10 @@ Esta guía contiene los pasos prácticos para diagnosticar, depurar y resolver p
 
 ---
 
-## 4. 🎙️ Servidor Hermes (Puerto 3001)
+## 4. 🎙️ Servidor Nexas (Puerto 3001)
 
 ### ⚠️ Conflicto de puerto `EADDRINUSE: address already in use :::3001`
-* Ocurre cuando un proceso viejo de Next.js o Hermes se quedó bloqueado reteniendo el puerto 3001.
+* Ocurre cuando un proceso viejo de Next.js o Nexas se quedó bloqueado reteniendo el puerto 3001.
 * **Solución en Windows (PowerShell)**:
   ```powershell
   # 1. Encontrar el PID que usa el puerto 3001
@@ -72,7 +72,7 @@ Esta guía contiene los pasos prácticos para diagnosticar, depurar y resolver p
   ```
 
 ### ⚠️ Ollama no conecta localmente
-* Si no tienes Ollama corriendo localmente, el servidor Hermes fallará de inmediato al intentar conectar.
+* Si no tienes Ollama corriendo localmente, el servidor Nexas fallará de inmediato al intentar conectar.
 * **Solución**: Asegúrate de tener configurada la variable `DIFY_API_KEY` en tu `.env.local` para que el **Fallback Transparente** se active de inmediato y procese todas las peticiones a través de Dify.
 
 ---

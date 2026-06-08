@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hermes Web AI - Premium Voice Chat</title>
+    <title>Nexas Web AI - Premium Voice Chat</title>
     <!-- Modern Premium Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -713,7 +713,7 @@
                     <div class="status-dot pulse-animation"></div>
                 </div>
                 <div class="header-title-wrapper">
-                    <h1>Hermes AI Assistant</h1>
+                    <h1>Nexas AI Assistant</h1>
                     <p><i class="fa-solid fa-shield-halved" style="color: var(--accent); font-size: 0.75rem;"></i> Voice v5.0 Connected & Secure</p>
                 </div>
             </div>
@@ -753,16 +753,16 @@
             <div class="message-row bot">
                 <div class="message-content">
                     <div style="font-weight: 700; margin-bottom: 0.25rem; font-family: 'Outfit'; color: var(--secondary);">
-                        <i class="fa-solid fa-sparkles"></i> Hermes AI
+                        <i class="fa-solid fa-sparkles"></i> Nexas AI
                     </div>
-                    ¡Hola! Soy **Hermes v5**, tu copiloto de Inteligencia Artificial de NexaIA. 
+                    ¡Hola! Soy **Nexas v5**, tu copiloto de Inteligencia Artificial de NexaIA. 
                     <br><br>
                     He sido actualizado con los últimos **fixes de manos libres**. Ahora cuento con soporte premium de **Reconocimiento de Voz (STT)** y **Sintetizador de Voz (TTS)** directamente en tu navegador.
                     <br><br>
                     Presiona el ícono del micrófono <i class="fa-solid fa-microphone" style="color:#ef4444"></i> abajo para hablarme, o escribe tu consulta. ¡Hablemos!
                     <div class="message-meta">
                         <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
-                        Hermes AI &bull; Justo ahora
+                        Nexas AI &bull; Justo ahora
                         <button class="msg-speak-btn" onclick="readMessageText(this.parentElement.parentElement)"><i class="fa-solid fa-volume-high"></i></button>
                     </div>
                 </div>
@@ -789,7 +789,7 @@
             <div class="input-row">
                 <div class="input-container">
                     <button class="chat-tool-btn" id="micBtn" aria-label="Hablar por micrófono"><i class="fa-solid fa-microphone"></i></button>
-                    <textarea id="chatInput" placeholder="Pregúntale a Hermes... (Usa Shift+Enter para nueva línea)" aria-label="Entrada de chat" aria-describedby="chat-help" rows="1"></textarea>
+                    <textarea id="chatInput" placeholder="Pregúntale a Nexas... (Usa Shift+Enter para nueva línea)" aria-label="Entrada de chat" aria-describedby="chat-help" rows="1"></textarea>
                     <button class="chat-tool-btn send-btn" id="sendBtn" aria-label="Enviar mensaje"><i class="fa-solid fa-paper-plane"></i></button>
                     <div id="chat-help" class="sr-only">
                         Presione Enter para enviar o use el botón de micrófono para entrada de voz
@@ -908,7 +908,7 @@
         setTimeout(() => setConnectionStatus('connected'), 500);
 
         function loadChatHistory() {
-            const saved = localStorage.getItem('hermesChatHistory');
+            const saved = localStorage.getItem('nexasChatHistory');
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
@@ -924,7 +924,7 @@
                 } catch (e) {
                     console.error('Error loading chat history:', e);
                     // If corrupted, start fresh
-                    localStorage.removeItem('hermesChatHistory');
+                    localStorage.removeItem('nexasChatHistory');
                 }
             }
         }
@@ -939,7 +939,7 @@
                     timestamp: Date.now(),
                     messages: chatArea.innerHTML
                 };
-                localStorage.setItem('hermesChatHistory', JSON.stringify(historyData));
+                localStorage.setItem('nexasChatHistory', JSON.stringify(historyData));
                 // Trim excess messages after saving
                 trimExcessMessages();
             }, 500);
@@ -985,7 +985,7 @@
                 "Iniciando diagnóstico del hands-free. Los fixes de manos libres corrigen el acople acústico en Samsung, Xiaomi y OPPO modificando el orden de apagado: liberando primero el micrófono y apagando el SCO después.",
                 "Prueba de latencia: el tiempo de respuesta de interruptibilidad ha bajado de 2.5 segundos a tan solo 80ms gracias al ajuste fino de delays asíncronos en el `ViewModelScope`.",
                 "El sensor de proximidad está integrado: apaga la pantalla y enruta el audio del altavoz al auricular del oído automáticamente si el dispositivo detecta que está cerca de tu oreja.",
-                "¡Excelente! Hemos diagnosticado que el booster de volumen aumenta el volumen de 7 flujos de audio de forma progresiva, garantizando que escuches a Hermes incluso en ambientes con mucho ruido."
+                "¡Excelente! Hemos diagnosticado que el booster de volumen aumenta el volumen de 7 flujos de audio de forma progresiva, garantizando que escuches a Nexas incluso en ambientes con mucho ruido."
             ]
         };
 
@@ -1043,7 +1043,7 @@
         function stopListeningState() {
             isListening = false;
             micBtn.classList.remove('listening');
-            chatInput.placeholder = "Pregúntale a Hermes...";
+            chatInput.placeholder = "Pregúntale a Nexas...";
         }
 
         function showWarning(msg) {
@@ -1122,12 +1122,12 @@
                 <div class="message-row bot">
                     <div class="message-content">
                         <div style="font-weight: 700; margin-bottom: 0.25rem; font-family: 'Outfit'; color: var(--secondary);">
-                            <i class="fa-solid fa-sparkles"></i> Hermes AI
+                            <i class="fa-solid fa-sparkles"></i> Nexas AI
                         </div>
                         Historial de chat limpiado con éxito. ¿Qué deseas consultar ahora?
                         <div class="message-meta">
                             <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
-                            Hermes AI &bull; Justo ahora
+                            Nexas AI &bull; Justo ahora
                             <button class="msg-speak-btn" onclick="readMessageText(this.parentElement.parentElement)"><i class="fa-solid fa-volume-high"></i></button>
                         </div>
                     </div>
@@ -1232,7 +1232,7 @@
 
                 if (!res.ok) {
                     setConnectionStatus('disconnected');
-                    addBotMessageBubble("Error de red: No pude conectarme con el cerebro de Hermes (servidor local). Asegúrate de correr 'node hermes-server.js'.");
+                    addBotMessageBubble("Error de red: No pude conectarme con el cerebro de Nexas (servidor local). Asegúrate de correr 'node nexas-server.js'.");
                     return;
                 }
 
@@ -1248,7 +1248,7 @@
             } catch (err) {
                 removeTypingIndicator();
                 setConnectionStatus('disconnected');
-                addBotMessageBubble("Error de conexión. Asegúrate de ejecutar `node hermes-server.js` en el servidor local. Detalles: " + err.message);
+                addBotMessageBubble("Error de conexión. Asegúrate de ejecutar `node nexas-server.js` en el servidor local. Detalles: " + err.message);
             }
         }
 
@@ -1273,7 +1273,7 @@
             titleDiv.style.marginBottom = '0.25rem';
             titleDiv.style.fontFamily = "'Outfit'";
             titleDiv.style.color = 'var(--secondary)';
-            titleDiv.innerHTML = '<i class="fa-solid fa-sparkles"></i> Hermes AI';
+            titleDiv.innerHTML = '<i class="fa-solid fa-sparkles"></i> Nexas AI';
             msgContent.appendChild(titleDiv);
 
             // Container for dynamic streaming text
@@ -1285,7 +1285,7 @@
             metaDiv.classList.add('message-meta');
             metaDiv.innerHTML = `
                 <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
-                Hermes AI &bull; ${timeString}
+                Nexas AI &bull; ${timeString}
                 <button class="msg-speak-btn" aria-label="Leer mensaje en voz alta" onclick="readMessageText(this.parentElement.parentElement)"><i class="fa-solid fa-volume-high"></i></button>
             `;
             msgContent.appendChild(metaDiv);
@@ -1362,7 +1362,7 @@
         // Trigger read when message speaker button clicked
         window.readMessageText = function(bubbleElement) {
             // Find text span inside bubble
-            const textContent = bubbleElement.innerText.replace("Hermes AI\n", "");
+            const textContent = bubbleElement.innerText.replace("Nexas AI\n", "");
             speakText(textContent);
         };
 

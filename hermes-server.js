@@ -31,18 +31,18 @@ function loadEnv() {
                     process.env[key] = value.trim();
                 }
             });
-            console.log('[Hermes Config] .env.local cargado con éxito.');
+            console.log('[Nexas Config] .env.local cargado con éxito.');
         } else {
-            console.warn('[Hermes Config] Archivo .env.local no encontrado, usando variables del sistema.');
+            console.warn('[Nexas Config] Archivo .env.local no encontrado, usando variables del sistema.');
         }
     } catch (e) {
-        console.warn('[Hermes Config] No se pudo cargar .env.local:', e.message);
+        console.warn('[Nexas Config] No se pudo cargar .env.local:', e.message);
     }
 }
 loadEnv();
 
 // --- LOCAL SKILLS ENGINE (Auto-Aprendizaje Autónomo) ---
-const SKILLS_FILE = path.resolve(process.cwd(), 'hermes-skills.json');
+const SKILLS_FILE = path.resolve(process.cwd(), 'nexas-skills.json');
 
 function loadLocalSkills() {
     try {
@@ -50,7 +50,7 @@ function loadLocalSkills() {
             return JSON.parse(fs.readFileSync(SKILLS_FILE, 'utf8'));
         }
     } catch (e) {
-        console.warn('[Hermes Skills] Error leyendo hermes-skills.json:', e.message);
+        console.warn('[Nexas Skills] Error leyendo nexas-skills.json:', e.message);
     }
     return [];
 }
@@ -61,9 +61,9 @@ function saveLocalSkill(skill) {
         const filtered = skills.filter(s => s.name !== skill.name);
         filtered.push(skill);
         fs.writeFileSync(SKILLS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
-        console.log(`[Hermes Skills] ¡Nueva habilidad aprendida y guardada localmente!: ${skill.name}`);
+        console.log(`[Nexas Skills] ¡Nueva habilidad aprendida y guardada localmente!: ${skill.name}`);
     } catch (e) {
-        console.error('[Hermes Skills] Error guardando skill local:', e.message);
+        console.error('[Nexas Skills] Error guardando skill local:', e.message);
     }
 }
 
@@ -83,7 +83,7 @@ async function extractAndLearnSkills(userMessage, assistantMessage) {
     if (!difyKey) return;
 
     try {
-        console.log('[Hermes Skills] Detectado posible intento de enseñanza, extrayendo regla...');
+        console.log('[Nexas Skills] Detectado posible intento de enseñanza, extrayendo regla...');
         const prompt = `Analiza esta conversación y extrae la regla de comportamiento, flujo o instrucción reutilizable que el usuario está enseñando o corrigiendo al asistente.
 Si encuentras una regla reutilizable, devuélvela estrictamente en este formato JSON (sin markdown ni texto adicional, solo el JSON puro):
 {
@@ -107,7 +107,7 @@ Asistente: ${assistantMessage}`;
                 inputs: {},
                 query: prompt,
                 response_mode: 'blocking',
-                user: 'hermes-skills-extractor'
+                user: 'nexas-skills-extractor'
             })
         });
 
@@ -130,7 +130,7 @@ Asistente: ${assistantMessage}`;
             }
         }
     } catch (e) {
-        console.warn('[Hermes Skills] Falló la extracción en segundo plano:', e.message);
+        console.warn('[Nexas Skills] Falló la extracción en segundo plano:', e.message);
     }
 }
 
@@ -199,7 +199,7 @@ app.post('/api/chat', async (req, res) => {
     try {
         const userMessage = req.body.message || '';
         let enhancedPrompt = userMessage;
-        let systemContext = "Eres Hermes, un asistente de IA local para Nexa OS. Eres experto en programación y muy servicial.";
+        let systemContext = "Eres Nexas, un asistente de IA local para Nexa OS. Eres experto en programación y muy servicial.";
 
         // Inyección de Skills (Aprendizaje Autónomo Local)
         const localSkills = loadLocalSkills();
@@ -225,7 +225,7 @@ app.post('/api/chat', async (req, res) => {
         if (msgLower.includes('commit') || msgLower.includes('push') || msgLower.includes('guarda los cambios') || msgLower.includes('sube los cambios')) {
             console.log(`[REQ-${reqId}] Ejecutando Git Commit y Push...`);
             try {
-                let commitMsg = "Automated commit via Hermes";
+                let commitMsg = "Automated commit via Nexas";
                 await execPromise('git add .');
                 await execPromise(`git commit -m "${commitMsg}"`);
                 await execPromise('git push');
@@ -282,7 +282,7 @@ app.post('/api/chat', async (req, res) => {
                             inputs: {},
                             query: enhancedPrompt,
                             response_mode: 'blocking',
-                            user: 'hermes-local-user'
+                            user: 'nexas-local-user'
                         })
                     });
 
@@ -327,6 +327,6 @@ app.post('/api/chat', async (req, res) => {
 
 const PORT = 3001;
 app.listen(PORT, () => {
-    console.log(`Hermes Backend corriendo en http://localhost:${PORT}`);
+    console.log(`Nexas Backend corriendo en http://localhost:${PORT}`);
     console.log(`Asegúrate de ejecutar esto desde la raíz del proyecto para que los comandos git funcionen.`);
 });
