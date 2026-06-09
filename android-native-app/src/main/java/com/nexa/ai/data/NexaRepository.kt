@@ -169,6 +169,36 @@ class NexaRepository @Inject constructor() {
             eventSource.cancel()
         }
     }.flowOn(Dispatchers.IO)
+
+    suspend fun sendVisionRequest(
+        baseUrl: String,
+        base64Image: String,
+        mimeType: String = "image/jpeg",
+        question: String? = null
+    ): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val body = JsonObject().apply {
+                addProperty("image", base64Image)
+                addProperty("mimeType", mimeType)
+                if (question != null) addProperty("question", question)
+            }
+
+            val request = Request.Builder()
+                .url("$baseUrl/api/vision")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val responseBody = response.body?.string() ?: return@withContext null
+                val obj = gson.fromJson(responseBody, JsonObject::class.java)
+                return@withContext obj.get("text")?.asString
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Vision request error", e)
+            null
+        }
+    }
 }
 
 sealed class StreamEvent {

@@ -32,7 +32,6 @@ class NexaCarMessageScreen(
             .addAction(
                 Action.Builder()
                     .setTitle("Activar voz")
-                    .setFlags(Action.FLAG_VOICE_COMMAND)
                     .setOnClickListener {
                         // Start localized hands-free vocal flow simulation when driver taps the button
                         voiceSession?.onVoiceQuery("Nexa, cuál es el estado del coche?")

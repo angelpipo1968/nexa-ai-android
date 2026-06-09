@@ -1112,7 +1112,7 @@ class IoTManager(private val application: Application) {
     }
 
     suspend fun removeDevice(deviceId: String) {
-        db.iotDeviceDao().delete(deviceId)
+        db.iotDeviceDao().deleteById(deviceId)
         // Remove from all rooms
         roomsMap.values.forEach { room ->
             room.deviceIds.remove(deviceId)
@@ -1134,7 +1134,7 @@ class IoTManager(private val application: Application) {
         val devices = db.iotDeviceDao().getAll()
         _iotState.value = _iotState.value.copy(devices = devices)
         // Update device state map for real-time monitoring
-        val stateMap = devices.associate { it.deviceId to it.state }
+        val stateMap = devices.associate { it.deviceId to (it.state ?: "unknown") }
         _deviceStateMap.value = stateMap
     }
 

@@ -17,7 +17,9 @@ import kotlinx.coroutines.launch
 class ObdSensorManager(
     private var socket: BluetoothSocket? = null
 ) {
-    private const val TAG = "NexaOBD"
+    companion object {
+        private const val TAG = "NexaOBD"
+    }
     private var isRunning = false
     private var workerJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO)

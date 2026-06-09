@@ -31,7 +31,9 @@ data class CanFrame(
  * Habilita comunicación de bajo nivel en vehículos pesados o integraciones OBD directas.
  */
 class CanBusManager {
-    private const val TAG = "NexaCAN"
+    companion object {
+        private const val TAG = "NexaCAN"
+    }
     private var isListening = false
 
     /**

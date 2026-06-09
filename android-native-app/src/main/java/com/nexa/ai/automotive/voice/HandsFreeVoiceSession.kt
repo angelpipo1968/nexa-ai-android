@@ -18,7 +18,9 @@ class HandsFreeVoiceSession(
     private val context: Context,
     private val localLLMManager: LocalLLMManager
 ) {
-    private const val TAG = "NexaAutoSession"
+    companion object {
+        private const val TAG = "NexaAutoSession"
+    }
     private val scope = CoroutineScope(Dispatchers.Default)
 
     init {

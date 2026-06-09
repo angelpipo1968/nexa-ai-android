@@ -98,9 +98,10 @@ data class SessionWithMessages(
         LearningSignalEntity::class,
         UserPreferenceEntity::class,
         ActivityLogEntity::class,
-        SensorDataEntity::class
+        SensorDataEntity::class,
+        IoTDeviceEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class NexaDatabase : RoomDatabase() {
@@ -115,6 +116,7 @@ abstract class NexaDatabase : RoomDatabase() {
     abstract fun userPreferenceDao(): UserPreferenceDao
     abstract fun activityLogDao(): ActivityLogDao
     abstract fun sensorDataDao(): SensorDataDao
+    abstract fun iotDeviceDao(): IoTDeviceDao
 
     companion object {
         @Volatile

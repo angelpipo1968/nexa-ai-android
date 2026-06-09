@@ -1087,6 +1087,10 @@ class NexaViewModel @Inject constructor(
         chatUseCase.sendMessage(fullContent, viewModelScope)
     }
 
+    fun onError(message: String) {
+        _uiState.update { it.copy(error = message) }
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }

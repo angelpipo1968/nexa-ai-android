@@ -60,7 +60,7 @@ class VoiceCommandsHandler(
         onSendMessage: (String) -> Unit,
         onShareLast: () -> Unit,
         onCameraCapture: () -> Unit,
-        onGenerateVideo: (String, VideoGenerator.VideoStyles) -> Unit
+        onGenerateVideo: (String, VideoGenerator.VideoStyle) -> Unit
     ): VoiceCommandResult {
         val c = cmd.lowercase().trim()
 

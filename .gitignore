@@ -46,6 +46,7 @@ screenshot.jpg
 temp/
 __pycache__/
 *.pyc
+.kotlin/
 app-debug.zip
 app-debug.apk
 android-native-app/build/
