@@ -45,6 +45,66 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+const PRIMARY_AGENT_ENDPOINT =
+    process.env.NEXA_AGENT_GATEWAY_URL || 'http://127.0.0.1:5002/agent';
+
+function getAgentEndpointLabel(endpoint: string): string {
+    if (endpoint.includes(':5002/')) return 'agent-swarm-v4';
+    if (endpoint.includes(':5001/')) return 'agent-loop-v2';
+    if (endpoint.includes(':5000/')) return 'agent-loop-v1';
+    return 'agent-gateway';
+}
+
+function normalizeAgentResponse(data: any): string {
+    const text = data?.final || data?.response || data?.result || data?.content || '';
+    if (typeof text === 'string' && text.trim()) return text.trim();
+    return JSON.stringify(data);
+}
+
+async function callAgentGateway(endpoint: string, userId: string, userQuery: string) {
+    const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, message: userQuery }),
+    });
+
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Gateway ${endpoint} devolvió ${res.status}: ${body || res.statusText}`);
+    }
+
+    const data = await res.json();
+    return {
+        text: normalizeAgentResponse(data),
+        provider: getAgentEndpointLabel(endpoint),
+    };
+}
+
+function createGatewayStream(requestId: string, userId: string, userQuery: string) {
+    const encoder = new TextEncoder();
+    return new ReadableStream({
+        async start(controller) {
+            try {
+                logger.info(`Attempting primary agent gateway ${PRIMARY_AGENT_ENDPOINT}`, 'chat', { requestId });
+                const { text, provider } = await callAgentGateway(PRIMARY_AGENT_ENDPOINT, userId, userQuery);
+                const chunks = text.match(/\S+\s*/g) || [text];
+                for (const chunk of chunks) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk, provider })}\n\n`));
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, fullResponse: text, provider })}\n\n`));
+                extractAndSaveSkills(userId, userQuery, text).catch(console.error);
+                controller.close();
+                return;
+            } catch (e: any) {
+                logger.warn(`Primary agent gateway failed ${PRIMARY_AGENT_ENDPOINT}: ${e.message}`, 'chat', { requestId });
+            }
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'El gateway principal del agente no respondió.' })}\n\n`));
+            controller.close();
+        }
+    });
+}
+
 const PROVIDERS = {
     groq: {
         url: 'https://api.groq.com/openai/v1/chat/completions',
@@ -384,6 +444,19 @@ export async function POST(req: NextRequest) {
         
         // --- NEXA INTELLIGENCE HUB (V3 - HIGH PRIORITY) ---
         const userQuery = messages[messages.length - 1].content;
+        const userId = identifier;
+        const preferAgentGateway = process.env.NEXA_AGENT_GATEWAY_MODE !== 'off';
+        if (preferAgentGateway) {
+            return new Response(createGatewayStream(requestId, userId, userQuery), {
+                headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'text/event-stream; charset=utf-8',
+                    'Cache-Control': 'no-cache, no-transform',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no',
+                },
+            });
+        }
         const lowerQuery = userQuery.toLowerCase();
         let toolContext = "";
 
@@ -433,7 +506,6 @@ Hora Local: ${timeStr}
 
         // --- NEXA ML ENGINE V1 (Machine Learning) ---
         // Derive userId from client IP or custom header (no auth system yet).
-        const userId = identifier;
         
         // 1. Emotion Analysis
         const emotion = analyzeEmotion(userQuery);
