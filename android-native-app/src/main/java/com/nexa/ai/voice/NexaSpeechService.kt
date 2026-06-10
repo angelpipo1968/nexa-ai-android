@@ -1,13 +1,16 @@
 package com.nexa.ai.voice
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
-import android.os.Bundle
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
+import android.os.Build
 import android.util.Log
+import com.nexa.ai.MainActivity
 
 /**
  * NexaSpeechService — Servicio de voz Android de grado de producción.
@@ -18,11 +21,17 @@ import android.util.Log
  * - Integra y encapsula la lógica avanzada de SpeechManager (VAD, Proximity, BT SCO, Barge-in, Focus).
  * - Comunica los resultados y estados conversacionales mediante Local Broadcasts para un
  *   desacoplamiento total del ciclo de vida de la UI, eliminando los cuellos de botella y cortes de voz.
+ *
+ * FIX v5.3: Added startForeground() with notification to prevent Android from killing
+ * the service within 5 seconds (ForegroundServiceDidNotStartInTimeException on API 31+).
+ * Added foregroundServiceType="microphone" in manifest for API 34+ compatibility.
  */
 class NexaSpeechService : Service() {
 
     private val TAG = "NexaSpeechService"
     private val binder = SpeechBinder()
+    private val NOTIFICATION_CHANNEL_ID = "nexa_voice_channel"
+    private val NOTIFICATION_ID = 1001
     
     // Instancia persistente del gestor de voz
     lateinit var speechManager: SpeechManager
@@ -45,6 +54,9 @@ class NexaSpeechService : Service() {
         super.onCreate()
         Log.i(TAG, "onCreate: Iniciando NexaSpeechService")
         
+        // Crear canal de notificación para Android 8+
+        createNotificationChannel()
+        
         // Instanciamos el administrador de voz con el contexto de aplicación
         speechManager = SpeechManager(application)
         speechManager.initialize()
@@ -56,11 +68,68 @@ class NexaSpeechService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand: Iniciando sesión de voz activa por intent")
         
+        // FIX: Start as foreground service IMMEDIATELY to prevent Android from killing it.
+        // This MUST happen within 5 seconds of startForegroundService() on API 31+.
+        startForegroundNotification()
+        
         // Cuando el servicio es iniciado por el sistema o por el botón del volante,
         // arrancamos la sesión de audio vehicular y el reconocedor de voz.
         startSpeechListeningSession()
         
         return START_STICKY // Asegura que Android intente recrear el servicio si es purgado por RAM
+    }
+
+    /**
+     * FIX v5.3: Creates and shows the foreground notification.
+     * Required on API 31+ — without this, Android kills the service within 5 seconds
+     * with ForegroundServiceDidNotStartInTimeException.
+     */
+    private fun startForegroundNotification() {
+        try {
+            val notificationIntent = Intent(this, MainActivity::class.java)
+            val pendingIntent = PendingIntent.getActivity(
+                this, 0, notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("NEXA PRO")
+                .setContentText("Sesión de voz manos libres activa")
+                .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .build()
+
+            // Use FOREGROUND_SERVICE_TYPE_MICROPHONE on API 34+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            
+            Log.d(TAG, "Foreground service started with notification")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting foreground: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Creates the notification channel required for Android 8+ (API 26+).
+     */
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Sesión de Voz NEXA",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Notificación de sesión de voz manos libres"
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
     }
 
     private fun startSpeechListeningSession() {
@@ -146,6 +215,14 @@ class NexaSpeechService : Service() {
         // Apagamos la sesión de audio vehicular y liberamos los recursos de hardware
         speechManager.stopVoiceAudioSession()
         speechManager.destroy()
+        
+        // Stop foreground service
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         
         sendSpeechStateBroadcast("destroyed")
         super.onDestroy()

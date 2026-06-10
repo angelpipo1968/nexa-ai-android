@@ -10,15 +10,12 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 🎙️ NEXA HANDS-FREE ALL-IN-ONE
@@ -40,9 +37,10 @@ import javax.inject.Singleton
         "com.nexa.ai.viewmodel.usecase.VoiceUseCase"
     )
 )
-@Singleton
-class NexaHandsFreeAllInOne @Inject constructor(
-    @ApplicationContext private val context: Context
+// FIX: Removed @Singleton and @Inject to prevent Hilt from creating a duplicate TTS engine.
+// This class is deprecated — use SpeechManager + VoiceUseCase instead.
+class NexaHandsFreeAllInOne(
+    private val context: Context
 ) : TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {

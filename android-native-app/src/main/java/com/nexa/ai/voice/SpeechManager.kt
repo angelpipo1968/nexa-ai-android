@@ -25,6 +25,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.os.HandlerThread
 import com.nexa.ai.viewmodel.AppLanguage
 import com.nexa.ai.viewmodel.VoiceType
 import java.util.Locale
@@ -433,7 +434,12 @@ class SpeechManager(private val application: Application) {
         if (scoReceiverRegistered) return
         try {
             val filter = IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
-            application.registerReceiver(scoStateReceiver, filter)
+            // FIX: RECEIVER_EXPORTED required on API 33+ for system broadcasts
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                application.registerReceiver(scoStateReceiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                application.registerReceiver(scoStateReceiver, filter)
+            }
             scoReceiverRegistered = true
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "SCO receiver register error: ${e.message}", e)
@@ -723,10 +729,15 @@ class SpeechManager(private val application: Application) {
             // v4.0: Focus request now uses USAGE_MEDIA for hands-free
             requestAudioFocus()
 
-            // ── VOLUME BOOST: Disabled to prevent TTS engine death ──
-            // (Originally boosted volume aggressively)
-            if (false && volumeBoostEnabled && audioSessionActive) {
-                // boostVolumeForHandsFree() // disabled
+            // FIX: Re-enabled volume boost for hands-free with safe thread handling
+            if (volumeBoostEnabled && audioSessionActive) {
+                Handler(Looper.getMainLooper()).post {
+                    try {
+                        boostVolumeForHandsFree()
+                    } catch (e: Exception) {
+                        android.util.Log.w("SpeechManager", "Volume boost error: ${e.message}")
+                    }
+                }
             }
 
             isTtsActive = true
@@ -853,9 +864,39 @@ class SpeechManager(private val application: Application) {
      * Lighter than boostVolumeForHandsFree() — only fixes routing, doesn't max volumes.
      */
     private fun reapplyHandsFreeRouting() {
-        // DISABLED: Causaba muerte del motor TTS
-        android.util.Log.w("SpeechManager", "reapplyHandsFreeRouting disabled to prevent TTS engine death")
-        return
+        // FIX: Re-enabled with safe main-thread execution to prevent TTS engine death.
+        // The original crash was caused by calling audio routing methods from a background thread.
+        // Now all audio routing calls run on the main looper.
+        try {
+            if (!audioSessionActive) return
+            if (isBluetoothScoConnected && scoConnected) return  // BT takes priority
+
+            // Must run on main thread — audio routing APIs require it
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                Handler(Looper.getMainLooper()).post { reapplyHandsFreeRouting() }
+                return
+            }
+
+            // Re-apply MODE_NORMAL for speaker output
+            audioManager.mode = AudioManager.MODE_NORMAL
+
+            // Re-apply speaker if not near ear and no BT
+            if (!isNearEar && !isBluetoothScoConnected) {
+                setSpeakerphoneOn(true)
+                // Verify speaker is actually active
+                if (!isSpeakerphoneActive()) {
+                    android.util.Log.w("SpeechManager", "Speaker not active after reapply, retrying...")
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (audioSessionActive && !isNearEar) {
+                            setSpeakerphoneOn(true)
+                        }
+                    }, 100)
+                }
+            }
+            android.util.Log.d("SpeechManager", "Hands-free routing re-applied successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "reapplyHandsFreeRouting error: ${e.message}", e)
+        }
     }
 
     /**
@@ -1176,10 +1217,8 @@ class SpeechManager(private val application: Application) {
      * Enhanced with Voice Activity Detection (VAD) via zero-crossing rate.
      */
     fun startBargeInMonitor() {
-        // DISABLED: Causaba congelamientos
-        android.util.Log.w("SpeechManager", "Barge-in disabled to prevent freezes")
-        return
-        
+        // FIX: Re-enabled with safe thread handling and proper error recovery.
+        // The original freezes were caused by AudioRecord blocking without interruption handling.
         if (bargeInActive) return
         bargeInActive = true
 
@@ -1238,6 +1277,11 @@ class SpeechManager(private val application: Application) {
                 calibrationFrames = 0
 
                 while (bargeInActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                    // FIX: Check for thread interruption to prevent freezes
+                    if (Thread.currentThread().isInterrupted) {
+                        android.util.Log.d("SpeechManager", "Barge-in thread interrupted, exiting")
+                        break
+                    }
                     val read = recorder.read(buffer, 0, buffer.size)
                     if (read > 0) {
                         // Compute RMS volume
