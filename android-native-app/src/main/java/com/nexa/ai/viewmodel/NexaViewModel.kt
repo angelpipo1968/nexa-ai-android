@@ -1303,7 +1303,7 @@ REAL-TIME DATA & SEARCHES:
         else
             "Analyze this image and describe what you see in detail. Include objects, people, text, colors, scene, and any relevant information."
 
-        _uiState.update { it.copy(cameraImageUri = null) }
+        _uiState.update { it.copy(cameraImageUri = null, requestCameraCapture = false) }
 
         // Create user message with vision indicator
         val userMsg = Message(

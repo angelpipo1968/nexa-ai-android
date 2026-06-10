@@ -56,16 +56,16 @@ class MainActivity : ComponentActivity() {
     private val requestCameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        viewModel.clearCameraRequest() // Always clear flag
         if (granted) {
             captureImage.launch(null)
-        } else {
-            viewModel.clearCameraRequest()
         }
     }
     
     private val captureImage = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
+        viewModel.clearCameraRequest() // Always clear flag
         if (bitmap != null) {
             // FIX v5.2: Compress and downscale to prevent OOM
             try {
@@ -238,11 +238,12 @@ class MainActivity : ComponentActivity() {
                 if (uiState.requestCameraCapture) {
                     // Small delay to ensure state propagates
                     kotlinx.coroutines.delay(100)
+                    viewModel.clearCameraRequest() // Clear immediately to allow re-trigger
+                    
                     if (ContextCompat.checkSelfPermission(this@MainActivity, android.Manifest.permission.CAMERA)
                         == PackageManager.PERMISSION_GRANTED
                     ) {
                         captureImage.launch(null)
-                        viewModel.clearCameraRequest()
                     } else {
                         requestCameraPermission.launch(android.Manifest.permission.CAMERA)
                     }
