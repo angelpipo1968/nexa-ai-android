@@ -234,14 +234,16 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsState()
 
             // Handle camera capture request from voice command
-            if (uiState.requestCameraCapture) {
-                viewModel.clearCameraRequest()
-                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA)
-                    == PackageManager.PERMISSION_GRANTED
-                ) {
-                    captureImage.launch(null)
-                } else {
-                    requestCameraPermission.launch(Manifest.permission.CAMERA)
+            androidx.compose.runtime.LaunchedEffect(uiState.requestCameraCapture) {
+                if (uiState.requestCameraCapture) {
+                    viewModel.clearCameraRequest()
+                    if (ContextCompat.checkSelfPermission(this@MainActivity, android.Manifest.permission.CAMERA)
+                        == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        captureImage.launch(null)
+                    } else {
+                        requestCameraPermission.launch(android.Manifest.permission.CAMERA)
+                    }
                 }
             }
 

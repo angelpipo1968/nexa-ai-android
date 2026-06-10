@@ -189,10 +189,24 @@ class NexaRepository @Inject constructor() {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "Vision API error: ${response.code} - ${response.body?.string()}")
+                    return@withContext null
+                }
                 val responseBody = response.body?.string() ?: return@withContext null
                 val obj = gson.fromJson(responseBody, JsonObject::class.java)
-                return@withContext obj.get("text")?.asString
+                
+                // Try multiple possible response fields
+                return@withContext when {
+                    obj.has("text") -> obj.get("text").asString
+                    obj.has("response") -> obj.get("response").asString
+                    obj.has("description") -> obj.get("description").asString
+                    obj.has("content") -> obj.get("content").asString
+                    else -> {
+                        Log.w(TAG, "Unknown Vision response format: $responseBody")
+                        null
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Vision request error", e)
