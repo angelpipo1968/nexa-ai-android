@@ -202,9 +202,15 @@ class NexaRepository @Inject constructor() {
                     obj.has("response") -> obj.get("response").asString
                     obj.has("description") -> obj.get("description").asString
                     obj.has("content") -> obj.get("content").asString
+                    obj.has("error") -> {
+                        val err = obj.get("error")
+                        if (err.isJsonObject) {
+                            err.asJsonObject.get("message")?.asString ?: err.toString()
+                        } else err.asString
+                    }
                     else -> {
-                        Log.w(TAG, "Unknown Vision response format: $responseBody")
-                        null
+                        Log.w(TAG, "Unknown Vision response format, returning raw body: $responseBody")
+                        if (responseBody.trim().startsWith("{")) null else responseBody
                     }
                 }
             }

@@ -1347,7 +1347,7 @@ REAL-TIME DATA & SEARCHES:
                         base64Image = base64Image,
                         mimeType = mimeType,
                         question = question
-                    ) ?: visionDecision.fallbackMessage ?: "Función de visión en la nube en mantenimiento."
+                    ) ?: visionDecision.fallbackMessage ?: if (lang == AppLanguage.SPANISH) "No se recibió una descripción clara del servidor." else "No description received from server."
                 }
 
                 if (result.isNotBlank()) {

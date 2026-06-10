@@ -236,11 +236,13 @@ class MainActivity : ComponentActivity() {
             // Handle camera capture request from voice command
             androidx.compose.runtime.LaunchedEffect(uiState.requestCameraCapture) {
                 if (uiState.requestCameraCapture) {
-                    viewModel.clearCameraRequest()
+                    // Small delay to ensure state propagates
+                    kotlinx.coroutines.delay(100)
                     if (ContextCompat.checkSelfPermission(this@MainActivity, android.Manifest.permission.CAMERA)
                         == PackageManager.PERMISSION_GRANTED
                     ) {
                         captureImage.launch(null)
+                        viewModel.clearCameraRequest()
                     } else {
                         requestCameraPermission.launch(android.Manifest.permission.CAMERA)
                     }
