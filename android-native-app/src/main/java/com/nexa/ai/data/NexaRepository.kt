@@ -206,11 +206,13 @@ class NexaRepository @Inject constructor() {
                         val err = obj.get("error")
                         if (err.isJsonObject) {
                             err.asJsonObject.get("message")?.asString ?: err.toString()
-                        } else err.asString
+                        } else {
+                            err.asString
+                        }
                     }
                     else -> {
-                        Log.w(TAG, "Unknown Vision response format, returning raw body: $responseBody")
-                        if (responseBody.trim().startsWith("{")) null else responseBody
+                        // If it's a valid string but not in a known field, return raw if it's not JSON
+                        if (!responseBody.trim().startsWith("{")) responseBody else null
                     }
                 }
             }
