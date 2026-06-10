@@ -588,17 +588,7 @@ private fun PermanentDrawerPanel(
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-            // Hands-Free button
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
-                .clip(RoundedCornerShape(8.dp)).clickable { onToggleVoiceMode() }
-                .padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Headset, contentDescription = null,
-                    tint = accentColor.copy(alpha = 0.7f), modifier = Modifier.size(AdaptiveDimens.iconSmall()))
-                Text(NexaStrings.get("hands_free_drawer", lang), fontSize = AdaptiveTypography.labelMedium(), fontWeight = FontWeight.Medium,
-                    color = accentColor.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+
             // Translator button
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
                 .clip(RoundedCornerShape(8.dp)).clickable { onNavigateToTranslator() }
@@ -1316,17 +1306,7 @@ fun DrawerContent(
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
-        // Hands-Free button
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(8.dp)).clickable { onToggleVoiceMode(); onClose() }
-            .padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.Headset, contentDescription = null,
-                tint = NexaAccent.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-            Text(NexaStrings.get("hands_free_drawer", lang), fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                color = NexaAccent.copy(alpha = 0.8f), letterSpacing = 0.3.sp)
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+
         // Translator button
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(8.dp)).clickable { onNavigateToTranslator(); onClose() }

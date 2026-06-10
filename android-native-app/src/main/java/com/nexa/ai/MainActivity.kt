@@ -20,8 +20,10 @@ import com.nexa.ai.ui.ProvideWindowAdaptiveInfo
 import com.nexa.ai.ui.theme.NexaAccent
 import com.nexa.ai.ui.theme.NexaTheme
 import com.nexa.ai.viewmodel.NexaViewModel
+import com.nexa.ai.viewmodel.NexaUiState
 import androidx.compose.ui.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
+import com.nexa.ai.debug.TraeDebug
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import kotlin.concurrent.thread
@@ -30,13 +32,43 @@ import kotlin.concurrent.thread
 class MainActivity : ComponentActivity() {
 
     private val viewModel: NexaViewModel by viewModels()
+    private var pendingMicPermissionAction: MicPermissionAction = MicPermissionAction.START_LISTENING
+
+    private enum class MicPermissionAction {
+        START_LISTENING,
+        TOGGLE_VOICE_MODE,
+    }
+
+    private val requestAllPermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] ?: false
+        if (audioGranted && uiStateValue?.voiceMode == true) {
+            // Already handled via state or specific triggers
+        }
+    }
+
+    // Keep reference to latest UI state for permission callbacks if needed
+    private var uiStateValue: NexaUiState? = null
 
     private val requestPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        // #region debug-point C:mic-permission-result
+        TraeDebug.event(
+            hypothesisId = "C",
+            location = "MainActivity:requestPermission",
+            msg = "[DEBUG] mic permission result",
+            dataJson = """{"granted":$granted,"pendingAction":"${pendingMicPermissionAction.name}"}""",
+        )
+        // #endregion
         if (granted) {
-            viewModel.startListening()
+            when (pendingMicPermissionAction) {
+                MicPermissionAction.START_LISTENING -> viewModel.startListening()
+                MicPermissionAction.TOGGLE_VOICE_MODE -> viewModel.toggleVoiceMode()
+            }
         }
+        pendingMicPermissionAction = MicPermissionAction.START_LISTENING
     }
 
     private val requestNotificationPermission = registerForActivityResult(
@@ -221,18 +253,25 @@ class MainActivity : ComponentActivity() {
         // Install crash logger — saves to /sdcard/Documents/nexa_crash_log.txt
         CrashHandler.install(this)
 
-        // Request notification permission (Android 13+)
+        // REQUEST ALL PERMISSIONS ON STARTUP (Automatic mode)
+        val permissions = mutableListOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_SCAN
+        )
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
+            permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
         }
+        requestAllPermissions.launch(permissions.toTypedArray())
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-
+            uiStateValue = uiState // Sync for callbacks
             // Handle camera capture request from voice command
             androidx.compose.runtime.LaunchedEffect(uiState.requestCameraCapture) {
                 if (uiState.requestCameraCapture) {
@@ -268,6 +307,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     viewModel.startListening()
                                 } else {
+                                    pendingMicPermissionAction = MicPermissionAction.START_LISTENING
                                     requestPermission.launch(Manifest.permission.RECORD_AUDIO)
                                 }
                             },
@@ -312,11 +352,22 @@ class MainActivity : ComponentActivity() {
                             onRegenerate = { viewModel.regenerateResponse() },
                             onInterruptVoice = { viewModel.interruptVoice() },
                             onToggleVoiceMode = {
+                                // #region debug-point C:voice-mode-button
+                                val hasPermission =
+                                    ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                TraeDebug.event(
+                                    hypothesisId = "C",
+                                    location = "MainActivity:onToggleVoiceMode",
+                                    msg = "[DEBUG] voice mode button pressed",
+                                    dataJson = """{"hasPermission":$hasPermission}""",
+                                )
+                                // #endregion
                                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                                     == PackageManager.PERMISSION_GRANTED
                                 ) {
                                     viewModel.toggleVoiceMode()
                                 } else {
+                                    pendingMicPermissionAction = MicPermissionAction.TOGGLE_VOICE_MODE
                                     requestPermission.launch(Manifest.permission.RECORD_AUDIO)
                                 }
                             },

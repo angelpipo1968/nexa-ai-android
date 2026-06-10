@@ -17,6 +17,19 @@
           "current_key": "PLACEHOLDER_API_KEY_REPLACE_WITH_REAL_ONE"
         }
       ]
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000001",
+        "android_client_info": {
+          "package_name": "com.nexa.ai.debug"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "PLACEHOLDER_API_KEY_REPLACE_WITH_REAL_ONE"
+        }
+      ]
     }
   ],
   "configuration_version": "1"

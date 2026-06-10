@@ -1,11 +1,19 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+<<<<<<< HEAD
     // Kotlin is built-in with AGP 9.0+
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
+=======
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.10"
+    id("com.google.devtools.ksp") version "2.1.10-1.0.31"
+    id("com.google.dagger.hilt.android") version "2.51.1"
+>>>>>>> ae42962 (Merged remote changes, keeping local fixes)
 }
+
+
 
 android {
     namespace = "com.nexa.ai"
@@ -17,7 +25,7 @@ android {
         targetSdk = 36
         versionCode = 52
         versionName = "5.2"
-        buildConfigField("String", "API_BASE_URL", "\"https://www.nexa-ai.dev\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://nexa-ai.dev\"")
         
         // Enable multidex for Android < 14 compatibility
         multiDexEnabled = true

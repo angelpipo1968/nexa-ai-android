@@ -93,19 +93,18 @@ class ChatUseCase @Inject constructor(
                 val url = determineBaseUrl()
 
                 repository.sendMessage(
-                    messages = messages,
-                    baseUrl = url,
-                    provider = if (groqApiKey.isNullOrBlank()) null else "groq",
-                    language = null,
-                    systemPrompt = systemPrompt.ifBlank { null }
+                    messages = messageHistory,
+                    baseUrl = url
                 ).collect { event ->
                     when (event) {
                         is StreamEvent.Text -> {
+                            android.util.Log.d("ChatUseCase", "Received text chunk: ${event.text}")
                             _state.update { current ->
                                 current.copy(currentStreamingText = current.currentStreamingText + event.text)
                             }
                         }
                         is StreamEvent.Done -> {
+                            android.util.Log.d("ChatUseCase", "Stream DONE. Final text length: ${_state.value.currentStreamingText.length}")
                             val finalText = _state.value.currentStreamingText
                             if (finalText.isNotBlank()) {
                                 messageHistory.add(ChatMessage("assistant", finalText))

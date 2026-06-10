@@ -44,6 +44,7 @@ import javax.inject.Inject
 import com.nexa.ai.data.ContextProvider
 import com.nexa.ai.viewmodel.usecase.ChatUseCase
 import com.nexa.ai.viewmodel.usecase.VoiceUseCase
+import com.nexa.ai.debug.TraeDebug
 
 @HiltViewModel
 class NexaViewModel @Inject constructor(
@@ -100,19 +101,31 @@ class NexaViewModel @Inject constructor(
     private val speechReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
             if (intent == null) return
+            // #region debug-point B:speech-receiver
+            val action = intent.action ?: "null"
+            TraeDebug.event(
+                hypothesisId = "B",
+                location = "NexaViewModel:speechReceiver",
+                msg = "[DEBUG] speech broadcast received",
+                dataJson = """{"action":"${action.replace("\"", "\\\"")}","voiceMode":${_uiState.value.voiceMode},"isListening":${_uiState.value.isListening},"isThinking":${_uiState.value.isThinking}}""",
+            )
+            // #endregion
             when (intent.action) {
                 NexaSpeechService.ACTION_SPEECH_RESULT -> {
-                    // Only update UI — SpeechManager.onSpeechResult handles the actual logic
                     val text = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
                     _uiState.update { it.copy(inputText = text) }
+                    // ✅ CRITICAL: Actually process the result if in voice mode
+                    if (_uiState.value.voiceMode) {
+                        handleSpeechResult(text)
+                    } else {
+                        sendMessage(text)
+                    }
                 }
                 NexaSpeechService.ACTION_SPEECH_PARTIAL -> {
-                    // Only update UI partial text display
                     val partialText = intent.getStringExtra(NexaSpeechService.EXTRA_TEXT) ?: return
                     _uiState.update { it.copy(inputText = partialText) }
                 }
                 NexaSpeechService.ACTION_SPEECH_STATE -> {
-                    // Only update UI state flags — do NOT call SpeechManager callbacks
                     val state = intent.getStringExtra(NexaSpeechService.EXTRA_STATE) ?: return
                     when (state) {
                         "listening" -> _uiState.update { it.copy(isListening = true) }
@@ -120,6 +133,7 @@ class NexaViewModel @Inject constructor(
                         "speaking" -> _uiState.update { it.copy(isSpeaking = true) }
                         "barge_in" -> {
                             _uiState.update { it.copy(isSpeaking = false, speakingMessageId = null) }
+                            interruptVoice()
                         }
                     }
                 }
@@ -127,6 +141,75 @@ class NexaViewModel @Inject constructor(
                     val errorKey = intent.getStringExtra(NexaSpeechService.EXTRA_ERROR_KEY) ?: return
                     val lang = _uiState.value.language
                     _uiState.update { it.copy(error = NexaStrings.get(errorKey, lang)) }
+                    
+                    // Handle retries if in voice mode
+                    if (_uiState.value.voiceMode) {
+                        handleSpeechError(errorKey)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleSpeechResult(text: String) {
+        // #region debug-point H1:handle-speech-result
+        TraeDebug.event(
+            hypothesisId = "H1",
+            location = "NexaViewModel:handleSpeechResult",
+            msg = "handle_speech_result",
+            dataJson = """{"textLength":${text.length},"voiceMode":${_uiState.value.voiceMode},"isSpeaking":${_uiState.value.isSpeaking},"isThinking":${_uiState.value.isThinking},"isListening":${_uiState.value.isListening}}""",
+        )
+        // #endregion
+        // Prevent duplicate sends from rapid recognition results
+        val now = System.currentTimeMillis()
+        if (now - lastVoiceResultAt < voiceResultCooldownMs) {
+            android.util.Log.d("NexaVM", "Dropping duplicate voice result: $text")
+            return
+        }
+        lastVoiceResultAt = now
+
+        if (_uiState.value.isSpeaking) {
+            speechManager.stopSpeaking()
+        }
+
+        speechDebounceJob?.cancel()
+        speechDebounceJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(speechDebounceTimeMs)
+            
+            // Re-check if still in voice mode
+            if (!_uiState.value.voiceMode) return@launch
+
+            if (text.trim().length >= 2) {
+                sendMessage(text)
+            } else {
+                // Accidental noise, restart listening with delay
+                kotlinx.coroutines.delay(800)
+                if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isSpeaking) {
+                    speechManager.startListening()
+                }
+            }
+        }
+    }
+
+    private fun handleSpeechError(errorKey: String) {
+        // #region debug-point H1:handle-speech-error
+        TraeDebug.event(
+            hypothesisId = "H1",
+            location = "NexaViewModel:handleSpeechError",
+            msg = "handle_speech_error",
+            dataJson = """{"errorKey":"${errorKey.replace("\"", "\\\"")}","voiceMode":${_uiState.value.voiceMode},"retryCount":$voiceRetryCount,"isThinking":${_uiState.value.isThinking},"isListening":${_uiState.value.isListening},"isSpeaking":${_uiState.value.isSpeaking}}""",
+        )
+        // #endregion
+        voiceRetryCount++
+        if (voiceRetryCount >= maxVoiceRetries) {
+            _uiState.update { it.copy(voiceMode = false) }
+            stopVoiceMode()
+        } else {
+            val delayMs = (2000L * (1 + voiceRetryCount / 3)).coerceAtMost(5000L)
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(delayMs)
+                if (_uiState.value.voiceMode && !_uiState.value.isListening && !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                    speechManager.startListening()
                 }
             }
         }
@@ -134,8 +217,16 @@ class NexaViewModel @Inject constructor(
 
     private fun startSpeechService() {
         try {
+            // #region debug-point A:start-speech-service
+            TraeDebug.event(
+                hypothesisId = "A",
+                location = "NexaViewModel:startSpeechService",
+                msg = "[DEBUG] starting speech service",
+                dataJson = """{"voiceMode":${_uiState.value.voiceMode},"autoSpeak":${_uiState.value.autoSpeak}}""",
+            )
+            // #endregion
             val intent = android.content.Intent(getApplication(), NexaSpeechService::class.java)
-            androidx.core.content.ContextCompat.startForegroundService(getApplication(), intent)
+            getApplication<Application>().startService(intent)
         } catch (e: Exception) {
             android.util.Log.e("NexaVM", "Failed to start NexaSpeechService: ${e.message}", e)
         }
@@ -308,19 +399,52 @@ REAL-TIME DATA & SEARCHES:
         // Initialize Smart Router for online/offline AI
         initializeSmartRouter()
 
+        // ✅ Configure ChatUseCase with correct backend URL
+        chatUseCase.baseUrl = BuildConfig.API_BASE_URL
+
         // ✅ Observe ChatUseCase state and sync with UI state
         viewModelScope.launch {
             chatUseCase.state.collect { chatState ->
+                // Sync thinking state and error
                 _uiState.update { current ->
                     current.copy(
                         isThinking = chatState.isLoading,
                         error = chatState.error
                     )
                 }
-                // Append new assistant message when available
-                if (chatState.messages.isNotEmpty()) {
+
+                // Sync streaming text
+                val streamingText = chatState.currentStreamingText
+                if (streamingText.isNotEmpty()) {
+                    updateActiveSession { session ->
+                        val messages = session.messages.toMutableList()
+                        val streamIdx = messages.indexOfLast { it.isStreaming }
+                        if (streamIdx >= 0) {
+                            messages[streamIdx] = messages[streamIdx].copy(content = streamingText)
+                        } else {
+                            messages.add(Message(
+                                id = "streaming",
+                                role = "assistant",
+                                content = streamingText,
+                                isStreaming = true
+                            ))
+                        }
+                        session.copy(messages = messages)
+                    }
+                }
+
+                // Append new assistant message when available (completed)
+                if (!chatState.isLoading && chatState.messages.isNotEmpty()) {
                     val last = chatState.messages.last()
                     if (last.ai != lastSyncedAssistantMessage) {
+                        // #region debug-point H2:assistant-message-ready
+                        TraeDebug.event(
+                            hypothesisId = "H2",
+                            location = "NexaViewModel:chatState",
+                            msg = "assistant_message_ready",
+                            dataJson = """{"aiLength":${last.ai.length},"voiceMode":${_uiState.value.voiceMode},"autoSpeak":${_uiState.value.autoSpeak},"isThinking":${_uiState.value.isThinking}}""",
+                        )
+                        // #endregion
                         lastSyncedAssistantMessage = last.ai
                         val assistantMsg = Message(
                             id = "a-${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}",
@@ -328,16 +452,18 @@ REAL-TIME DATA & SEARCHES:
                             content = last.ai
                         )
                         updateActiveSession { session ->
-                            val alreadyContains = session.messages.any { it.content == last.ai && it.role == "assistant" }
+                            // Remove streaming placeholder and add final message
+                            val messages = session.messages.filter { !it.isStreaming }.toMutableList()
+                            val alreadyContains = messages.any { it.content == last.ai && it.role == "assistant" }
                             if (!alreadyContains) {
-                                session.copy(messages = session.messages + assistantMsg)
-                            } else {
-                                session
+                                messages.add(assistantMsg)
                             }
+                            session.copy(messages = messages, updatedAt = System.currentTimeMillis())
                         }
 
-                        // ✅ SPEECH SYNTHESIS: Speak if hands-free/voiceMode is enabled!
-                        if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                        // ✅ SPEECH SYNTHESIS: Speak if autoSpeak is enabled!
+                        if (_uiState.value.autoSpeak) {
+                            android.util.Log.d("NexaVM", "Triggering speak for message: ${assistantMsg.id} (voiceMode=${_uiState.value.voiceMode})")
                             speak(last.ai, assistantMsg.id)
                         }
 
@@ -347,6 +473,11 @@ REAL-TIME DATA & SEARCHES:
                             aiResponse = last.ai,
                             emotion = voiceEnhancer.voiceState.value.voiceEmotion
                         )
+                    }
+                } else if (!chatState.isLoading && streamingText.isEmpty()) {
+                    // Ensure streaming placeholder is removed when loading finishes
+                    updateActiveSession { session ->
+                        session.copy(messages = session.messages.filter { !it.isStreaming })
                     }
                 }
             }
@@ -893,6 +1024,14 @@ REAL-TIME DATA & SEARCHES:
     // ═══════════════════════════════════════
 
     fun speak(text: String, messageId: String? = null) {
+        // #region debug-point H3:viewmodel-speak
+        TraeDebug.event(
+            hypothesisId = "H3",
+            location = "NexaViewModel:speak",
+            msg = "viewmodel_speak_called",
+            dataJson = """{"textLength":${text.length},"messageIdProvided":${messageId != null},"voiceMode":${_uiState.value.voiceMode},"autoSpeak":${_uiState.value.autoSpeak},"speakingMessageIdPresent":${_uiState.value.speakingMessageId != null}}""",
+        )
+        // #endregion
         speechManager.speak(text, messageId, _uiState.value.speakingMessageId)
     }
 
@@ -937,6 +1076,7 @@ REAL-TIME DATA & SEARCHES:
     // ═══════════════════════════════════════
 
     fun createNewSession() {
+        chatUseCase.clearChat()
         val session = ChatSession()
         _uiState.value = _uiState.value.copy(
             sessions = listOf(session) + _uiState.value.sessions,
@@ -997,6 +1137,14 @@ REAL-TIME DATA & SEARCHES:
     fun sendMessage(text: String? = null) {
         val content = text ?: _uiState.value.inputText.trim()
         if (content.isBlank() && _uiState.value.pendingAttachment == null) return
+        // #region debug-point H2:send-message
+        TraeDebug.event(
+            hypothesisId = "H2",
+            location = "NexaViewModel:sendMessage",
+            msg = "send_message_called",
+            dataJson = """{"contentLength":${content.length},"voiceMode":${_uiState.value.voiceMode},"autoSpeak":${_uiState.value.autoSpeak},"isListening":${_uiState.value.isListening},"isSpeaking":${_uiState.value.isSpeaking},"isThinking":${_uiState.value.isThinking}}""",
+        )
+        // #endregion
 
         // Voice-mode mute handling (existing logic preserved)
         if (_uiState.value.voiceMode) {
@@ -1194,6 +1342,14 @@ REAL-TIME DATA & SEARCHES:
 
     fun toggleVoiceMode() {
         val activating = !_uiState.value.voiceMode
+        // #region debug-point H4:toggle-voice-mode
+        TraeDebug.event(
+            hypothesisId = "H4",
+            location = "NexaViewModel:toggleVoiceMode",
+            msg = if (activating) "voice_mode_activating" else "voice_mode_deactivating",
+            dataJson = """{"currentVoiceMode":${_uiState.value.voiceMode},"autoSpeak":${_uiState.value.autoSpeak},"isListening":${_uiState.value.isListening},"isSpeaking":${_uiState.value.isSpeaking},"isThinking":${_uiState.value.isThinking}}""",
+        )
+        // #endregion
         _uiState.value = _uiState.value.copy(voiceMode = activating, voiceVolumeLevel = 0f)
         if (activating) {
             // Enable auto-speak so AI responses are spoken aloud

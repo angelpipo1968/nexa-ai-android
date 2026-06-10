@@ -3,6 +3,7 @@ package com.nexa.ai.data
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.nexa.ai.debug.TraeDebug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -62,43 +63,52 @@ class NexaRepository @Inject constructor() {
     fun sendMessage(
         messages: List<ChatMessage>,
         baseUrl: String,
-        provider: String? = null,
-        language: String? = null,
-        systemPrompt: String? = null,
         latitude: Double? = null,
         longitude: Double? = null,
         city: String? = null,
         country: String? = null
     ): Flow<StreamEvent> = callbackFlow {
-        val chatRequest = ChatRequest(messages, provider, language, systemPrompt, latitude, longitude, city, country)
-        val body = gson.toJsonTree(chatRequest).asJsonObject
-
-        // Remove systemPrompt from body and inject as first message instead
-        if (body.has("systemPrompt")) body.remove("systemPrompt")
-        if (!systemPrompt.isNullOrBlank()) {
-            val msgArray = body.getAsJsonArray("messages")
-            val systemMsg = com.google.gson.JsonObject().apply {
-                addProperty("role", "system")
-                addProperty("content", systemPrompt)
+        // Build a clean JSON body that exactly matches the server's expected schema (Zod)
+        val body = JsonObject().apply {
+            val msgArray = com.google.gson.JsonArray()
+            messages.forEach {
+                val m = JsonObject()
+                m.addProperty("role", it.role)
+                m.addProperty("content", it.content)
+                msgArray.add(m)
             }
-            msgArray?.let { it ->
-                val newArray = com.google.gson.JsonArray()
-                newArray.add(systemMsg)
-                it.forEach { elem -> newArray.add(elem) }
-                body.add("messages", newArray)
-            }
+            add("messages", msgArray)
+            
+            // Add location if available
+            if (latitude != null) addProperty("latitude", latitude)
+            if (longitude != null) addProperty("longitude", longitude)
+            if (city != null) addProperty("city", city)
+            if (country != null) addProperty("country", country)
         }
+
+        Log.d(TAG, "Sending request to: $baseUrl/api/chat")
+        Log.d(TAG, "Request body: $body")
 
         val httpRequest = Request.Builder()
             .url("$baseUrl/api/chat")
             .header("Accept", "text/event-stream")
             .header("Cache-Control", "no-cache")
+            .header("User-Agent", "NexaAI-Android/1.2.0")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         val listener = object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: Response) {
-                Log.d(TAG, "SSE Connection Opened")
+                Log.d(TAG, "SSE Connection Opened: ${response.code}")
+                Log.d(TAG, "Content-Type: ${response.header("Content-Type")}")
+                // #region debug-point H2:sse-open
+                TraeDebug.event(
+                    hypothesisId = "H2",
+                    location = "NexaRepository:onOpen",
+                    msg = "sse_open",
+                    dataJson = """{"code":${response.code},"contentType":"${(response.header("Content-Type") ?: "").replace("\"", "\\\"")}"}""",
+                )
+                // #endregion
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
@@ -117,6 +127,14 @@ class NexaRepository @Inject constructor() {
 
                     if (obj.has("text")) {
                         val text = obj.get("text").asString
+                        // #region debug-point H2:sse-text
+                        TraeDebug.event(
+                            hypothesisId = "H2",
+                            location = "NexaRepository:onEvent",
+                            msg = "sse_text_chunk",
+                            dataJson = """{"textLength":${text.length}}""",
+                        )
+                        // #endregion
                         if (text.isNotEmpty()) trySend(StreamEvent.Text(text))
                     }
 
@@ -144,8 +162,19 @@ class NexaRepository @Inject constructor() {
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 Log.e(TAG, "SSE Failure: ${t?.message}", t)
+                // #region debug-point H2:sse-failure
+                TraeDebug.event(
+                    hypothesisId = "H2",
+                    location = "NexaRepository:onFailure",
+                    msg = "sse_failure",
+                    dataJson = """{"code":${response?.code ?: -1},"contentType":"${(response?.header("Content-Type") ?: "").replace("\"", "\\\"")}","throwable":"${(t?.javaClass?.simpleName ?: "null").replace("\"", "\\\"")}","message":"${(t?.message ?: "").replace("\"", "\\\"")}"}""",
+                )
+                // #endregion
                 
                 val errorEvent = when {
+                    response?.code == 404 -> StreamEvent.Error("API endpoint not found (404). Check URL.")
+                    response?.header("Content-Type")?.contains("text/html") == true -> 
+                        StreamEvent.Error("Server returned HTML instead of API response. Possible redirect or error page.")
                     t is SocketTimeoutException -> StreamEvent.Error("timeout")
                     t is IOException -> StreamEvent.Error("network_error")
                     response?.code == 401 -> StreamEvent.AuthExpired
