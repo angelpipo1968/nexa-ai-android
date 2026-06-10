@@ -1466,6 +1466,12 @@ fun ChatTopBar(uiState: NexaUiState, isDarkTheme: Boolean, onToggleDrawer: () ->
                         Text(NexaStrings.get("online", uiState.language), fontSize = 8.sp,
                             color = if (isDarkTheme) NexaAccent.copy(alpha = 0.8f) else Color(0xFF007A4D), 
                             letterSpacing = 1.5.sp, fontWeight = FontWeight.Bold)
+                        
+                        if (uiState.isHandsFreeVisionActive) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color(0xFF00E5D0)))
+                            Text("VISIÓN", fontSize = 8.sp, color = Color(0xFF00E5D0), letterSpacing = 1.sp, fontWeight = FontWeight.Black)
+                        }
                     }
                 }
             }

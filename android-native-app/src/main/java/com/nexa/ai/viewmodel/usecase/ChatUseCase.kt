@@ -63,16 +63,30 @@ class ChatUseCase @Inject constructor(
      *
      * @param text The user's message content
      * @param viewModelScope The ViewModel's coroutine scope for collecting the flow
+     * @param extraContext Optional context (e.g., web search results) to inject
      */
-    fun sendMessage(text: String, viewModelScope: CoroutineScope) {
-        // Add user message to history
-        messageHistory.add(ChatMessage("user", text))
+    fun sendMessage(text: String, viewModelScope: CoroutineScope, extraContext: String? = null) {
+        // Add user message to history if not already there (prevents duplicates during regenerate)
+        if (messageHistory.lastOrNull()?.content != text) {
+            messageHistory.add(ChatMessage("user", text))
+        }
+
+        val finalPrompt = if (!extraContext.isNullOrBlank()) {
+            "[CONTEXT: $extraContext]\n\nUSER MESSAGE: $text"
+        } else {
+            text
+        }
 
         _state.update { it.copy(isLoading = true, error = null, currentStreamingText = "") }
 
         viewModelScope.launch {
             try {
-                val messages = buildMessageList()
+                val messages = buildMessageList().toMutableList()
+                // Replace the last user message with the contextual one for the API call
+                if (messages.isNotEmpty() && messages.last().role == "user") {
+                    messages[messages.size - 1] = ChatMessage("user", finalPrompt)
+                }
+
                 val url = determineBaseUrl()
 
                 repository.sendMessage(
@@ -122,6 +136,27 @@ class ChatUseCase @Inject constructor(
                 android.util.Log.e("ChatUseCase", "Error sending message: ${e.message}", e)
             }
         }
+    }
+
+    /**
+     * Re-trigger the last user message to get a new AI response.
+     */
+    fun regenerateResponse(viewModelScope: CoroutineScope) {
+        val lastUserMsg = messageHistory.lastOrNull { it.role == "user" }?.content ?: return
+        
+        // Remove the last assistant message from history
+        if (messageHistory.lastOrNull()?.role == "assistant") {
+            messageHistory.removeAt(messageHistory.size - 1)
+        }
+        
+        // Remove the last entry from the state messages list
+        _state.update { current ->
+            if (current.messages.isNotEmpty()) {
+                current.copy(messages = current.messages.dropLast(1))
+            } else current
+        }
+        
+        sendMessage(lastUserMsg, viewModelScope)
     }
 
     /**

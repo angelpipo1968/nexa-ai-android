@@ -155,8 +155,35 @@ class NexaViewModel @Inject constructor(
     private var voiceRetryCount = 0
     private val maxVoiceRetries = 10
 
-    // ── Advanced AI System Prompt (compressed to reduce memory) ──
-    private val advancedSystemPrompt = "You are NEXA PRO v5.2, an advanced AI assistant by ZOO company. Be concise, accurate, and helpful. Respond in the user's language (Spanish/English)."
+    // ── Advanced AI System Prompt (Senior Architect/Engineer v5.4) ──
+    private val advancedSystemPrompt = """
+You are NEXA PRO v5.4, an Ultra Advanced Autonomous AI System developed by ZOO company.
+You are designed as a world-class senior engineer, software architect, analyst, and researcher.
+
+MISSION: Provide highly accurate, intelligent, optimized, and production-ready responses.
+
+CORE RULES:
+- Think deeply before answering. Use multi-step reasoning internally.
+- Never hallucinate. Verify information whenever possible.
+- Detect and self-correct mistakes before responding.
+- Prefer precision and technical depth over generic speed.
+- Respond in the user's language (Spanish or English).
+
+DEVELOPMENT CAPABILITIES:
+- Generate production-level code, architectures, and database schemas.
+- Build clean, modular, and scalable solutions.
+- Optimize performance and detect bugs automatically.
+
+VOICE INTERACTION & TTS (CRITICAL):
+- Your responses are read by a Text-To-Speech (TTS) engine.
+- AVOID ALL markdown symbols like asterisks (*), hashtags (#), underscores (_), or backticks (`).
+- Write naturally in plain text with normal punctuation.
+- Do not use markdown lists or tables; use natural prose (e.g., "First...", "Second...").
+
+REAL-TIME DATA & SEARCHES:
+- Use your integrated tools for live data (weather, prices, news).
+- Provide accurate, real-time information formatted for fluid reading.
+""".trimIndent()
 
     /** Builds a dynamic system prompt with location context when available. */
     private fun buildSystemPrompt(): String {
@@ -212,9 +239,9 @@ class NexaViewModel @Inject constructor(
     }
 
     // Debounce logic — prevents rapid/accidental voice triggers
-    // Reduced from 800ms to 600ms for faster response while still filtering noise
+    // v5.4: Reduced to 450ms for world-class fluidity
     private var speechDebounceJob: kotlinx.coroutines.Job? = null
-    private val speechDebounceTimeMs = 600L
+    private val speechDebounceTimeMs = 450L
 
     // Track last successful voice result time to prevent duplicate sends
     private var lastVoiceResultAt = 0L
@@ -258,7 +285,9 @@ class NexaViewModel @Inject constructor(
             addAction(NexaSpeechService.ACTION_SPEECH_ERROR)
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            application.registerReceiver(speechReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+            androidx.core.content.ContextCompat.registerReceiver(
+                application, speechReceiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
         } else {
             application.registerReceiver(speechReceiver, filter)
         }
@@ -474,12 +503,9 @@ class NexaViewModel @Inject constructor(
                     // Start actual speech recognition if not already listening
                     if (!_uiState.value.isListening && !_uiState.value.isThinking) {
                         viewModelScope.launch {
-                            // ═══ v5.1 BUG 3 FIX ═══
-                            // Increased from 300ms to 700ms — on Samsung/Xiaomi/OPPO
-                            // devices the audio system needs more time to switch from
-                            // TTS output to mic input. 300ms caused SpeechRecognizer
-                            // errors and restart loops.
-                            kotlinx.coroutines.delay(700)
+                            // ═══ v5.4 SEAMLESS TRANSITION IMPROVEMENT ═══
+                            // Reduced from 700ms to 150ms for near-instant conversation.
+                            kotlinx.coroutines.delay(150)
                             if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                                 !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                                 speechManager.startListening()
@@ -586,10 +612,9 @@ class NexaViewModel @Inject constructor(
         speechManager.onRecognitionEnded = {
             if (_uiState.value.voiceMode) {
                 viewModelScope.launch {
-                    // ═══ v5.1 BUG 3 FIX ═══
-                    // Increased back to 2000ms — 1500ms was too aggressive
-                    // and caused rapid restart loops on some devices
-                    kotlinx.coroutines.delay(2000)
+                    // ═══ v5.4 FAST RE-ARM ═══
+                    // Reduced from 2000ms to 400ms for near-instant re-listening
+                    kotlinx.coroutines.delay(400)
                     if (_uiState.value.voiceMode && !_uiState.value.isListening &&
                         !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
                         speechManager.startListening()
@@ -1051,13 +1076,30 @@ class NexaViewModel @Inject constructor(
             }
         }
 
-        // Existing voice command parsing (clear chat, export PDF, etc.) – keep as needed
-        when {
-            content.equals("clear chat", ignoreCase = true) -> {
+        // --- VOICE COMMAND DETECTION ---
+        if (_uiState.value.voiceMode) {
+            val cmd = content.lowercase().trim()
+            val lang = _uiState.value.language
+            
+            // ✅ HANDS-FREE VISION COMMANDS
+            if (cmd.contains("activa visión manos libres") || cmd.contains("activar visión manos libres") || cmd.contains("enable hands free vision")) {
+                _uiState.update { it.copy(isHandsFreeVisionActive = true) }
+                speak(if (lang == AppLanguage.SPANISH) "Modo visión manos libres activado. Ahora puedes decir mira esto o qué ves." else "Hands-free vision mode enabled. You can now say look at this or what do you see.")
+                return
+            }
+            if (cmd.contains("mira esto") || cmd.contains("qué ves") || cmd.contains("describe lo que ves") || 
+                cmd.contains("look at this") || cmd.contains("what do you see") || cmd.contains("describe what you see")) {
+                
+                speak(if (lang == AppLanguage.SPANISH) "Entendido, estoy mirando. Por favor, apunta la cámara y toma la foto." else "Understood, I'm looking. Please point the camera and take the photo.")
+                // Request camera capture via UI
+                _uiState.update { it.copy(requestCameraCapture = true) }
+                return
+            }
+            
+            if (cmd.contains("limpiar chat") || cmd.contains("borra el chat") || cmd.contains("clear chat")) {
                 clearChat()
                 return
             }
-            // ... other voice commands remain unchanged ...
         }
 
         // Build final user message (with attachment prefix)
@@ -1086,14 +1128,32 @@ class NexaViewModel @Inject constructor(
         )
 
         // ✅ Delegate core AI interaction to ChatUseCase
-        chatUseCase.apply {
-            baseUrl = BuildConfig.API_BASE_URL
-            systemPrompt = buildSystemPrompt()
-            groqApiKey = _uiState.value.groqApiKey
-            maxTokens = _uiState.value.maxTokens
-            useLocalLLM = _uiState.value.useLocalLLM
+        viewModelScope.launch {
+            var webContext: String? = null
+            
+            // Smart Web Search Trigger: check for news, prices, weather, etc.
+            val needsWeb = Regex("(?i)(precio|vuelo|noticia|clima|weather|price|news|flight|cotización|dólar|bitcoin|ethereum|hoy|ahora|live|actual)").containsMatchIn(content)
+            
+            if (needsWeb) {
+                try {
+                    val searchResult = performWebSearch(content)
+                    if (searchResult.summary.isNotBlank()) {
+                        webContext = searchResult.summary
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("NexaVM", "Web search failed: ${e.message}")
+                }
+            }
+
+            chatUseCase.apply {
+                baseUrl = BuildConfig.API_BASE_URL
+                systemPrompt = buildSystemPrompt()
+                groqApiKey = _uiState.value.groqApiKey
+                maxTokens = _uiState.value.maxTokens
+                useLocalLLM = _uiState.value.useLocalLLM
+            }
+            chatUseCase.sendMessage(fullContent, viewModelScope, extraContext = webContext)
         }
-        chatUseCase.sendMessage(fullContent, viewModelScope)
     }
 
     fun onError(message: String) {
@@ -1105,7 +1165,17 @@ class NexaViewModel @Inject constructor(
     }
 
     fun regenerateResponse() {
-        // Not implemented yet
+        speechManager.stopSpeaking()
+        
+        // Remove the last assistant message from the active session
+        updateActiveSession { session ->
+            if (session.messages.isNotEmpty() && session.messages.last().role == "assistant") {
+                session.copy(messages = session.messages.dropLast(1))
+            } else session
+        }
+        
+        _uiState.update { it.copy(isThinking = true, error = null) }
+        chatUseCase.regenerateResponse(viewModelScope)
     }
 
     fun toggleAutoSpeak() {
@@ -1147,7 +1217,7 @@ class NexaViewModel @Inject constructor(
     }
 
     fun stopVoiceMode() {
-        _uiState.value = _uiState.value.copy(voiceMode = false)
+        _uiState.value = _uiState.value.copy(voiceMode = false, isHandsFreeVisionActive = false)
         speechManager.stopVoiceAudioSession()
         stopSpeechService()
         voiceUseCase.stopVoiceSession()
@@ -1250,6 +1320,11 @@ class NexaViewModel @Inject constructor(
         }
 
         _uiState.value = _uiState.value.copy(isThinking = true, error = null)
+        
+        // Audible feedback for Hands-Free
+        if (_uiState.value.voiceMode) {
+            speak(if (lang == AppLanguage.SPANISH) "Imagen recibida. Analizando..." else "Image received. Analyzing...")
+        }
 
         viewModelScope.launch {
             try {
