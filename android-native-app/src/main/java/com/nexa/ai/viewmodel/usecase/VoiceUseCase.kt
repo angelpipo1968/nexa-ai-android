@@ -66,9 +66,13 @@ class VoiceUseCase @Inject constructor(
      * and VoiceEnhancer wake word detection.
      */
     fun startVoiceSession() {
-        // Start wake word detection
-        voiceEnhancer.startWakeWordDetection()
-        _state.update { it.copy(isWakeWordActive = true) }
+        // FIX: Do NOT start wake word detection here — it opens a separate AudioRecord
+        // that competes with SpeechRecognizer for the microphone, causing "not connected" errors.
+        // Wake word should only be used in background/standby mode, not during active voice sessions.
+        // voiceEnhancer.startWakeWordDetection()  // DISABLED: causes mic conflict
+
+        // Track that voice session is active (for conversation context)
+        _state.update { it.copy(isWakeWordActive = false, sessionState = VoiceSessionState.LISTENING) }
 
         // Wire voice enhancer callbacks if not already done
         voiceEnhancer.onWakeWordDetected = {
@@ -87,7 +91,7 @@ class VoiceUseCase @Inject constructor(
             _state.update { it.copy(sessionState = VoiceSessionState.PROCESSING) }
         }
 
-        android.util.Log.d("VoiceUseCase", "Voice session started — wake word active")
+        android.util.Log.d("VoiceUseCase", "Voice session started — wake word DISABLED to prevent mic conflict")
     }
 
     /**

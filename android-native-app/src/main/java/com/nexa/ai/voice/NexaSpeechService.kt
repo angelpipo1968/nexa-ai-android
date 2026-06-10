@@ -134,12 +134,15 @@ class NexaSpeechService : Service() {
 
     private fun startSpeechListeningSession() {
         try {
-            Log.d(TAG, "Arrancando sesión de audio manos libres y reconociendo...")
+            // FIX: Only start the audio session here — do NOT call startListening()
+            // because the ViewModel already manages the listening lifecycle.
+            // Calling startListening() here creates a duplicate SpeechRecognizer
+            // that competes with the ViewModel's instance for the microphone.
             speechManager.startVoiceAudioSession()
-            speechManager.startListening()
+            // speechManager.startListening()  // REMOVED: ViewModel manages listening
             
-            // Notificamos el estado mediante broadcast
-            sendSpeechStateBroadcast("listening")
+            Log.d(TAG, "Sesión de audio manos libres iniciada (listening gestionado por ViewModel)")
+            sendSpeechStateBroadcast("ready")
         } catch (e: Exception) {
             Log.e(TAG, "Error al iniciar la sesión de escucha: ${e.message}", e)
             sendSpeechErrorBroadcast("init_failed")

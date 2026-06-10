@@ -1115,6 +1115,19 @@ class NexaViewModel @Inject constructor(
             startSpeechService()
             // Start voice session tracking via VoiceUseCase
             voiceUseCase.startVoiceSession()
+
+            // CRITICAL FIX: Start listening immediately after activating voice mode!
+            // Without this, the mic never turns on and voice input doesn't work.
+            // The old code only started listening after TTS finished speaking,
+            // but if the AI hasn't spoken yet, the mic would never activate.
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(500) // Wait for audio session to fully initialize
+                if (_uiState.value.voiceMode && !_uiState.value.isListening &&
+                    !_uiState.value.isThinking && !_uiState.value.isSpeaking) {
+                    speechManager.startListening()
+                    android.util.Log.d("NexaVM", "Voice mode activated — starting initial listening")
+                }
+            }
         } else {
             // Stop SpeechManager audio session and release audio routing
             speechManager.stopVoiceAudioSession()
