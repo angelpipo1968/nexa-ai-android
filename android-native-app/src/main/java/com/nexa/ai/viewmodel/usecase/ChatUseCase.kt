@@ -1,5 +1,6 @@
 package com.nexa.ai.viewmodel.usecase
 
+import com.nexa.ai.BuildConfig
 import com.nexa.ai.data.ChatMessage
 import com.nexa.ai.data.NexaRepository
 import com.nexa.ai.data.StreamEvent
@@ -48,7 +49,7 @@ class ChatUseCase @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Configuration — set by ViewModel before sending
-    var baseUrl: String = "https://nexa-ai-server.vercel.app"
+    var baseUrl: String = BuildConfig.API_BASE_URL
     var systemPrompt: String = ""
     var groqApiKey: String? = null
     var useLocalLLM: Boolean = false

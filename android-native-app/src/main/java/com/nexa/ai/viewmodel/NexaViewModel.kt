@@ -1086,6 +1086,13 @@ class NexaViewModel @Inject constructor(
         )
 
         // ✅ Delegate core AI interaction to ChatUseCase
+        chatUseCase.apply {
+            baseUrl = BuildConfig.API_BASE_URL
+            systemPrompt = buildSystemPrompt()
+            groqApiKey = _uiState.value.groqApiKey
+            maxTokens = _uiState.value.maxTokens
+            useLocalLLM = _uiState.value.useLocalLLM
+        }
         chatUseCase.sendMessage(fullContent, viewModelScope)
     }
 

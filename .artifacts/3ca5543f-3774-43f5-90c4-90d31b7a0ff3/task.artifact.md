@@ -1,0 +1,3 @@
+- [ ] Remove legacy `kotlinOptions` from app-level build file
+- [ ] Remove incompatible `kapt` plugin from root build file
+- [ ] Verify build and sync

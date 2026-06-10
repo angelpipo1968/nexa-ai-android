@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Nexas AI - Mobile</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-mesh: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #03001e 100%);
+            --glass-bg: rgba(10, 10, 25, 0.8);
+            --glass-border: rgba(99, 102, 241, 0.15);
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --accent: #10b981;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: #03001e;
+            background-image: var(--bg-mesh);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .app-wrapper {
+            width: 100%;
+            height: 100vh;
+            background: var(--glass-bg);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 1rem;
+            background: rgba(15, 12, 35, 0.4);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .header-title-wrapper h1 {
+            font-size: 1.1rem;
+            background: linear-gradient(to right, #ffffff, #c7d2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: transparent;
+            color: white;
+        }
+
+        #handsFreeStatus.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .chat-area {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message-row {
+            display: flex;
+            width: 100%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .message-row.bot {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 0.8rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .user .message-content {
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot .message-content {
+            background: rgba(20, 20, 45, 0.6);
+            color: #e2e8f0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-meta {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+            text-align: right;
+        }
+
+        .bot .message-meta {
+            text-align: left;
+        }
+
+        .input-panel {
+            padding: 1rem;
+            background: rgba(10, 8, 25, 0.7);
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .input-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(5, 3, 15, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 0.5rem;
+        }
+
+        .input-container input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 0.5rem;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .input-container input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .mic-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mic-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .mic-btn.listening {
+            color: #ef4444;
+            animation: pulse 1.2s infinite alternate;
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            height: 40px;
+            padding: 0 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+        }
+
+        .category-container {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .category-badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .category-badge:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+        }
+
+        .category-badge.active {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: var(--secondary);
+            color: #d8b4fe;
+        }
+
+        .warning-bar {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+            padding: 0.5rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .typing-bubble {
+            background: rgba(20, 20, 45, 0.6);
+            border: 1px solid var(--glass-border);
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            border-bottom-left-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            width: fit-content;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--secondary);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: typingAnimation 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+            background: var(--primary);
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+            background: var(--accent);
+        }
+
+        .proximity-overlay {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            padding: 0.8rem 1.2rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .proximity-overlay.active {
+            opacity: 1;
+        }
+
+        .latency-indicator, .booster-indicator {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #6ee7b7;
+            padding: 0.2rem 0.4rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            min-width: 60px;
+            justify-content: center;
+        }
+
+        .latency-indicator {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            color: #a5b4fc;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            from { filter: drop-shadow(0 0 2px #ef4444); }
+            to { filter: drop-shadow(0 0 8px #ef4444) scale(1.1); }
+        }
+
+        @keyframes typingAnimation {
+            0%, 100% { transform: translateY(0); opacity: 0.6; }
+            50% { transform: translateY(-6px); opacity: 1; }
+        }
+
+        /* Scrollbar mobile */
+        .chat-area::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+            border-radius: 2px;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .message-content {
+                max-width: 85%;
+                font-size: 0.85rem;
+                padding: 0.6rem 0.8rem;
+            }
+            
+            .header-title-wrapper h1 {
+                font-size: 1rem;
+            }
+            
+            .control-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <header class="header">
+            <div class="header-title-wrapper">
+                <h1>Nexas AI Mobile</h1>
+                <p><i class="fa-solid fa-shield-halved" style="color: var(--accent); font-size: 0.7rem;"></i> Voice Ready</p>
+            </div>
+            
+            <div class="header-controls">
+                <button class="control-btn active" id="voiceToggle" title="Voz">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+                <button id="handsFreeStatus" class="control-btn" title="Manos Libres">
+                    <i class="fa-solid fa-microphone-slash"></i>
+                </button>
+                <button class="control-btn" id="clearChatBtn" title="Limpiar">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <div id="connectionStatus" class="control-btn" title="Conexión">
+                    <i class="fa-solid fa-wifi"></i>
+                </div>
+            </div>
+        </header>
+
+        <main class="chat-area" id="chatArea">
+            <div class="message-row bot">
+                <div class="message-content">
+                    <div style="font-weight: 700; margin-bottom: 0.2rem; color: var(--secondary);">
+                        <i class="fa-solid fa-sparkles"></i> Nexas AI
+                    </div>
+                    ¡Hola! Soy Nexas v5 con modo manos libres mejorado. 🎤<br><br>
+                    Presiona el micrófono para hablar o escribe tu consulta.
+                    <div class="message-meta">
+                        <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
+                        Nexas AI • Ahora
+                        <button class="msg-speak-btn" onclick="readMessageText(this.parentElement.parentElement)">
+                            <i class="fa-solid fa-volume-high"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="input-panel">
+            <div class="category-container">
+                <div class="category-badge active" data-category="general">Chat</div>
+                <div class="category-badge" data-category="coding">Código</div>
+                <div class="category-badge" data-category="design">Diseño</div>
+                <div class="category-badge" data-category="voice">Voz</div>
+            </div>
+
+            <div class="warning-bar" id="warningBar">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="warningMsg"></span>
+            </div>
+
+            <div class="input-container">
+                <button class="mic-btn" id="micBtn" aria-label="Micrófono">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+                <input type="text" id="chatInput" placeholder="Pregúntale a Nexas..." aria-label="Entrada">
+                <button class="send-btn" id="sendBtn">
+                    Enviar <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <div class="proximity-overlay" id="proximityOverlay">
+        <i class="fa-solid fa-ear"></i>
+        <span>Oreja detectada</span>
+    </div>
+
+    <script>
+        // Variables globales
+        const chatArea = document.getElementById('chatArea');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const micBtn = document.getElementById('micBtn');
+        const voiceToggle = document.getElementById('voiceToggle');
+        const clearChatBtn = document.getElementById('clearChatBtn');
+        const handsFreeStatus = document.getElementById('handsFreeStatus');
+        const warningBar = document.getElementById('warningBar');
+        const warningMsg = document.getElementById('warningMsg');
+        const proximityOverlay = document.getElementById('proximityOverlay');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        let isVoiceEnabled = true;
+        let isListening = false;
+        let isHandsFreeEnabled = false;
+        let recognition = null;
+        let ttsSynth = window.speechSynthesis;
+        let currentUtterance = null;
+
+        // Inicializar reconocimiento de voz
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'es-ES';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                chatInput.placeholder = "Escuchando...";
+                hideWarning();
+            };
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                chatInput.value = speechResult;
+                handleSendMessage();
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Error de voz:", event.error);
+                if (event.error === 'not-allowed') {
+                    showWarning("Permiso de micrófono denegado");
+                } else if (event.error === 'no-speech') {
+                    showWarning("No detecté voz. Intenta de nuevo.");
+                } else {
+                    showWarning("Error: " + event.error);
+                }
+                stopListening();
+            };
+
+            recognition.onend = () => {
+                stopListening();
+            };
+        } else {
+            micBtn.style.opacity = '0.5';
+            micBtn.title = "Voz no soportada";
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', handleSendMessage);
+        micBtn.addEventListener('click', () => {
+            if (isListening) {
+                recognition.stop();
+            } else if (recognition) {
+                if (ttsSynth) ttsSynth.cancel();
+                recognition.start();
+            }
+        });
+
+        voiceToggle.addEventListener('click', () => {
+            isVoiceEnabled = !isVoiceEnabled;
+            voiceToggle.classList.toggle('active');
+            voiceToggle.innerHTML = isVoiceEnabled ? 
+                '<i class="fa-solid fa-volume-high"></i>' : 
+                '<i class="fa-solid fa-volume-xmark"></i>';
+            if (!isVoiceEnabled && ttsSynth) ttsSynth.cancel();
+        });
+
+        clearChatBtn.addEventListener('click', () => {
+            chatArea.innerHTML = `
+                <div class="message-row bot">
+                    <div class="message-content">
+                        <div style="font-weight: 700; margin-bottom: 0.2rem; color: var(--secondary);">
+                            <i class="fa-solid fa-sparkles"></i> Nexas AI
+                        </div>
+                        Chat limpiado. ¿Qué necesitas?
+                        <div class="message-meta">
+                            <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
+                            Nexas AI • Ahora
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Modo manos libres
+        handsFreeStatus.addEventListener('click', () => {
+            isHandsFreeEnabled = !isHandsFreeEnabled;
+            updateHandsFreeUI();
+            
+            if (isHandsFreeEnabled) {
+                addBotMessage("Modo manos libres activado. 🎧");
+                startHandsFreeMode();
+            } else {
+                addBotMessage("Modo manos libres desactivado.");
+                stopHandsFreeMode();
+            }
+        });
+
+        function updateHandsFreeUI() {
+            handsFreeStatus.classList.toggle('active');
+            handsFreeStatus.innerHTML = isHandsFreeEnabled ? 
+                '<i class="fa-solid fa-microphone"></i>' : 
+                '<i class="fa-solid fa-microphone-slash"></i>';
+            handsFreeStatus.title = isHandsFreeEnabled ? 
+                'Desactivar manos libres' : 'Activar manos libres';
+        }
+
+        function startHandsFreeMode() {
+            // Mostrar indicadores
+            showHandsFreeIndicators();
+            // Simular detección de proximidad
+            simulateProximityDetection();
+        }
+
+        function stopHandsFreeMode() {
+            hideHandsFreeIndicators();
+            proximityOverlay.classList.remove('active');
+        }
+
+        function showHandsFreeIndicators() {
+            const latencyIndicator = document.createElement('div');
+            latencyIndicator.className = 'latency-indicator';
+            latencyIndicator.innerHTML = '<i class="fa-solid fa-stopwatch"></i><span>80ms</span>';
+            latencyIndicator.title = 'Latencia';
+            
+            const boosterIndicator = document.createElement('div');
+            boosterIndicator.className = 'booster-indicator';
+            boosterIndicator.innerHTML = '<i class="fa-solid fa-volume-up"></i><span>+7</span>';
+            boosterIndicator.title = 'Booster';
+            
+            connectionStatus.parentNode.appendChild(latencyIndicator);
+            latencyIndicator.parentNode.appendChild(boosterIndicator);
+        }
+
+        function hideHandsFreeIndicators() {
+            const indicators = document.querySelectorAll('.latency-indicator, .booster-indicator');
+            indicators.forEach(indicator => indicator.remove());
+        }
+
+        function simulateProximityDetection() {
+            if (!isHandsFreeEnabled) return;
+            
+            setTimeout(() => {
+                if (isHandsFreeEnabled) {
+                    if (Math.random() > 0.7) {
+                        proximityOverlay.classList.add('active');
+                        setTimeout(() => {
+                            proximityOverlay.classList.remove('active');
+                        }, 2000);
+                    }
+                    simulateProximityDetection();
+                }
+            }, 3000);
+        }
+
+        // Funciones de ayuda
+        function handleSendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            
+            addUserMessage(text);
+            chatInput.value = '';
+            
+            // Simular respuesta del servidor
+            setTimeout(() => {
+                addBotMessage("Procesando tu mensaje... 🤖");
+                setTimeout(() => {
+                    const responses = [
+                        "Entendido. Con el modo manos libres activado, la latencia se reduce a 80ms para una mejor experiencia.",
+                        "Excelente pregunta. El modo manos libres optimiza el audio para interrupciones rápidas.",
+                        "Perfecto. El booster de volumen está activado (+7 flujos) para mejor claridad.",
+                        "¡Listo! El sensor de proximidad está monitoreando tu entorno."
+                    ];
+                    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                    addBotMessage(randomResponse);
+                }, 1500);
+            }, 500);
+        }
+
+        function addUserMessage(text) {
+            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const messageRow = document.createElement('div');
+            messageRow.className = 'message-row user';
+            
+            messageRow.innerHTML = `
+                <div class="message-content">
+                    ${text}
+                    <div class="message-meta">Tú • ${timeString}</div>
+                </div>
+            `;
+            chatArea.appendChild(messageRow);
+            scrollToBottom();
+        }
+
+        function addBotMessage(text) {
+            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const messageRow = document.createElement('div');
+            messageRow.className = 'message-row bot';
+            
+            messageRow.innerHTML = `
+                <div class="message-content">
+                    <div style="font-weight: 700; margin-bottom: 0.2rem; color: var(--secondary);">
+                        <i class="fa-solid fa-sparkles"></i> Nexas AI
+                    </div>
+                    ${text}
+                    <div class="message-meta">
+                        <span class="bot-avatar-inline"><i class="fa-solid fa-robot"></i></span>
+                        Nexas AI • ${timeString}
+                    </div>
+                </div>
+            `;
+            chatArea.appendChild(messageRow);
+            scrollToBottom();
+            
+            // Text-to-speech
+            if (isVoiceEnabled) {
+                speakText(text);
+            }
+        }
+
+        function speakText(text) {
+            if (!isVoiceEnabled || !ttsSynth) return;
+            
+            ttsSynth.cancel();
+            const cleanText = text.replace(/\*\*/g, '').replace(/`/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            
+            ttsSynth.speak(utterance);
+        }
+
+        function stopListening() {
+            isListening = false;
+            micBtn.classList.remove('listening');
+            chatInput.placeholder = "Pregúntale a Nexas...";
+        }
+
+        function showWarning(msg) {
+            warningMsg.textContent = msg;
+            warningBar.style.display = 'flex';
+            setTimeout(() => {
+                warningBar.style.display = 'none';
+            }, 3000);
+        }
+
+        function hideWarning() {
+            warningBar.style.display = 'none';
+        }
+
+        function scrollToBottom() {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // Categorías
+        document.querySelectorAll('.category-badge').forEach(badge => {
+            badge.addEventListener('click', () => {
+                document.querySelectorAll('.category-badge').forEach(b => b.classList.remove('active'));
+                badge.classList.add('active');
+                const category = badge.getAttribute('data-category');
+                const messages = {
+                    general: "Modo general activado. ¿En qué puedo ayudarte?",
+                    coding: "Modo programación. ¿Qué necesitas desarrollar?",
+                    design: "Modo diseño. ¡Creemos interfaces increíbles!",
+                    voice: "Modo voz. Probando manos libres y audio."
+                };
+                addBotMessage(messages[category]);
+            });
+        });
+
+        // Eventos de teclado
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+            }
+        });
+
+        // Estado de conexión simulado
+        setConnectionStatus('connected');
+
+        function setConnectionStatus(status) {
+            const icons = {
+                connected: 'fa-wifi',
+                connecting: 'fa-spinner fa-spin',
+                disconnected: 'fa-wifi-slash'
+            };
+            connectionStatus.innerHTML = `<i class="fa-solid ${icons[status]}"></i>`;
+        }
+
+        // Inicializar
+        chatInput.focus();
+    </script>
+</body>
+</html>

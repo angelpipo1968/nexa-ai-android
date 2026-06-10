@@ -673,6 +673,103 @@
             white-space: nowrap;
             border: 0;
         }
+
+        /* Hands-Free Mode Indicators */
+        .latency-indicator, .booster-indicator {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #6ee7b7;
+            padding: 0.3rem 0.6rem;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 80px;
+            justify-content: center;
+        }
+
+        .latency-indicator {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            color: #a5b4fc;
+        }
+
+        .latency-indicator i, .booster-indicator i {
+            font-size: 0.7rem;
+        }
+
+        .latency-indicator span, .booster-indicator span {
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+
+        .proximity-overlay {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .proximity-overlay.active {
+            opacity: 1;
+        }
+
+        .proximity-overlay i {
+            font-size: 1.2rem;
+            animation: pulse-proximity 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-proximity {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* Enhanced hands-free button styling */
+        #handsFreeStatus.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+            animation: glow-hands-free 2s infinite alternate;
+        }
+
+        @keyframes glow-hands-free {
+            from { box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+            to { box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); }
+        }
+
+        /* Audio session visualization for hands-free mode */
+        .audio-session-indicator {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #6ee7b7;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-family: monospace;
+            display: none;
+        }
+
+        .audio-session-indicator.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -1015,19 +1112,77 @@
                 console.error("Speech recognition error:", event.error);
                 setConnectionStatus('disconnected');
 
-                if (event.error === 'no-speech' || event.error === 'audio-capture') {
-                    setTimeout(() => {
-                        if (isListening) recognition.start();
-                    }, 1000);
-                } else if (event.error === 'not-allowed') {
-                    showWarning("Permiso de micrófono denegado. Actívalo en tu navegador para hablar.");
-                } else if (event.error === 'not-supported') {
-                    showWarning("Reconocimiento de voz no soportado en este navegador.");
+                // Manejo de errores mejorado para modo manos libres
+                if (isHandsFreeEnabled) {
+                    handleHandsFreeSpeechError(event);
                 } else {
-                    showWarning("Error de voz: " + event.error);
+                    handleNormalSpeechError(event);
+                }
+            };
+
+            function handleHandsFreeSpeechError(event) {
+                console.log("Error en modo manos libres:", event.error);
+                
+                switch(event.error) {
+                    case 'no-speech':
+                        // En modo manos libres, intenta reiniciar automáticamente
+                        setTimeout(() => {
+                            if (isHandsFreeEnabled && !isListening) {
+                                showTypingAndRespond("No detecté voz. Reintentando en modo manos libres...");
+                                recognition.start();
+                            }
+                        }, 1500);
+                        break;
+                        
+                    case 'audio-capture':
+                        showWarning("Problema con captura de audio. Verifica permisos de micrófono.");
+                        // Intentar cambiar a modo normal
+                        isHandsFreeEnabled = false;
+                        updateHandsFreeUI();
+                        setTimeout(() => recognition.start(), 1000);
+                        break;
+                        
+                    case 'not-allowed':
+                        showWarning("Permiso de micrófono denegado. Actívalo en tu navegador para usar manos libres.");
+                        isHandsFreeEnabled = false;
+                        updateHandsFreeUI();
+                        break;
+                        
+                    case 'not-supported':
+                        showWarning("Reconocimiento de voz no soportado. Cambiando a modo texto.");
+                        isHandsFreeEnabled = false;
+                        updateHandsFreeUI();
+                        break;
+                        
+                    default:
+                        showWarning("Error de voz en modo manos libres: " + event.error);
+                        // Fallback a modo normal
+                        isHandsFreeEnabled = false;
+                        updateHandsFreeUI();
+                        break;
                 }
                 stopListeningState();
-            };
+            }
+
+            function handleNormalSpeechError(event) {
+                switch(event.error) {
+                    case 'no-speech' || 'audio-capture':
+                        setTimeout(() => {
+                            if (isListening) recognition.start();
+                        }, 1000);
+                        break;
+                    case 'not-allowed':
+                        showWarning("Permiso de micrófono denegado. Actívalo en tu navegador para hablar.");
+                        break;
+                    case 'not-supported':
+                        showWarning("Reconocimiento de voz no soportado en este navegador.");
+                        break;
+                    default:
+                        showWarning("Error de voz: " + event.error);
+                        break;
+                }
+                stopListeningState();
+            }
 
             recognition.onend = () => {
                 stopListeningState();
@@ -1136,18 +1291,60 @@
             speakText("Historial de chat limpiado");
         });
 
-        // Handle micro button click
+        // Handle micro button click mejorado para manos libres
         micBtn.addEventListener('click', (e) => {
-            if (!recognition) return; // unsupported logic handled above
+            if (!recognition) {
+                showWarning("Reconocimiento de voz no soportado en este navegador.");
+                return;
+            }
             
             if (isListening) {
+                // Detener escucha
                 recognition.stop();
+                stopListeningState();
             } else {
-                if (ttsSynth) ttsSynth.cancel(); // Stop talking before listening
-                soundWaves.classList.remove('active');
-                recognition.start();
+                // Iniciar escucha con optimización de manos libres
+                if (isHandsFreeEnabled) {
+                    // Modo manos libres: mejor manejo de audio session
+                    startHandsFreeListening();
+                } else {
+                    // Modo normal
+                    if (ttsSynth) ttsSynth.cancel(); // Stop talking before listening
+                    soundWaves.classList.remove('active');
+                    recognition.start();
+                }
             }
         });
+
+        // Escucha optimizada para manos libres
+        function startHandsFreeListening() {
+            try {
+                // Cancelar cualquier habla en curso
+                if (ttsSynth) {
+                    ttsSynth.cancel();
+                    soundWaves.classList.remove('active');
+                }
+                
+                // Mostrar indicador de escucha
+                micBtn.classList.add('listening');
+                chatInput.placeholder = "Modo manos libres... Habla ahora";
+                hideWarning();
+                
+                // Iniciar reconocimiento con configuración optimizada
+                recognition.start();
+                
+                // Mostrar feedback visual
+                showTypingAndRespond("Modo manos libre activado. Escuchando...");
+                
+            } catch (error) {
+                console.error("Error al iniciar escucha manos libres:", error);
+                showWarning("Error al iniciar modo manos libres. Intentando modo normal...");
+                // Fallback a modo normal
+                isHandsFreeEnabled = false;
+                updateHandsFreeUI();
+                recognition.start();
+            }
+        }
 
         // Input and Send handlers
         sendBtn.addEventListener('click', handleSendMessage);
@@ -1380,19 +1577,29 @@
             }
         });
 
-        // Funciones para el modo manos libres
+        // Funciones para el modo manos libres mejorado
         function updateHandsFreeUI() {
             const handsFreeStatus = document.getElementById('handsFreeStatus');
             if (isHandsFreeEnabled) {
                 handsFreeStatus.classList.add('active');
                 handsFreeStatus.title = 'Desactivar modo manos libres';
+                handsFreeStatus.innerHTML = '<i class="fa-solid fa-microphone"></i>';
                 // Mostrar indicadores de sensores
                 showHandsFreeIndicators();
+                // Iniciar monitoreo de audio session
+                startAudioSessionMonitoring();
+                // Optimizar configuración de audio
+                optimizeAudioSettings();
             } else {
                 handsFreeStatus.classList.remove('active');
                 handsFreeStatus.title = 'Activar modo manos libres';
+                handsFreeStatus.innerHTML = '<i class="fa-solid fa-microphone-slash"></i>';
                 // Ocultar indicadores de sensores
                 hideHandsFreeIndicators();
+                // Detener monitoreo de audio session
+                stopAudioSessionMonitoring();
+                // Restaurar configuración de audio
+                restoreAudioSettings();
             }
         }
 
@@ -1422,36 +1629,167 @@
             }
             boosterValueEl.querySelector('span').textContent = '+7 flujos';
             
-            // Crear overlay de proximidad (simulado)
+            // Crear overlay de proximidad (mejorado)
             if (!proximityOverlayEl) {
                 proximityOverlayEl = document.createElement('div');
                 proximityOverlayEl.className = 'proximity-overlay';
-                proximityOverlayEl.innerHTML = '<div class="proximity-content"><i class="fa-solid fa-ear"></i><span>Orejo detectado</span></div>';
+                proximityOverlayEl.innerHTML = '<i class="fa-solid fa-ear"></i><span>Oreja detectada</span>';
                 document.body.appendChild(proximityOverlayEl);
             }
-            // Simular detección de proximidad cada 5 segundos cuando está activo
-            if (isHandsFreeEnabled) {
-                simulateProximityDetection();
-            }
+            // Iniciar detección de proximidad mejorada
+            startProximityDetection();
         }
 
         function hideHandsFreeIndicators() {
             // Ocultar indicadores (pero mantenerlos en DOM para rendimiento)
             if (latencyValueEl) latencyValueEl.style.display = 'none';
             if (boosterValueEl) boosterValueEl.style.display = 'none';
-            if (proximityOverlayEl) proximityOverlayEl.style.display = 'none';
+            if (proximityOverlayEl) {
+                proximityOverlayEl.style.display = 'none';
+                proximityOverlayEl.classList.remove('active');
+            }
+        }
+
+        // Mejor detección de proximidad
+        function startProximityDetection() {
+            if (!isHandsFreeEnabled || !proximityOverlayEl) return;
+            
+            // Usar sensor de proximidad del dispositivo si está disponible
+            if ('ProximitySensor' in window) {
+                try {
+                    const sensor = new ProximitySensor();
+                    sensor.addEventListener('reading', () => {
+                        if (sensor.near) {
+                            showProximityAlert();
+                        } else {
+                            hideProximityAlert();
+                        }
+                    });
+                    sensor.start();
+                } catch (error) {
+                    console.log('Sensor de proximidad no disponible, usando simulación');
+                    simulateProximityDetection();
+                }
+            } else {
+                // Simular detección si no hay sensor real
+                simulateProximityDetection();
+            }
         }
 
         function simulateProximityDetection() {
             if (!isHandsFreeEnabled || !proximityOverlayEl) return;
             
             // Alternar visibilidad del overlay cada 3-5 segundos para simular detección
+            const interval = Math.random() * 2000 + 3000; // 3-5 segundos
             setTimeout(() => {
                 if (isHandsFreeEnabled) {
-                    proximityOverlayEl.style.opacity = proximityOverlayEl.style.opacity === '0' ? '1' : '0';
+                    const shouldShow = Math.random() > 0.6; // 40% de probabilidad de mostrar
+                    if (shouldShow) {
+                        showProximityAlert();
+                        setTimeout(hideProximityAlert, 2000); // Mostrar por 2 segundos
+                    }
                     simulateProximityDetection();
                 }
-            }, 4000);
+            }, interval);
+        }
+
+        function showProximityAlert() {
+            if (proximityOverlayEl) {
+                proximityOverlayEl.style.display = 'flex';
+                proximityOverlayEl.classList.add('active');
+            }
+        }
+
+        function hideProximityAlert() {
+            if (proximityOverlayEl) {
+                proximityOverlayEl.style.display = 'none';
+                proximityOverlayEl.classList.remove('active');
+            }
+        }
+
+        // Monitoreo de sesión de audio
+        let audioSessionInterval = null;
+        function startAudioSessionMonitoring() {
+            // Crear indicador de sesión de audio
+            const audioIndicator = document.createElement('div');
+            audioIndicator.className = 'audio-session-indicator';
+            audioIndicator.id = 'audioSessionIndicator';
+            audioIndicator.textContent = '● AUDIO SESSION ACTIVE';
+            document.querySelector('.app-wrapper').appendChild(audioIndicator);
+            
+            // Simular monitoreo de latencia
+            audioSessionInterval = setInterval(() => {
+                if (latencyValueEl) {
+                    const latency = Math.floor(Math.random() * 40) + 60; // 60-100ms
+                    latencyValueEl.querySelector('span').textContent = latency + 'ms';
+                }
+                
+                // Simular booster de volumen
+                if (boosterValueEl) {
+                    const boosters = Math.floor(Math.random() * 3) + 6; // 6-8 flujos
+                    boosterValueEl.querySelector('span').textContent = '+' + boosters + ' flujos';
+                }
+            }, 2000);
+        }
+
+        function stopAudioSessionMonitoring() {
+            if (audioSessionInterval) {
+                clearInterval(audioSessionInterval);
+                audioSessionInterval = null;
+            }
+            
+            const audioIndicator = document.getElementById('audioSessionIndicator');
+            if (audioIndicator) {
+                audioIndicator.remove();
+            }
+        }
+
+        // Optimización de configuración de audio
+        function optimizeAudioSettings() {
+            // Optimizar configuración de reconocimiento de voz
+            if (recognition) {
+                recognition.continuous = true; // Mantener escucha continua
+                recognition.interimResults = true; // Resultados intermedios para mejor responsividad
+                recognition.lang = 'es-ES';
+                
+                // Ajustar para mejor barge-in (interrupción)
+                recognition.onresult = (event) => {
+                    const result = event.results[event.results.length - 1];
+                    if (result.isFinal) {
+                        const speechResult = result[0].transcript;
+                        chatInput.value = speechResult;
+                        handleSendMessage();
+                    } else {
+                        // Mostrar resultados intermedios para feedback visual
+                        const interimText = result[0].transcript;
+                        chatInput.placeholder = `Escuchando... ${interimText}`;
+                    }
+                };
+            }
+            
+            // Optimizar TTS para mejor calidad
+            if (ttsSynth) {
+                ttsSynth.onvoiceschanged = () => {
+                    const voices = ttsSynth.getVoices();
+                    const spanishVoice = voices.find(voice => 
+                        voice.lang.startsWith('es-') && voice.default
+                    );
+                    if (spanishVoice) {
+                        currentUtterance = new SpeechSynthesisUtterance();
+                        currentUtterance.voice = spanishVoice;
+                    }
+                };
+            }
+        }
+
+        function restoreAudioSettings() {
+            // Restaurar configuración original de reconocimiento de voz
+            if (recognition) {
+                recognition.continuous = false;
+                recognition.interimResults = false;
+            }
+            
+            chatInput.placeholder = "Pregúntale a Nexas... (Usa Shift+Enter para nueva línea)";
         }
 
         loadChatHistory();

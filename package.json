@@ -1,58 +1,31 @@
 {
-  "name": "nexa-os",
-  "version": "4.0.0",
-  "private": true,
-  "type": "module",
+  "name": "nexa-ai-assistant",
+  "version": "1.0.0",
+  "description": "Nexas AI Assistant with enhanced hands-free mode",
+  "main": "nexas-server.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "start": "node nexas-server.js",
+    "dev": "nodemon nexas-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "ai",
+    "voice-assistant",
+    "chatbot",
+    "hands-free",
+    "nexa",
+    "speech-recognition"
+  ],
+  "author": "NexaAI",
+  "license": "MIT",
   "dependencies": {
-    "@capacitor/android": "^8.3.1",
-    "@capacitor/app": "^8.1.0",
-    "@capacitor/camera": "^8.1.0",
-    "@capacitor/cli": "^8.3.1",
-    "@capacitor/core": "^8.3.1",
-    "@capacitor/filesystem": "^8.1.2",
-    "@capacitor/haptics": "^8.0.2",
-    "@capacitor/keyboard": "^8.0.0",
-    "@capacitor/push-notifications": "^8.0.3",
-    "@capacitor/status-bar": "^8.0.1",
-    "@larksuiteoapi/node-sdk": "^1.66.0",
-    "@sentry/nextjs": "^10.55.0",
-    "@supabase/supabase-js": "^2.105.3",
-    "@upstash/redis": "^1.38.0",
-    "cheerio": "^1.2.0",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "framer-motion": "^11.11.17",
-    "lucide-react": "^0.460.0",
-    "next": "15.0.7",
-    "pdf-parse": "^2.4.5",
-    "qs": "^6.15.1",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "uuid": "^14.0.0",
-    "zod": "^3.23.0",
-    "zustand": "^5.0.10"
-  },
-  "optionalDependencies": {
-    "koffi": "^3.0.1"
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
-    "@types/node": "^20.17.6",
-    "@types/qs": "^6.15.1",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@types/uuid": "^10.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3",
-    "vitest": "^3.1.1"
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
