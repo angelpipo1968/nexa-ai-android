@@ -64,12 +64,19 @@ class VoiceUseCase @Inject constructor(
     /**
      * Start a voice session: activates SpeechManager listening
      * and VoiceEnhancer wake word detection.
+     *
+     * v5.4 FIX: Also stop continuous listening in VoiceEnhancer because
+     * it opens a separate AudioRecord that competes with SpeechRecognizer
+     * for the microphone, causing "not connected" errors.
      */
     fun startVoiceSession() {
         // FIX: Do NOT start wake word detection here — it opens a separate AudioRecord
         // that competes with SpeechRecognizer for the microphone, causing "not connected" errors.
         // Wake word should only be used in background/standby mode, not during active voice sessions.
         // voiceEnhancer.startWakeWordDetection()  // DISABLED: causes mic conflict
+
+        // v5.4 FIX: Also stop continuous listening — it opens another AudioRecord
+        voiceEnhancer.stopContinuousListening()
 
         // Track that voice session is active (for conversation context)
         _state.update { it.copy(isWakeWordActive = false, sessionState = VoiceSessionState.LISTENING) }

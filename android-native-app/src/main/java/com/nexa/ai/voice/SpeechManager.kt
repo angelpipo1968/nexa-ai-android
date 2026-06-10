@@ -69,8 +69,11 @@ class SpeechManager(private val application: Application) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    @Volatile private var ttsInitializing = false  // v5.4: Guard against double-init
     private var isCurrentlyListening = false
     private var recognizeFailCount = 0  // v5.2: prevent infinite recognizer recreation leak
+    private var ttsInitRetryCount = 0  // v5.4: Track TTS init retries
+    private val maxTtsInitRetries = 3   // v5.4: Max TTS init retry attempts
 
     // ═══════════════════════════════════════════════════════════════
     //  v5.0 FIX: Hands-free cut-off prevention flags
@@ -212,7 +215,19 @@ class SpeechManager(private val application: Application) {
     private var savedMusicVolume = -1
     private var savedVoiceCallVolume = -1
 
+    /**
+     * v5.4: Initialize SpeechManager. Idempotent — safe to call multiple times.
+     * Prevents double TTS initialization which was causing duplicate engines.
+     */
     fun initialize() {
+        if (ttsInitializing || ttsReady) {
+            android.util.Log.d("SpeechManager", "initialize() called but TTS already ${if (ttsReady) "ready" else "initializing"} — skipping")
+            // Still ensure other subsystems are set up
+            detectBluetoothSco()
+            if (!scoReceiverRegistered) registerScoStateReceiver()
+            initProximitySensor()
+            return
+        }
         initTTS()
         detectBluetoothSco()
         registerScoStateReceiver()
@@ -547,10 +562,24 @@ class SpeechManager(private val application: Application) {
     // ═══════════════════════════════════════
 
     private fun initTTS() {
+        if (ttsInitializing || ttsReady) {
+            android.util.Log.d("SpeechManager", "initTTS() skipped — already ${if (ttsReady) "ready" else "initializing"}")
+            return
+        }
+        ttsInitializing = true
         try {
+            // CRITICAL FIX v5.4: Shut down any existing TTS before creating a new one.
+            // This prevents duplicate TTS engines that fight for audio output.
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+
             tts = TextToSpeech(application) { status ->
+                ttsInitializing = false
                 if (status == TextToSpeech.SUCCESS) {
                     ttsReady = true
+                    ttsInitRetryCount = 0  // Reset retry count on success
+                    android.util.Log.i("SpeechManager", "TTS initialized successfully")
                     tts?.setSpeechRate(speechRate)
 
                     // Set default language first, then apply voice settings
@@ -611,11 +640,63 @@ class SpeechManager(private val application: Application) {
                     Handler(Looper.getMainLooper()).postDelayed({
                         applyVoiceSettings()
                     }, 500)
+                } else {
+                    // v5.4 FIX: TTS init failed — retry with exponential backoff
+                    ttsInitializing = false
+                    ttsReady = false
+                    ttsInitRetryCount++
+                    android.util.Log.e("SpeechManager", "TTS init FAILED (status=$status), retry $ttsInitRetryCount/$maxTtsInitRetries")
+
+                    if (ttsInitRetryCount < maxTtsInitRetries) {
+                        // Clean up failed TTS instance
+                        try { tts?.stop(); tts?.shutdown() } catch (_: Exception) {}
+                        tts = null
+
+                        // Retry with exponential backoff: 1s, 2s, 4s
+                        val delayMs = (1000L * (1L shl (ttsInitRetryCount - 1))).coerceAtMost(4000L)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (!ttsReady && !ttsInitializing) {
+                                android.util.Log.d("SpeechManager", "Retrying TTS init after ${delayMs}ms...")
+                                initTTS()
+                            }
+                        }, delayMs)
+                    } else {
+                        android.util.Log.e("SpeechManager", "TTS init failed $maxTtsInitRetries times — giving up")
+                        onError?.invoke("tts_init_failed")
+                    }
                 }
             }
         } catch (e: Exception) {
+            ttsInitializing = false
             android.util.Log.e("SpeechManager", "TTS init error: ${e.message}", e)
         }
+    }
+
+    /**
+     * v5.4: Check if TTS engine is alive and responsive.
+     * If TTS has died (common on some OEMs), reinitialize it.
+     * Call this before any speak() operation.
+     */
+    private fun ensureTtsAlive(): Boolean {
+        if (ttsReady && tts != null) {
+            // Quick health check: try to get voices — if this throws, TTS is dead
+            try {
+                val engines = tts?.engines
+                if (!engines.isNullOrEmpty()) return true
+            } catch (e: Exception) {
+                android.util.Log.w("SpeechManager", "TTS health check failed — engine appears dead: ${e.message}")
+            }
+        }
+
+        // TTS is dead or not ready — try to reinitialize
+        android.util.Log.w("SpeechManager", "TTS not alive — attempting reconnection...")
+        ttsReady = false
+        ttsInitializing = false
+        ttsInitRetryCount = 0  // Reset for fresh attempt
+        initTTS()
+
+        // Give it a moment to initialize
+        return ttsReady
     }
 
     fun applyVoiceSettings() {
@@ -702,7 +783,22 @@ class SpeechManager(private val application: Application) {
     }
 
     fun speak(text: String, messageId: String? = null, currentSpeakingId: String?) {
-        if (!ttsReady || tts == null) return
+        // v5.4 FIX: Use ensureTtsAlive() to auto-reconnect dead TTS engines
+        if (!ttsReady || tts == null) {
+            if (!ensureTtsAlive()) {
+                android.util.Log.w("SpeechManager", "speak() called but TTS not ready — attempting reconnect")
+                // Don't just return silently — try again after TTS reconnects
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (ttsReady && tts != null) {
+                        speak(text, messageId, currentSpeakingId)
+                    } else {
+                        android.util.Log.e("SpeechManager", "TTS still not ready after reconnect attempt")
+                        onSpeakingStateChanged?.invoke(false, null)
+                    }
+                }, 1500)
+                return
+            }
+        }
 
         if (messageId != null && currentSpeakingId == messageId) {
             stopSpeaking()
@@ -831,6 +927,9 @@ class SpeechManager(private val application: Application) {
     fun getVolumeBoost(): Boolean = volumeBoostEnabled
 
     fun getSpeechRate(): Float = speechRate
+
+    /** v5.4: Public accessor for TTS readiness state */
+    fun isTtsReady(): Boolean = ttsReady
 
     /**
      * Aggressively boosts all relevant audio streams to maximum volume
@@ -1428,5 +1527,12 @@ class SpeechManager(private val application: Application) {
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Destroy error: ${e.message}", e)
         }
+        // v5.4: Reset all state so initialize() can be called again if needed
+        tts = null
+        ttsReady = false
+        ttsInitializing = false
+        isCurrentlyListening = false
+        audioSessionActive = false
+        hasAudioFocus = false
     }
 }

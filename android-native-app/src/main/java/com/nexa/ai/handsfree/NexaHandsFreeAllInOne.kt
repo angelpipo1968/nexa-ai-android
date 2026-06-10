@@ -39,16 +39,15 @@ import java.util.UUID
 )
 // FIX: Removed @Singleton and @Inject to prevent Hilt from creating a duplicate TTS engine.
 // This class is deprecated — use SpeechManager + VoiceUseCase instead.
+// v5.4 FIX: Do NOT initialize TTS or STT at all — these create duplicate engines
+// that compete with SpeechManager for the microphone and audio output.
+// All voice functionality is now handled by SpeechManager + VoiceUseCase.
 class NexaHandsFreeAllInOne(
     private val context: Context
 ) : TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale.forLanguageTag(currentLang)
-        } else {
-            onError?.invoke("TTS initialization failed")
-        }
+        // No-op: TTS is now managed by SpeechManager
     }
 
     // Estado reactivo para UI
@@ -73,8 +72,11 @@ class NexaHandsFreeAllInOne(
     // Inicialización segura
     @androidx.annotation.CallSuper
     fun initialize() {
-        initTTS()
-        initSTT()
+        // v5.4 FIX: Do NOT init TTS or STT here!
+        // These create duplicate engines that compete with SpeechManager.
+        // initTTS()  // REMOVED: causes duplicate TTS engine
+        // initSTT()  // REMOVED: causes duplicate SpeechRecognizer competing for mic
+        android.util.Log.w("NexaHandsFree", "initialize() called — but TTS/STT init SKIPPED to prevent conflicts with SpeechManager")
     }
 
     /**

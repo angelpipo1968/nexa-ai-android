@@ -246,6 +246,8 @@ class NexaViewModel @Inject constructor(
 
     init {
         setupSpeechCallbacks()
+        // v5.4 FIX: initialize() is now idempotent — safe to call even if
+        // NexaSpeechService also calls it (same singleton instance via Hilt)
         speechManager.initialize()
         
         // Register persistent Speech Service receiver (API 33+ safe)

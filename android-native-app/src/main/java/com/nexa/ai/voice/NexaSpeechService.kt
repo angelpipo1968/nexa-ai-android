@@ -11,31 +11,41 @@ import android.os.IBinder
 import android.os.Build
 import android.util.Log
 import com.nexa.ai.MainActivity
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * NexaSpeechService — Servicio de voz Android de grado de producción.
  *
- * Arquitectura:
- * - Soporta inicio por Intent (startService) para activaciones persistentes del volante / Android Auto.
- * - Soporta vinculación por Binder (onBind) para comunicación directa con ViewModels/Activities.
- * - Integra y encapsula la lógica avanzada de SpeechManager (VAD, Proximity, BT SCO, Barge-in, Focus).
- * - Comunica los resultados y estados conversacionales mediante Local Broadcasts para un
- *   desacoplamiento total del ciclo de vida de la UI, eliminando los cuellos de botella y cortes de voz.
+ * CRITICAL FIX v5.4: This service now uses Hilt injection to get the SAME
+ * SpeechManager singleton that the ViewModel uses. Previously, this service
+ * created its own SpeechManager instance, causing:
+ * - TWO TTS engines fighting for audio output
+ * - TWO SpeechRecognizers competing for the microphone
+ * - "Speech not connected" errors because the service's SpeechManager
+ *   was a different instance than the ViewModel's
  *
- * FIX v5.3: Added startForeground() with notification to prevent Android from killing
- * the service within 5 seconds (ForegroundServiceDidNotStartInTimeException on API 31+).
- * Added foregroundServiceType="microphone" in manifest for API 34+ compatibility.
+ * Architecture:
+ * - Uses @AndroidEntryPoint for Hilt DI
+ * - Injects the same @Singleton SpeechManager from AppModule
+ * - Only serves as foreground service (keeps app alive during voice mode)
+ * - Does NOT create duplicate audio sessions or recognizers
+ * - SpeechManager callbacks are managed by the ViewModel, not by this service
  */
+@AndroidEntryPoint
 class NexaSpeechService : Service() {
 
     private val TAG = "NexaSpeechService"
     private val binder = SpeechBinder()
     private val NOTIFICATION_CHANNEL_ID = "nexa_voice_channel"
     private val NOTIFICATION_ID = 1001
-    
-    // Instancia persistente del gestor de voz
+
+    // CRITICAL FIX: Inject the SAME SpeechManager singleton that the ViewModel uses.
+    // Before this fix, the service created its own SpeechManager(application) which
+    // was a completely separate instance, causing duplicate TTS engines and
+    // SpeechRecognizers fighting for the microphone.
+    @Inject
     lateinit var speechManager: SpeechManager
-        private set
 
     companion object {
         // Acciones de Broadcast para desacoplar el ViewModel de la UI
@@ -43,7 +53,7 @@ class NexaSpeechService : Service() {
         const val ACTION_SPEECH_PARTIAL = "com.nexa.ai.action.SPEECH_PARTIAL"
         const val ACTION_SPEECH_STATE = "com.nexa.ai.action.SPEECH_STATE"
         const val ACTION_SPEECH_ERROR = "com.nexa.ai.action.SPEECH_ERROR"
-        
+
         // Extras
         const val EXTRA_TEXT = "extra_text"
         const val EXTRA_STATE = "extra_state"
@@ -53,36 +63,42 @@ class NexaSpeechService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "onCreate: Iniciando NexaSpeechService")
-        
+
         // Crear canal de notificación para Android 8+
         createNotificationChannel()
-        
-        // Instanciamos el administrador de voz con el contexto de aplicación
-        speechManager = SpeechManager(application)
+
+        // CRITICAL FIX: Do NOT create a new SpeechManager here!
+        // The injected speechManager is the SAME singleton that the ViewModel uses.
+        // We only need to initialize it if it hasn't been initialized yet.
+        // The ViewModel calls speechManager.initialize() in its init block,
+        // so by the time this service starts, it should already be initialized.
+        // We still call initialize() as a safety net (it's idempotent for TTS).
         speechManager.initialize()
-        
-        // Vinculamos los callbacks de SpeechManager con envíos de Broadcast
-        setupSpeechManagerCallbacks()
+
+        Log.d(TAG, "Using SHARED SpeechManager singleton — no duplicate TTS/STT")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand: Iniciando sesión de voz activa por intent")
-        
+
         // FIX: Start as foreground service IMMEDIATELY to prevent Android from killing it.
-        // This MUST happen within 5 seconds of startForegroundService() on API 31+.
         startForegroundNotification()
-        
-        // Cuando el servicio es iniciado por el sistema o por el botón del volante,
-        // arrancamos la sesión de audio vehicular y el reconocedor de voz.
-        startSpeechListeningSession()
-        
-        return START_STICKY // Asegura que Android intente recrear el servicio si es purgado por RAM
+
+        // CRITICAL FIX: Do NOT call startVoiceAudioSession() or startListening() here!
+        // The ViewModel already manages the full voice lifecycle:
+        //   1. toggleVoiceMode() → speechManager.startVoiceAudioSession()
+        //   2. toggleVoiceMode() → speechManager.startListening()
+        // If we call these here too, we'd create duplicate audio sessions.
+        // This service's ONLY job is to be a foreground service that keeps
+        // the app alive during voice mode.
+        sendSpeechStateBroadcast("ready")
+
+        return START_STICKY
     }
 
     /**
      * FIX v5.3: Creates and shows the foreground notification.
-     * Required on API 31+ — without this, Android kills the service within 5 seconds
-     * with ForegroundServiceDidNotStartInTimeException.
+     * Required on API 31+ — without this, Android kills the service within 5 seconds.
      */
     private fun startForegroundNotification() {
         try {
@@ -106,7 +122,7 @@ class NexaSpeechService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            
+
             Log.d(TAG, "Foreground service started with notification")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting foreground: ${e.message}", e)
@@ -132,71 +148,9 @@ class NexaSpeechService : Service() {
         }
     }
 
-    private fun startSpeechListeningSession() {
-        try {
-            // FIX: Only start the audio session here — do NOT call startListening()
-            // because the ViewModel already manages the listening lifecycle.
-            // Calling startListening() here creates a duplicate SpeechRecognizer
-            // that competes with the ViewModel's instance for the microphone.
-            speechManager.startVoiceAudioSession()
-            // speechManager.startListening()  // REMOVED: ViewModel manages listening
-            
-            Log.d(TAG, "Sesión de audio manos libres iniciada (listening gestionado por ViewModel)")
-            sendSpeechStateBroadcast("ready")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al iniciar la sesión de escucha: ${e.message}", e)
-            sendSpeechErrorBroadcast("init_failed")
-        }
-    }
-
-    private fun setupSpeechManagerCallbacks() {
-        speechManager.onListeningStateChanged = { isListening ->
-            sendSpeechStateBroadcast(if (isListening) "listening" else "idle")
-        }
-
-        speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
-            sendSpeechStateBroadcast(if (isSpeaking) "speaking" else "idle")
-        }
-
-        speechManager.onSpeechResult = { text ->
-            Log.i(TAG, "onSpeechResult: Texto capturado -> $text")
-            val intent = Intent(ACTION_SPEECH_RESULT).apply {
-                putExtra(EXTRA_TEXT, text)
-                setPackage(packageName) // Seguridad extra: restringe el broadcast a nuestra app
-            }
-            sendBroadcast(intent)
-        }
-
-        speechManager.onSpeechPartial = { partialText ->
-            val intent = Intent(ACTION_SPEECH_PARTIAL).apply {
-                putExtra(EXTRA_TEXT, partialText)
-                setPackage(packageName)
-            }
-            sendBroadcast(intent)
-        }
-
-        speechManager.onError = { errorKey ->
-            Log.e(TAG, "onError: Error en el SpeechRecognizer -> $errorKey")
-            sendSpeechErrorBroadcast(errorKey)
-        }
-
-        speechManager.onBargeInDetected = {
-            Log.d(TAG, "onBargeInDetected: Interrupción por voz activa detectada")
-            sendSpeechStateBroadcast("barge_in")
-        }
-    }
-
     private fun sendSpeechStateBroadcast(state: String) {
         val intent = Intent(ACTION_SPEECH_STATE).apply {
             putExtra(EXTRA_STATE, state)
-            setPackage(packageName)
-        }
-        sendBroadcast(intent)
-    }
-
-    private fun sendSpeechErrorBroadcast(errorKey: String) {
-        val intent = Intent(ACTION_SPEECH_ERROR).apply {
-            putExtra(EXTRA_ERROR_KEY, errorKey)
             setPackage(packageName)
         }
         sendBroadcast(intent)
@@ -213,12 +167,13 @@ class NexaSpeechService : Service() {
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "onDestroy: Apagando servicio de voz y liberando hardware")
-        
-        // Apagamos la sesión de audio vehicular y liberamos los recursos de hardware
-        speechManager.stopVoiceAudioSession()
-        speechManager.destroy()
-        
+        Log.i(TAG, "onDestroy: Apagando servicio de voz")
+
+        // CRITICAL FIX: Do NOT call speechManager.stopVoiceAudioSession() or destroy() here!
+        // The ViewModel manages the SpeechManager lifecycle. If we destroy it here,
+        // the ViewModel's SpeechManager reference becomes invalid because it's the SAME instance.
+        // The ViewModel handles cleanup in its own onCleared() method.
+
         // Stop foreground service
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -226,7 +181,7 @@ class NexaSpeechService : Service() {
             @Suppress("DEPRECATION")
             stopForeground(true)
         }
-        
+
         sendSpeechStateBroadcast("destroyed")
         super.onDestroy()
     }
@@ -236,5 +191,6 @@ class NexaSpeechService : Service() {
      */
     inner class SpeechBinder : Binder() {
         fun getService(): NexaSpeechService = this@NexaSpeechService
+        fun getSpeechManager(): SpeechManager = speechManager
     }
 }
