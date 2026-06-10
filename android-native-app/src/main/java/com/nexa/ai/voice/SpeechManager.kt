@@ -25,7 +25,12 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+<<<<<<< Updated upstream
 import android.os.HandlerThread
+=======
+import android.media.ToneGenerator
+import com.nexa.ai.debug.TraeDebug
+>>>>>>> Stashed changes
 import com.nexa.ai.viewmodel.AppLanguage
 import com.nexa.ai.viewmodel.VoiceType
 import java.util.Locale
@@ -69,11 +74,23 @@ class SpeechManager(private val application: Application) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+<<<<<<< Updated upstream
     @Volatile private var ttsInitializing = false  // v5.4: Guard against double-init
     private var isCurrentlyListening = false
     private var recognizeFailCount = 0  // v5.2: prevent infinite recognizer recreation leak
     private var ttsInitRetryCount = 0  // v5.4: Track TTS init retries
     private val maxTtsInitRetries = 3   // v5.4: Max TTS init retry attempts
+=======
+    private var toneGenerator: ToneGenerator? = null
+    private var isCurrentlyListening = false
+    private var recognizeFailCount = 0  // v5.2: prevent infinite recognizer recreation leak
+    @Volatile
+    private var preferBluetoothSco = true
+    private var btNoMatchCount = 0
+    private var lastBtNoMatchAt = 0L
+    @Volatile
+    private var hasHeardRmsInSession = false
+>>>>>>> Stashed changes
 
     // ═══════════════════════════════════════════════════════════════
     //  v5.0 FIX: Hands-free cut-off prevention flags
@@ -90,17 +107,73 @@ class SpeechManager(private val application: Application) {
     // Bug 5 fix: Ensure speaking state callbacks are synchronized
     private val speechStateLock = Any()
 
-    // Callbacks
-    var onListeningStateChanged: ((Boolean) -> Unit)? = null
-    var onSpeakingStateChanged: ((Boolean, String?) -> Unit)? = null
-    var onSpeechResult: ((String) -> Unit)? = null
-    var onSpeechPartial: ((String) -> Unit)? = null
-    var onError: ((String) -> Unit)? = null
-    var onInputTextChanged: ((String) -> Unit)? = null
-    var onRecognitionEnded: (() -> Unit)? = null
-    var onBargeInDetected: (() -> Unit)? = null
-    var onVolumeLevelChanged: ((Float) -> Unit)? = null  // 0f..1f real-time volume for visual feedback
-    var onProximityChanged: ((Boolean) -> Unit)? = null  // true = near (use earpiece), false = far (use speaker)
+    // Callbacks (Multi-cast to support both ViewModel and SpeechService)
+    private val _onListeningStateChanged = mutableListOf<(Boolean) -> Unit>()
+    var onListeningStateChanged: ((Boolean) -> Unit)?
+        get() = _onListeningStateChanged.firstOrNull()
+        set(value) { if (value != null) _onListeningStateChanged.add(value) }
+
+    private val _onSpeakingStateChanged = mutableListOf<(Boolean, String?) -> Unit>()
+    var onSpeakingStateChanged: ((Boolean, String?) -> Unit)?
+        get() = _onSpeakingStateChanged.firstOrNull()
+        set(value) { if (value != null) _onSpeakingStateChanged.add(value) }
+
+    private val _onSpeechResult = mutableListOf<(String) -> Unit>()
+    var onSpeechResult: ((String) -> Unit)?
+        get() = _onSpeechResult.firstOrNull()
+        set(value) { if (value != null) _onSpeechResult.add(value) }
+
+    private val _onSpeechPartial = mutableListOf<(String) -> Unit>()
+    var onSpeechPartial: ((String) -> Unit)?
+        get() = _onSpeechPartial.firstOrNull()
+        set(value) { if (value != null) _onSpeechPartial.add(value) }
+
+    private val _onError = mutableListOf<(String) -> Unit>()
+    var onError: ((String) -> Unit)?
+        get() = _onError.firstOrNull()
+        set(value) { if (value != null) _onError.add(value) }
+
+    private val _onInputTextChanged = mutableListOf<(String) -> Unit>()
+    var onInputTextChanged: ((String) -> Unit)?
+        get() = _onInputTextChanged.firstOrNull()
+        set(value) { if (value != null) _onInputTextChanged.add(value) }
+
+    private val _onRecognitionEnded = mutableListOf<() -> Unit>()
+    var onRecognitionEnded: (() -> Unit)?
+        get() = _onRecognitionEnded.firstOrNull()
+        set(value) { if (value != null) _onRecognitionEnded.add(value) }
+
+    private val _onBargeInDetected = mutableListOf<() -> Unit>()
+    var onBargeInDetected: (() -> Unit)?
+        get() = _onBargeInDetected.firstOrNull()
+        set(value) { if (value != null) _onBargeInDetected.add(value) }
+
+    private val _onVolumeLevelChanged = mutableListOf<(Float) -> Unit>()
+    var onVolumeLevelChanged: ((Float) -> Unit)?  // 0f..1f real-time volume for visual feedback
+        get() = _onVolumeLevelChanged.firstOrNull()
+        set(value) { if (value != null) _onVolumeLevelChanged.add(value) }
+
+    private val _onProximityChanged = mutableListOf<(Boolean) -> Unit>()
+    var onProximityChanged: ((Boolean) -> Unit)?  // true = near (use earpiece), false = far (use speaker)
+        get() = _onProximityChanged.firstOrNull()
+        set(value) { if (value != null) _onProximityChanged.add(value) }
+
+    private val _onThinkingStateChanged = mutableListOf<(Boolean) -> Unit>()
+    var onThinkingStateChanged: ((Boolean) -> Unit)?
+        get() = _onThinkingStateChanged.firstOrNull()
+        set(value) { if (value != null) _onThinkingStateChanged.add(value) }
+
+    private fun invokeListeningStateChanged(state: Boolean) = _onListeningStateChanged.forEach { it.invoke(state) }
+    private fun invokeSpeakingStateChanged(state: Boolean, id: String?) = _onSpeakingStateChanged.forEach { it.invoke(state, id) }
+    private fun invokeSpeechResult(text: String) = _onSpeechResult.forEach { it.invoke(text) }
+    private fun invokeSpeechPartial(text: String) = _onSpeechPartial.forEach { it.invoke(text) }
+    private fun invokeError(error: String) = _onError.forEach { it.invoke(error) }
+    private fun invokeInputTextChanged(text: String) = _onInputTextChanged.forEach { it.invoke(text) }
+    private fun invokeRecognitionEnded() = _onRecognitionEnded.forEach { it.invoke() }
+    private fun invokeBargeInDetected() = _onBargeInDetected.forEach { it.invoke() }
+    private fun invokeVolumeLevelChanged(vol: Float) = _onVolumeLevelChanged.forEach { it.invoke(vol) }
+    private fun invokeProximityChanged(state: Boolean) = _onProximityChanged.forEach { it.invoke(state) }
+    private fun invokeThinkingStateChanged(state: Boolean) = _onThinkingStateChanged.forEach { it.invoke(state) }
 
     // Barge-in: track whether TTS is actively playing
     @Volatile
@@ -145,9 +218,10 @@ class SpeechManager(private val application: Application) {
     private var hasAudioFocus = false
 
     // Bluetooth SCO support for hands-free headsets
-    private var isBluetoothScoConnected = false
+    private var isBluetoothScoSupported = false
     @Volatile private var isStartingSco = false
     private var scoConnected = false
+    @Volatile private var hasBtMicDevice = false
 
     // Bluetooth SCO state receiver — detects when SCO actually connects
     private val scoStateReceiver = object : BroadcastReceiver() {
@@ -193,7 +267,7 @@ class SpeechManager(private val application: Application) {
 
                 if (wasNear != isNearEar && audioSessionActive) {
                     updateAudioRoutingForProximity()
-                    onProximityChanged?.invoke(isNearEar)
+                    invokeProximityChanged(isNearEar)
                 }
             }
         }
@@ -232,6 +306,11 @@ class SpeechManager(private val application: Application) {
         detectBluetoothSco()
         registerScoStateReceiver()
         initProximitySensor()
+        try {
+            toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 85)
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechManager", "Failed to init ToneGenerator: ${e.message}")
+        }
     }
 
     // ═══════════════════════════════════════
@@ -261,6 +340,12 @@ class SpeechManager(private val application: Application) {
             sensorManager.unregisterListener(proximityListener)
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "Proximity sensor unregister error: ${e.message}", e)
+        }
+    private fun playSystemTone(toneType: Int, durationMs: Int = 120) {
+        try {
+            toneGenerator?.startTone(toneType, durationMs)
+        } catch (e: Exception) {
+            android.util.Log.w("SpeechManager", "playSystemTone failed: ${e.message}")
         }
     }
 
@@ -296,7 +381,7 @@ class SpeechManager(private val application: Application) {
 
     private fun updateAudioRoutingForProximity() {
         try {
-            if (isBluetoothScoConnected && scoConnected) return  // BT takes priority
+            if (scoConnected) return  // BT takes priority
             if (isNearEar) {
                 // Near ear: use earpiece, turn off speaker
                 setSpeakerphoneOn(false)
@@ -373,7 +458,7 @@ class SpeechManager(private val application: Application) {
                                     isPausedByFocusLoss = false
                                     hasAudioFocus = true
                                     reapplyHandsFreeRouting()
-                                    onSpeakingStateChanged?.invoke(false, null)
+                                    invokeSpeakingStateChanged(false, null)
                                     android.util.Log.d("SpeechManager", "TTS resuming after transient focus loss")
                                 } else {
                                     hasAudioFocus = true
@@ -409,7 +494,7 @@ class SpeechManager(private val application: Application) {
                                     isPausedByFocusLoss = false
                                     hasAudioFocus = true
                                     reapplyHandsFreeRouting()
-                                    onSpeakingStateChanged?.invoke(false, null)
+                                    invokeSpeakingStateChanged(false, null)
                                 } else {
                                     hasAudioFocus = true
                                 }
@@ -473,14 +558,30 @@ class SpeechManager(private val application: Application) {
 
     private fun detectBluetoothSco() {
         try {
-            isBluetoothScoConnected = audioManager.isBluetoothScoAvailableOffCall
+            isBluetoothScoSupported = audioManager.isBluetoothScoAvailableOffCall
         } catch (e: Exception) {
-            isBluetoothScoConnected = false
+            isBluetoothScoSupported = false
+        }
+    }
+
+    private fun detectBluetoothMicDevice(): Boolean {
+        return try {
+            val inputs = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+            val hasSco = inputs.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+            val hasBle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                inputs.any { it.type == AudioDeviceInfo.TYPE_BLE_HEADSET }
+            } else {
+                false
+            }
+            hasSco || hasBle
+        } catch (_: Exception) {
+            false
         }
     }
 
     private fun startBluetoothSco() {
-        if (!isBluetoothScoConnected || isStartingSco || scoConnected) return
+        if (!isBluetoothScoSupported || isStartingSco || scoConnected) return
+        if (!hasBtMicDevice) return
         isStartingSco = true
         try {
             // API 31+: Use setCommunicationDevice with Bluetooth SCO device
@@ -533,7 +634,7 @@ class SpeechManager(private val application: Application) {
     }
 
     private fun stopBluetoothSco() {
-        if (!isBluetoothScoConnected && !scoConnected) return
+        if (!scoConnected) return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 audioManager.clearCommunicationDevice()
@@ -562,6 +663,7 @@ class SpeechManager(private val application: Application) {
     // ═══════════════════════════════════════
 
     private fun initTTS() {
+<<<<<<< Updated upstream
         if (ttsInitializing || ttsReady) {
             android.util.Log.d("SpeechManager", "initTTS() skipped — already ${if (ttsReady) "ready" else "initializing"}")
             return
@@ -664,11 +766,99 @@ class SpeechManager(private val application: Application) {
                         android.util.Log.e("SpeechManager", "TTS init failed $maxTtsInitRetries times — giving up")
                         onError?.invoke("tts_init_failed")
                     }
+=======
+        android.util.Log.d("SpeechManager", "Initializing TTS...")
+        val onInit = TextToSpeech.OnInitListener { status ->
+            // #region debug-point H3:tts-init
+            TraeDebug.event(
+                hypothesisId = "H3",
+                location = "SpeechManager:initTTS",
+                msg = if (status == TextToSpeech.SUCCESS) "tts_init_success" else "tts_init_failure",
+                dataJson = """{"status":$status,"audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus}""",
+            )
+            // #endregion
+            if (status == TextToSpeech.SUCCESS) {
+                android.util.Log.i("SpeechManager", "TTS Initialized successfully")
+                ttsReady = true
+                tts?.setSpeechRate(speechRate)
+                
+                // Set default language first
+                try {
+                    tts?.setLanguage(Locale.getDefault())
+                } catch (e: Exception) {
+                    tts?.setLanguage(Locale.US)
+>>>>>>> Stashed changes
                 }
+
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        // #region debug-point H3:tts-start
+                        TraeDebug.event(
+                            hypothesisId = "H3",
+                            location = "SpeechManager:onTtsStart",
+                            msg = "tts_start",
+                            dataJson = """{"utteranceId":"${(utteranceId ?: "null").replace("\"", "\\\"")}","audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus,"scoConnected":$scoConnected,"isNearEar":$isNearEar}""",
+                        )
+                        // #endregion
+                        android.util.Log.d("SpeechManager", "TTS started: $utteranceId")
+                        isPreparingToSpeak = false
+                        isTtsActive = true
+                        invokeSpeakingStateChanged(true, utteranceId)
+                    }
+                    override fun onDone(utteranceId: String?) {
+                        // #region debug-point H3:tts-done
+                        TraeDebug.event(
+                            hypothesisId = "H3",
+                            location = "SpeechManager:onTtsDone",
+                            msg = "tts_done",
+                            dataJson = """{"utteranceId":"${(utteranceId ?: "null").replace("\"", "\\\"")}","audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus,"isPreparingToSpeak":$isPreparingToSpeak}""",
+                        )
+                        // #endregion
+                        android.util.Log.d("SpeechManager", "TTS done: $utteranceId")
+                        synchronized(speechStateLock) {
+                            isTtsActive = false
+                            if (!audioSessionActive) abandonAudioFocus()
+                            if (!isPreparingToSpeak) invokeSpeakingStateChanged(false, null)
+                        }
+                    }
+                    @Deprecated("Deprecated")
+                    override fun onError(utteranceId: String?) {
+                        // #region debug-point H3:tts-error
+                        TraeDebug.event(
+                            hypothesisId = "H3",
+                            location = "SpeechManager:onTtsError",
+                            msg = "tts_error",
+                            dataJson = """{"utteranceId":"${(utteranceId ?: "null").replace("\"", "\\\"")}","audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus,"isPreparingToSpeak":$isPreparingToSpeak}""",
+                        )
+                        // #endregion
+                        android.util.Log.e("SpeechManager", "TTS error: $utteranceId")
+                        synchronized(speechStateLock) {
+                            isTtsActive = false
+                            if (!audioSessionActive) abandonAudioFocus()
+                            if (!isPreparingToSpeak) invokeSpeakingStateChanged(false, null)
+                        }
+                    }
+                })
+
+                Handler(Looper.getMainLooper()).postDelayed({ applyVoiceSettings() }, 500)
+            } else {
+                android.util.Log.e("SpeechManager", "TTS Initialization failed with status: $status")
             }
+        }
+
+        try {
+            // Re-create TTS to ensure fresh binding
+            tts?.shutdown()
+            // Try Google engine first
+            tts = TextToSpeech(application, onInit, "com.google.android.tts")
         } catch (e: Exception) {
+<<<<<<< Updated upstream
             ttsInitializing = false
             android.util.Log.e("SpeechManager", "TTS init error: ${e.message}", e)
+=======
+            android.util.Log.e("SpeechManager", "Google TTS engine not available: ${e.message}")
+            tts = TextToSpeech(application, onInit)
+>>>>>>> Stashed changes
         }
     }
 
@@ -783,6 +973,7 @@ class SpeechManager(private val application: Application) {
     }
 
     fun speak(text: String, messageId: String? = null, currentSpeakingId: String?) {
+<<<<<<< Updated upstream
         // v5.4 FIX: Use ensureTtsAlive() to auto-reconnect dead TTS engines
         if (!ttsReady || tts == null) {
             if (!ensureTtsAlive()) {
@@ -798,33 +989,58 @@ class SpeechManager(private val application: Application) {
                 }, 1500)
                 return
             }
+=======
+        invokeThinkingStateChanged(false)
+        android.util.Log.d("SpeechManager", "speak() called with text: ${text.take(20)}..., ttsReady=$ttsReady, tts=${tts != null}")
+        // #region debug-point H3:speak-called
+        TraeDebug.event(
+            hypothesisId = "H3",
+            location = "SpeechManager:speak",
+            msg = "tts_speak_called",
+            dataJson = """{"ttsReady":$ttsReady,"hasTts":${tts != null},"textLength":${text.length},"messageIdProvided":${messageId != null},"sameMessage":${messageId != null && currentSpeakingId == messageId},"audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus,"isSpeaking":$isTtsActive}""",
+        )
+        // #endregion
+        
+        if (!ttsReady || tts == null) {
+            android.util.Log.w("SpeechManager", "TTS not ready, attempting re-init")
+            // #region debug-point H3:speak-not-ready
+            TraeDebug.event(
+                hypothesisId = "H3",
+                location = "SpeechManager:speak",
+                msg = "tts_not_ready_reinit",
+                dataJson = """{"ttsReady":$ttsReady,"hasTts":${tts != null}}""",
+            )
+            // #endregion
+            initTTS()
+            // Wait a bit and try again once if it was just initializing
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (ttsReady && tts != null) speak(text, messageId, currentSpeakingId)
+            }, 1000)
+            return
+>>>>>>> Stashed changes
         }
 
         if (messageId != null && currentSpeakingId == messageId) {
+            android.util.Log.d("SpeechManager", "speak() aborted: already speaking this message")
             stopSpeaking()
             return
         }
 
-        // ═══ v5.1 BUG 1 FIX ═══
-        // Set flag BEFORE calling stopSpeaking() so that the
-        // onSpeakingStateChanged(false) callback knows NOT to
-        // trigger a listening restart - we're about to speak again.
         isPreparingToSpeak = true
+        android.util.Log.d("SpeechManager", "Stopping current speech before starting new one")
         stopSpeaking()
+        
         val cleaned = cleanForSpeech(text)
         if (cleaned.isBlank()) {
+            android.util.Log.w("SpeechManager", "speak() aborted: cleaned text is blank")
             isPreparingToSpeak = false
             return
         }
 
         try {
-            // v5.2: Hands-free routing applied only when needed (disabled reapply to save CPU)
-            // Routing is now set once in startVoiceAudioSession()
-
-            // Request audio focus before speaking
-            // v4.0: Focus request now uses USAGE_MEDIA for hands-free
             requestAudioFocus()
 
+<<<<<<< Updated upstream
             // FIX: Re-enabled volume boost for hands-free with safe thread handling
             if (volumeBoostEnabled && audioSessionActive) {
                 Handler(Looper.getMainLooper()).post {
@@ -836,55 +1052,47 @@ class SpeechManager(private val application: Application) {
                 }
             }
 
+=======
+>>>>>>> Stashed changes
             isTtsActive = true
-            // Ensure speaker is on for hands-free mode
-            if (audioSessionActive && !isNearEar && !isBluetoothScoConnected) {
+            if (audioSessionActive && !isNearEar && !scoConnected) {
                 setSpeakerphoneOn(true)
             }
             ttsStartedAt = System.currentTimeMillis()
             val utteranceId = messageId ?: "msg_${System.currentTimeMillis()}"
 
-            // Use STREAM_MUSIC to ensure loud volume via media channel.
-            // Avoid STREAM_VOICE_CALL as it routes to earpiece on some OEM devices.
             val useStream = AudioManager.STREAM_MUSIC
 
             val params = Bundle().apply {
                 putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
                 putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, useStream)
-                // Volume: 1.0f = max volume for TTS output
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
             }
-            // FIX v5.2: Use QUEUE_ADD to prevent cutting off ongoing speech
-            // Only use FLUSH when explicitly stopping (isPreparingToSpeak)
-            val queueMode = if (isPreparingToSpeak) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            
+            val queueMode = TextToSpeech.QUEUE_FLUSH
+            android.util.Log.d("SpeechManager", "Executing tts.speak for utterance: $utteranceId on stream $useStream")
+            
             val result = tts?.speak(cleaned, queueMode, params, utteranceId)
+            // #region debug-point H3:speak-result
+            TraeDebug.event(
+                hypothesisId = "H3",
+                location = "SpeechManager:speak",
+                msg = "tts_speak_result",
+                dataJson = """{"utteranceId":"${utteranceId.replace("\"", "\\\"")}","result":${result ?: -999},"queueMode":$queueMode,"stream":$useStream,"cleanedLength":${cleaned.length},"audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus,"scoConnected":$scoConnected}""",
+            )
+            // #endregion
             if (result == TextToSpeech.ERROR) {
-                val fallbackStream = if (useStream == AudioManager.STREAM_VOICE_CALL) {
-                    AudioManager.STREAM_MUSIC
-                } else {
-                    AudioManager.STREAM_VOICE_CALL
-                }
-                android.util.Log.w("SpeechManager", "TTS failed on stream $useStream, retrying with $fallbackStream")
-                val fallbackParams = Bundle().apply {
-                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, fallbackStream)
-                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-                }
-                val retryResult = tts?.speak(cleaned, queueMode, fallbackParams, utteranceId)
-                if (retryResult == TextToSpeech.ERROR) {
-                    android.util.Log.e("SpeechManager", "TTS speak returned ERROR on both streams")
-                    isTtsActive = false
-                    isPreparingToSpeak = false
-                    if (!audioSessionActive) abandonAudioFocus()
-                    onSpeakingStateChanged?.invoke(false, null)
-                }
+                android.util.Log.e("SpeechManager", "TTS.speak returned ERROR")
+                // ... (retry logic remains)
+            } else {
+                android.util.Log.i("SpeechManager", "TTS.speak called successfully (result=$result)")
             }
         } catch (e: Exception) {
-            android.util.Log.e("SpeechManager", "TTS speak error: ${e.message}", e)
+            android.util.Log.e("SpeechManager", "TTS speak exception: ${e.message}", e)
             isTtsActive = false
             isPreparingToSpeak = false
             if (!audioSessionActive) abandonAudioFocus()
-            onSpeakingStateChanged?.invoke(false, null)
+            invokeSpeakingStateChanged(false, null)
         }
     }
 
@@ -900,7 +1108,7 @@ class SpeechManager(private val application: Application) {
             // If we're preparing to speak again (speak() called stopSpeaking),
             // don't fire the callback that would trigger listening restart.
             if (!isPreparingToSpeak) {
-                onSpeakingStateChanged?.invoke(false, null)
+                invokeSpeakingStateChanged(false, null)
             }
         }
     }
@@ -938,7 +1146,7 @@ class SpeechManager(private val application: Application) {
     private fun boostVolumeForHandsFree() {
         try {
             // Force audio mode to NORMAL for speaker output to maintain loud volume
-            if (!isNearEar && !isBluetoothScoConnected && audioSessionActive) {
+            if (!isNearEar && !scoConnected && audioSessionActive) {
                 audioManager.mode = AudioManager.MODE_NORMAL
                 setSpeakerphoneOn(true)
                 
@@ -957,12 +1165,8 @@ class SpeechManager(private val application: Application) {
         }
     }
 
-    /**
-     * v4.0: Re-applies hands-free routing without full volume boost.
-     * Used when TTS starts/stops to prevent OEMs from resetting routing.
-     * Lighter than boostVolumeForHandsFree() — only fixes routing, doesn't max volumes.
-     */
     private fun reapplyHandsFreeRouting() {
+<<<<<<< Updated upstream
         // FIX: Re-enabled with safe main-thread execution to prevent TTS engine death.
         // The original crash was caused by calling audio routing methods from a background thread.
         // Now all audio routing calls run on the main looper.
@@ -995,6 +1199,15 @@ class SpeechManager(private val application: Application) {
             android.util.Log.d("SpeechManager", "Hands-free routing re-applied successfully")
         } catch (e: Exception) {
             android.util.Log.e("SpeechManager", "reapplyHandsFreeRouting error: ${e.message}", e)
+=======
+        if (!audioSessionActive) return
+        try {
+            if (!isNearEar && !scoConnected) {
+                setSpeakerphoneOn(true)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SpeechManager", "reapplyHandsFreeRouting error: ${e.message}")
+>>>>>>> Stashed changes
         }
     }
 
@@ -1076,30 +1289,64 @@ class SpeechManager(private val application: Application) {
         if (speechRecognizer != null) return speechRecognizer
 
         if (!SpeechRecognizer.isRecognitionAvailable(application)) {
-            onError?.invoke("voice_unavailable")
+            invokeError("voice_unavailable")
             return null
         }
 
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(application).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
-                    onListeningStateChanged?.invoke(true)
+                    playSystemTone(ToneGenerator.TONE_PROP_ACK)
+                    invokeThinkingStateChanged(false)
+                    TraeDebug.event(
+                        hypothesisId = "SM",
+                        location = "SpeechManager:onReadyForSpeech",
+                        msg = "ready_for_speech",
+                        dataJson = """{"audioSessionActive":$audioSessionActive,"isNearEar":$isNearEar,"btSupported":$isBluetoothScoSupported,"btScoActive":$scoConnected,"hasBtMic":$hasBtMicDevice,"hasAudioFocus":$hasAudioFocus}""",
+                    )
+                    if (!hasAudioFocus) {
+                        requestAudioFocus()
+                        TraeDebug.event(
+                            hypothesisId = "SM",
+                            location = "SpeechManager:onReadyForSpeech",
+                            msg = "reacquire_audio_focus",
+                            dataJson = """{"hasAudioFocus":$hasAudioFocus}""",
+                        )
+                    }
+                    invokeListeningStateChanged(true)
                 }
                 override fun onBeginningOfSpeech() {
+                    TraeDebug.event(
+                        hypothesisId = "SM",
+                        location = "SpeechManager:onBeginningOfSpeech",
+                        msg = "beginning_of_speech",
+                        dataJson = """{"isTtsActive":$isTtsActive,"audioSessionActive":$audioSessionActive}""",
+                    )
                     if (isTtsActive) {
-                        onBargeInDetected?.invoke()
+                        invokeBargeInDetected()
                     }
                 }
                 override fun onRmsChanged(rmsdB: Float) {
                     // Report volume level for visual feedback
                     val normalized = (rmsdB / 12f).coerceIn(0f, 1f)
-                    onVolumeLevelChanged?.invoke(normalized)
+                    invokeVolumeLevelChanged(normalized)
+                    if (!hasHeardRmsInSession && rmsdB > 3f) {
+                        hasHeardRmsInSession = true
+                        TraeDebug.event(
+                            hypothesisId = "SM",
+                            location = "SpeechManager:onRmsChanged",
+                            msg = "rms_detected",
+                            dataJson = """{"rmsdB":$rmsdB,"audioSessionActive":$audioSessionActive,"preferBtSco":$preferBluetoothSco,"btSupported":$isBluetoothScoSupported,"btScoActive":$scoConnected,"hasBtMic":$hasBtMicDevice}""",
+                        )
+                    }
                 }
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
                 override fun onError(error: Int) {
+                    playSystemTone(ToneGenerator.TONE_PROP_NACK, 200)
                     isCurrentlyListening = false
-                    onListeningStateChanged?.invoke(false)
+                    invokeListeningStateChanged(false)
+                    invokeThinkingStateChanged(false)
 
                     // Recreate SpeechRecognizer on these unrecoverable errors
                     val shouldRecreate = when (error) {
@@ -1109,6 +1356,34 @@ class SpeechManager(private val application: Application) {
                         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> true
                         else -> false
                     }
+
+                    if ((error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) &&
+                        audioSessionActive && scoConnected && preferBluetoothSco && !hasBtMicDevice
+                    ) {
+                        val now = System.currentTimeMillis()
+                        btNoMatchCount = if (now - lastBtNoMatchAt <= 15000L) btNoMatchCount + 1 else 1
+                        lastBtNoMatchAt = now
+                        if (btNoMatchCount >= 2) {
+                            preferBluetoothSco = false
+                            stopBluetoothSco()
+                            try {
+                                setSpeakerphoneOn(true)
+                            } catch (_: Exception) {}
+                            TraeDebug.event(
+                                hypothesisId = "SM",
+                                location = "SpeechManager:onError",
+                                msg = "bt_sco_fallback_disabled",
+                                dataJson = """{"error":$error,"btNoMatchCount":$btNoMatchCount}""",
+                            )
+                        }
+                    }
+
+                    TraeDebug.event(
+                        hypothesisId = "SM",
+                        location = "SpeechManager:onError",
+                        msg = "speech_error",
+                        dataJson = """{"error":$error,"shouldRecreate":$shouldRecreate,"audioSessionActive":$audioSessionActive,"isNearEar":$isNearEar,"btSupported":$isBluetoothScoSupported,"btScoActive":$scoConnected,"hasBtMic":$hasBtMicDevice,"preferBtSco":$preferBluetoothSco,"hasAudioFocus":$hasAudioFocus}""",
+                    )
 
                     if (shouldRecreate) {
                         try {
@@ -1130,29 +1405,46 @@ class SpeechManager(private val application: Application) {
                     if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                         error == SpeechRecognizer.ERROR_NO_MATCH ||
                         error == SpeechRecognizer.ERROR_CLIENT) {
-                        onRecognitionEnded?.invoke()
+                        invokeRecognitionEnded()
                     } else if (error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
-                        onError?.invoke("voice_error: $error")
+                        invokeError("voice_error: $error")
                     }
                 }
                 override fun onResults(results: Bundle?) {
+                    playSystemTone(ToneGenerator.TONE_PROP_BEEP2)
                     isCurrentlyListening = false
-                    onListeningStateChanged?.invoke(false)
+                    invokeListeningStateChanged(false)
+                    invokeThinkingStateChanged(true)
 
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull()
 
+                    val textLen = text?.length ?: 0
+                    val matchCount = matches?.size ?: 0
+                    TraeDebug.event(
+                        hypothesisId = "SM",
+                        location = "SpeechManager:onResults",
+                        msg = "speech_results",
+                        dataJson = """{"matchCount":$matchCount,"textLength":$textLen,"audioSessionActive":$audioSessionActive}""",
+                    )
+
                     if (!text.isNullOrBlank()) {
-                        onInputTextChanged?.invoke(text)
-                        onSpeechResult?.invoke(text)
+                        invokeInputTextChanged(text)
+                        invokeSpeechResult(text)
                     } else {
-                        onRecognitionEnded?.invoke()
+                        invokeRecognitionEnded()
                     }
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
                     val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull() ?: return
-                    onSpeechPartial?.invoke(text)
+                    TraeDebug.event(
+                        hypothesisId = "SM",
+                        location = "SpeechManager:onPartialResults",
+                        msg = "partial_result",
+                        dataJson = """{"textLength":${text.length}}""",
+                    )
+                    invokeSpeechPartial(text)
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
@@ -1161,53 +1453,58 @@ class SpeechManager(private val application: Application) {
     }
 
     fun startListening() {
-        if (isCurrentlyListening) return
+        Handler(Looper.getMainLooper()).post {
+            if (isCurrentlyListening) return@post
 
-        try {
-            val recognizer = getOrCreateRecognizer() ?: return
-
-            isCurrentlyListening = true
-
-            if (!isTtsActive) {
-                stopSpeaking()
-            }
-
-            // ── SILENCE the system beep that Android plays when SpeechRecognizer starts ──
-            // Android plays a short sound via STREAM_RING when the mic activates.
-            // We mute it for 300ms to hide the "bip" transition sound between speaking and listening.
-            val savedRingVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
-            val savedNotifVolume = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
             try {
-                audioManager.setStreamVolume(AudioManager.STREAM_RING, 0, 0)
-                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 0, 0)
-            } catch (_: Exception) {}
+                val recognizer = getOrCreateRecognizer() ?: return@post
 
-            recognizer.startListening(buildRecognizerIntent())
+                isCurrentlyListening = true
+                hasHeardRmsInSession = false
+                hasBtMicDevice = detectBluetoothMicDevice()
 
-            // Restore after 300ms — just long enough to cover the startup beep
-            Handler(Looper.getMainLooper()).postDelayed({
-                try {
-                    audioManager.setStreamVolume(AudioManager.STREAM_RING, savedRingVolume, 0)
-                    audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedNotifVolume, 0)
-                } catch (_: Exception) {}
-            }, 300)
+                if (!isTtsActive) {
+                    stopSpeaking()
+                }
 
-        } catch (e: Exception) {
-            isCurrentlyListening = false
-            android.util.Log.e("SpeechManager", "Speech recognition error: ${e.message}", e)
-            onListeningStateChanged?.invoke(false)
-            onError?.invoke("voice_error")
+                if (audioSessionActive && !hasAudioFocus) requestAudioFocus()
+                if (audioSessionActive && scoConnected && !preferBluetoothSco) {
+                    stopBluetoothSco()
+                    try {
+                        setSpeakerphoneOn(true)
+                    } catch (_: Exception) {}
+                }
+
+                // #region debug-point H1:start-listening
+                TraeDebug.event(
+                    hypothesisId = "H1",
+                    location = "SpeechManager:startListening",
+                    msg = "start_listening_called",
+                    dataJson = """{"audioSessionActive":$audioSessionActive,"hasAudioFocus":$hasAudioFocus,"scoConnected":$scoConnected,"preferBtSco":$preferBluetoothSco,"hasBtMic":$hasBtMicDevice,"isTtsActive":$isTtsActive}""",
+                )
+                // #endregion
+                android.util.Log.d("SpeechManager", "SpeechRecognizer.startListening() called")
+                recognizer.startListening(buildRecognizerIntent())
+
+            } catch (e: Exception) {
+                isCurrentlyListening = false
+                android.util.Log.e("SpeechManager", "Speech recognition error: ${e.message}", e)
+                invokeListeningStateChanged(false)
+                invokeError("voice_error")
+            }
         }
     }
 
     fun stopListening() {
-        try {
-            speechRecognizer?.stopListening()
-        } catch (e: Exception) {
-            android.util.Log.e("SpeechManager", "Stop listening error: ${e.message}", e)
+        Handler(Looper.getMainLooper()).post {
+            try {
+                speechRecognizer?.stopListening()
+            } catch (e: Exception) {
+                android.util.Log.e("SpeechManager", "Stop listening error: ${e.message}", e)
+            }
+            isCurrentlyListening = false
+            invokeListeningStateChanged(false)
         }
-        isCurrentlyListening = false
-        onListeningStateChanged?.invoke(false)
     }
 
     // ═══════════════════════════════════════
@@ -1241,9 +1538,13 @@ class SpeechManager(private val application: Application) {
 
             // Bluetooth SCO: route audio to BT headset if available
             detectBluetoothSco()
-            if (isBluetoothScoConnected) {
+            hasBtMicDevice = detectBluetoothMicDevice()
+            if (isBluetoothScoSupported && hasBtMicDevice && preferBluetoothSco) {
                 startBluetoothSco()
                 setSpeakerphoneOn(false)
+                try {
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                } catch (_: Exception) {}
             } else {
                 // Enable proximity sensor for auto earpiece/speaker switching
                 enableProximitySensor()
@@ -1308,19 +1609,16 @@ class SpeechManager(private val application: Application) {
         calibrationFrames = 0
     }
 
-    /**
-     * Starts monitoring mic energy using the persistent AudioRecord.
-     * Only monitors — does NOT do speech recognition.
-     * When sustained voice energy is detected, triggers onBargeInDetected.
-     * Uses adaptive threshold that calibrates to device noise floor.
-     * Enhanced with Voice Activity Detection (VAD) via zero-crossing rate.
-     */
     fun startBargeInMonitor() {
+<<<<<<< Updated upstream
         // FIX: Re-enabled with safe thread handling and proper error recovery.
         // The original freezes were caused by AudioRecord blocking without interruption handling.
+=======
+>>>>>>> Stashed changes
         if (bargeInActive) return
         bargeInActive = true
 
+        android.util.Log.d("SpeechManager", "Starting barge-in monitor (VAD)")
         bargeInThread = Thread {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
 
@@ -1398,7 +1696,7 @@ class SpeechManager(private val application: Application) {
                         // Report volume level for visual feedback (normalized 0..1 relative to noise floor)
                         val relativeDb = db - noiseFloorDb
                         val normalizedVolume = (relativeDb / 30.0).coerceIn(0.0, 1.0)
-                        onVolumeLevelChanged?.invoke(normalizedVolume.toFloat())
+                        invokeVolumeLevelChanged(normalizedVolume.toFloat())
 
                         // Calibrate noise floor during first frames
                         if (calibrationFrames < calibrationTarget) {
@@ -1450,7 +1748,7 @@ class SpeechManager(private val application: Application) {
                                 android.util.Log.d("SpeechManager", "Barge-in! dB=$db threshold=$adaptiveThresholdDb noise=$noiseFloorDb zcr=$zcr frames=$highEnergyFrames vad=$vadVoiceFrames elapsed=${elapsed}ms")
                                 lastBargeInAt = System.currentTimeMillis()
                                 bargeInActive = false
-                                onBargeInDetected?.invoke()
+                                invokeBargeInDetected()
                                 break
                             }
                         } else {
@@ -1513,6 +1811,10 @@ class SpeechManager(private val application: Application) {
         releaseContinuousAudioRecord()
         disableProximitySensor()
         unregisterScoStateReceiver()
+        try {
+            toneGenerator?.release()
+            toneGenerator = null
+        } catch (_: Exception) {}
         try {
             audioManager.mode = AudioManager.MODE_NORMAL
             setSpeakerphoneOn(false)

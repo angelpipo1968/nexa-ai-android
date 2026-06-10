@@ -10,7 +10,11 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Build
 import android.util.Log
+<<<<<<< Updated upstream
 import com.nexa.ai.MainActivity
+=======
+import com.nexa.ai.debug.TraeDebug
+>>>>>>> Stashed changes
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -37,6 +41,7 @@ class NexaSpeechService : Service() {
 
     private val TAG = "NexaSpeechService"
     private val binder = SpeechBinder()
+<<<<<<< Updated upstream
     private val NOTIFICATION_CHANNEL_ID = "nexa_voice_channel"
     private val NOTIFICATION_ID = 1001
 
@@ -44,6 +49,10 @@ class NexaSpeechService : Service() {
     // Before this fix, the service created its own SpeechManager(application) which
     // was a completely separate instance, causing duplicate TTS engines and
     // SpeechRecognizers fighting for the microphone.
+=======
+    
+    // Instancia persistente del gestor de voz
+>>>>>>> Stashed changes
     @Inject
     lateinit var speechManager: SpeechManager
 
@@ -64,6 +73,7 @@ class NexaSpeechService : Service() {
         super.onCreate()
         Log.i(TAG, "onCreate: Iniciando NexaSpeechService")
 
+<<<<<<< Updated upstream
         // Crear canal de notificación para Android 8+
         createNotificationChannel()
 
@@ -76,10 +86,15 @@ class NexaSpeechService : Service() {
         speechManager.initialize()
 
         Log.d(TAG, "Using SHARED SpeechManager singleton — no duplicate TTS/STT")
+=======
+        // Vinculamos los callbacks de SpeechManager con envíos de Broadcast
+        setupSpeechManagerCallbacks()
+>>>>>>> Stashed changes
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand: Iniciando sesión de voz activa por intent")
+<<<<<<< Updated upstream
 
         // FIX: Start as foreground service IMMEDIATELY to prevent Android from killing it.
         startForegroundNotification()
@@ -94,6 +109,22 @@ class NexaSpeechService : Service() {
         sendSpeechStateBroadcast("ready")
 
         return START_STICKY
+=======
+        // #region debug-point A:service-start-command
+        TraeDebug.event(
+            hypothesisId = "A",
+            location = "NexaSpeechService:onStartCommand",
+            msg = "[DEBUG] speech service onStartCommand",
+            dataJson = """{"startId":$startId}""",
+        )
+        // #endregion
+        
+        // Cuando el servicio es iniciado por el sistema o por el botón del volante,
+        // arrancamos la sesión de audio vehicular y el reconocedor de voz.
+        startSpeechListeningSession()
+        
+        return START_STICKY // Asegura que Android intente recrear el servicio si es purgado por RAM
+>>>>>>> Stashed changes
     }
 
     /**
@@ -102,6 +133,7 @@ class NexaSpeechService : Service() {
      */
     private fun startForegroundNotification() {
         try {
+<<<<<<< Updated upstream
             val notificationIntent = Intent(this, MainActivity::class.java)
             val pendingIntent = PendingIntent.getActivity(
                 this, 0, notificationIntent,
@@ -124,11 +156,28 @@ class NexaSpeechService : Service() {
             }
 
             Log.d(TAG, "Foreground service started with notification")
+=======
+            Log.d(TAG, "Arrancando sesión de audio manos libres y reconociendo...")
+            // #region debug-point A:start-listening-session
+            TraeDebug.event(
+                hypothesisId = "A",
+                location = "NexaSpeechService:startSpeechListeningSession",
+                msg = "[DEBUG] start speech listening session",
+                dataJson = """{"serviceCreated":true}""",
+            )
+            // #endregion
+            speechManager.startVoiceAudioSession()
+            speechManager.startListening()
+            
+            // Notificamos el estado mediante broadcast
+            sendSpeechStateBroadcast("listening")
+>>>>>>> Stashed changes
         } catch (e: Exception) {
             Log.e(TAG, "Error starting foreground: ${e.message}", e)
         }
     }
 
+<<<<<<< Updated upstream
     /**
      * Creates the notification channel required for Android 8+ (API 26+).
      */
@@ -145,6 +194,58 @@ class NexaSpeechService : Service() {
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
+=======
+    private fun setupSpeechManagerCallbacks() {
+        speechManager.onListeningStateChanged = { isListening ->
+            sendSpeechStateBroadcast(if (isListening) "listening" else "idle")
+        }
+
+        speechManager.onSpeakingStateChanged = { isSpeaking, messageId ->
+            sendSpeechStateBroadcast(if (isSpeaking) "speaking" else "idle")
+        }
+
+        speechManager.onSpeechResult = { text ->
+            Log.i(TAG, "onSpeechResult: Texto capturado -> $text")
+            // #region debug-point D:speech-result
+            TraeDebug.event(
+                hypothesisId = "D",
+                location = "NexaSpeechService:onSpeechResult",
+                msg = "[DEBUG] speech result captured",
+                dataJson = """{"textLength":${text.length}}""",
+            )
+            // #endregion
+            val intent = Intent(ACTION_SPEECH_RESULT).apply {
+                putExtra(EXTRA_TEXT, text)
+                setPackage(packageName) // Seguridad extra: restringe el broadcast a nuestra app
+            }
+            sendBroadcast(intent)
+        }
+
+        speechManager.onSpeechPartial = { partialText ->
+            val intent = Intent(ACTION_SPEECH_PARTIAL).apply {
+                putExtra(EXTRA_TEXT, partialText)
+                setPackage(packageName)
+            }
+            sendBroadcast(intent)
+        }
+
+        speechManager.onError = { errorKey ->
+            Log.e(TAG, "onError: Error en el SpeechRecognizer -> $errorKey")
+            // #region debug-point A:speech-error
+            TraeDebug.event(
+                hypothesisId = "A",
+                location = "NexaSpeechService:onError",
+                msg = "[DEBUG] speech manager error",
+                dataJson = """{"errorKey":"${errorKey.replace("\"", "\\\"")}"}""",
+            )
+            // #endregion
+            sendSpeechErrorBroadcast(errorKey)
+        }
+
+        speechManager.onBargeInDetected = {
+            Log.d(TAG, "onBargeInDetected: Interrupción por voz activa detectada")
+            sendSpeechStateBroadcast("barge_in")
+>>>>>>> Stashed changes
         }
     }
 
@@ -167,6 +268,7 @@ class NexaSpeechService : Service() {
     }
 
     override fun onDestroy() {
+<<<<<<< Updated upstream
         Log.i(TAG, "onDestroy: Apagando servicio de voz")
 
         // CRITICAL FIX: Do NOT call speechManager.stopVoiceAudioSession() or destroy() here!
@@ -182,6 +284,14 @@ class NexaSpeechService : Service() {
             stopForeground(true)
         }
 
+=======
+        Log.i(TAG, "onDestroy: Deteniendo sesión de voz activa")
+        
+        // Solo detenemos la sesión activa, NO destruimos el manager
+        // porque es un Singleton compartido con el ViewModel
+        speechManager.stopVoiceAudioSession()
+        
+>>>>>>> Stashed changes
         sendSpeechStateBroadcast("destroyed")
         super.onDestroy()
     }
