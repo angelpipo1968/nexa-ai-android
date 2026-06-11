@@ -1,0 +1,100 @@
+# ═══════════════════════════════════════════════════════════════
+# LiteLLM Configuration for Nexa AI - RTX 3090 Server
+# ═══════════════════════════════════════════════════════════════
+#
+# This configuration enables both text chat and vision (VLM)
+# through LiteLLM proxy on port 4000.
+#
+# Flow:
+#   Android App → LiteLLM :4000/v1/chat/completions → Ollama → Model
+#
+# IMPORTANT:
+#   - Android must ALWAYS connect to port 4000 (LiteLLM router)
+#   - Do NOT connect directly to port 8002 (vLLM internal)
+#   - Do NOT connect to port 3000 (Next.js web UI)
+#
+# Install models:
+#   ollama pull qwen2.5:7b              # Text chat
+#   ollama pull llava:7b                 # Vision (lightweight, fast)
+#   ollama pull qwen2.5-vl:7b           # Vision (better quality, OCR)
+#   # OR for Phi-3-vision (fastest):
+#   # Download from HuggingFace and serve with vLLM
+#
+# Start LiteLLM:
+#   docker run -d --name litellm \
+#     -p 4000:4000 \
+#     -v ./litellm_config.yaml:/app/config.yaml \
+#     ghcr.io/berriai/litellm:main-latest \
+#     --config /app/config.yaml
+#
+# Or with docker-compose (recommended):
+#   docker compose up -d
+# ═══════════════════════════════════════════════════════════════
+
+model_list:
+  # ── Text Chat Model ──
+  # qwen2.5-7b: Great general-purpose text model
+  - model_name: qwen
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://host.docker.internal:11434
+      max_tokens: 4096
+      temperature: 0.7
+
+  # ── Vision Models ──
+
+  # Option 1: llava:7b (Lightweight, fast, good for basic vision)
+  - model_name: vision
+    litellm_params:
+      model: ollama/llava:7b
+      api_base: http://host.docker.internal:11434
+      max_tokens: 1024
+      temperature: 0.5
+
+  # Option 2: Qwen2.5-VL-7B (Best quality, great OCR, document analysis)
+  - model_name: qwen-vision
+    litellm_params:
+      model: ollama/qwen2.5-vl:7b
+      api_base: http://host.docker.internal:11434
+      max_tokens: 2048
+      temperature: 0.5
+
+  # Option 3: Phi-3-vision (Fastest, good for real-time)
+  # Requires vLLM instead of Ollama:
+  # - model_name: phi-vision
+  #   litellm_params:
+  #     model: openai/microsoft/Phi-3-vision-128k-instruct
+  #     api_base: http://host.docker.internal:8002/v1
+  #     max_tokens: 1024
+  #     temperature: 0.5
+
+# ── General Settings ──
+litellm_settings:
+  # Drop unsupported params instead of erroring
+  drop_params: true
+  # Success callback for logging
+  success_callback: ["langfuse"]
+  # Failure callback
+  failure_callback: ["langfuse"]
+
+# ── Router Settings ──
+router_settings:
+  # Routing strategy: simple (round-robin), least-busy, latency-based
+  routing_strategy: simple
+  # Model retry count
+  num_retries: 2
+  # Timeout per request (seconds)
+  timeout: 180
+  # Retry after cooldown
+  retry_after: 10
+  # Allowed fails before cooldown
+  allowed_fails: 3
+
+# ── Server Settings ──
+general_settings:
+  # Master key (optional - set for security)
+  # master_key: sk-your-secret-key-here
+  # Maximum budget per API key
+  # max_budget: 100
+  # Database URL for tracking spend (optional)
+  # database_url: postgresql://user:pass@localhost:5432/litellm

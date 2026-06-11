@@ -326,6 +326,169 @@ class NexaRepository @Inject constructor() {
             null
         }
     }
+
+    /**
+     * Send a STREAMING vision request to LiteLLM using SSE.
+     * This sends an image (as base64 data URI) along with a text prompt to a VLM model
+     * (e.g., llava:7b, qwen2.5-vl) through LiteLLM's proxy on port 4000.
+     *
+     * The response arrives as Server-Sent Events with OpenAI streaming format:
+     *   data: {"choices":[{"delta":{"content":"La "}}]}
+     *   data: {"choices":[{"delta":{"content":"imagen "}}]}
+     *   data: [DONE]
+     *
+     * Flow: Android Camera → Base64 → LiteLLM :4000/v1/chat/completions (stream=true) → SSE → VLM
+     *
+     * @param baseUrl LiteLLM base URL, e.g. "http://192.168.1.50:4000"
+     * @param base64Image Base64-encoded image data (raw, without data URI prefix)
+     * @param mimeType Image MIME type, e.g. "image/jpeg"
+     * @param question Text prompt/question about the image
+     * @param model Model name configured in LiteLLM, e.g. "vision", "qwen-vision"
+     * @return Flow of StreamEvent with streamed text chunks, provider info, errors, and Done
+     */
+    fun sendLiteLLMVisionStream(
+        baseUrl: String,
+        base64Image: String,
+        mimeType: String = "image/jpeg",
+        question: String = "Describe esta imagen en detalle",
+        model: String = "vision"
+    ): Flow<StreamEvent> = callbackFlow {
+        val dataUri = "data:$mimeType;base64,$base64Image"
+
+        // Build OpenAI-compatible vision request with stream=true
+        val body = JsonObject().apply {
+            addProperty("model", model)
+            addProperty("max_tokens", 1024)
+            addProperty("stream", true)  // Enable SSE streaming
+
+            val messagesArray = com.google.gson.JsonArray()
+            val userMessage = JsonObject().apply {
+                addProperty("role", "user")
+                val contentArray = com.google.gson.JsonArray()
+
+                // Text part
+                val textPart = JsonObject().apply {
+                    addProperty("type", "text")
+                    addProperty("text", question)
+                }
+                contentArray.add(textPart)
+
+                // Image part
+                val imagePart = JsonObject().apply {
+                    addProperty("type", "image_url")
+                    val imageUrlObj = JsonObject().apply {
+                        addProperty("url", dataUri)
+                    }
+                    add("image_url", imageUrlObj)
+                }
+                contentArray.add(imagePart)
+
+                add("content", contentArray)
+            }
+            messagesArray.add(userMessage)
+            add("messages", messagesArray)
+        }
+
+        Log.d(TAG, "Sending STREAMING LiteLLM vision request to $baseUrl/v1/chat/completions model=$model")
+
+        val httpRequest = Request.Builder()
+            .url("$baseUrl/v1/chat/completions")
+            .header("Accept", "text/event-stream")
+            .header("Cache-Control", "no-cache")
+            .header("Content-Type", "application/json")
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val listener = object : EventSourceListener() {
+            override fun onOpen(eventSource: EventSource, response: Response) {
+                Log.d(TAG, "Vision SSE Connection Opened")
+            }
+
+            override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                try {
+                    if (data == "[DONE]") {
+                        trySend(StreamEvent.Done)
+                        return
+                    }
+
+                    val obj = gson.fromJson(data, JsonObject::class.java)
+
+                    // OpenAI streaming format: {"choices":[{"delta":{"content":"text"}}]}
+                    if (obj.has("choices")) {
+                        val choices = obj.getAsJsonArray("choices")
+                        if (choices.size() > 0) {
+                            val choice = choices[0].asJsonObject
+                            if (choice.has("delta")) {
+                                val delta = choice.getAsJsonObject("delta")
+                                if (delta.has("content")) {
+                                    val content = delta.get("content").asString
+                                    if (content.isNotEmpty()) {
+                                        trySend(StreamEvent.Text(content))
+                                    }
+                                }
+                            }
+                            // Check finish_reason
+                            if (choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull) {
+                                val reason = choice.get("finish_reason").asString
+                                if (reason == "stop") {
+                                    trySend(StreamEvent.Done)
+                                }
+                            }
+                        }
+                    }
+
+                    // Error handling in stream
+                    if (obj.has("error")) {
+                        val err = obj.get("error")
+                        val errMsg = if (err.isJsonObject) {
+                            err.asJsonObject.get("message")?.asString ?: err.toString()
+                        } else {
+                            err.asString
+                        }
+                        trySend(StreamEvent.Error(errMsg))
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing vision SSE data: $data", e)
+                }
+            }
+
+            override fun onClosed(eventSource: EventSource) {
+                Log.d(TAG, "Vision SSE Connection Closed")
+                try {
+                    trySend(StreamEvent.Done)
+                    close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing vision SSE flow", e)
+                }
+            }
+
+            override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                Log.e(TAG, "Vision SSE Failure: ${t?.message}", t)
+
+                val errorEvent = when {
+                    t is SocketTimeoutException -> StreamEvent.Error("timeout")
+                    t is IOException -> StreamEvent.Error("network_error")
+                    response?.code == 401 -> StreamEvent.AuthExpired
+                    response?.code == 429 -> StreamEvent.Error("rate_limit")
+                    (response?.code ?: 0) >= 500 -> StreamEvent.Error("server_error")
+                    else -> StreamEvent.Error(t?.localizedMessage ?: "unknown_error")
+                }
+
+                try {
+                    trySend(errorEvent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error sending vision failure event", e)
+                }
+                close()
+            }
+        }
+
+        val eventSource = EventSources.createFactory(client).newEventSource(httpRequest, listener)
+
+        awaitClose {
+            eventSource.cancel()
+        }
+    }.flowOn(Dispatchers.IO)
 }
 
 sealed class StreamEvent {

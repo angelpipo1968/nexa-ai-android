@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -326,26 +327,105 @@ fun OfflineSettingsScreen(
 
                         Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
-                        // Vision Model
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // Vision Model - VLM Selector
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Modelo de Visión (VLM)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            var visionModel by remember(uiState.localVisionModel) { mutableStateOf(uiState.localVisionModel) }
-                            OutlinedTextField(
-                                value = visionModel,
-                                onValueChange = { visionModel = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("vision", fontSize = 12.sp) },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
-                                trailingIcon = {
-                                    TextButton(onClick = { onSetLocalVisionModel(visionModel) }) {
-                                        Text("Guardar", fontSize = 11.sp, color = effectiveAccent)
+
+                            // Predefined VLM model options
+                            val vlmOptions = listOf(
+                                "vision" to "llava:7b (Rápido, liviano)",
+                                "qwen-vision" to "Qwen2.5-VL (Mejor calidad, OCR)",
+                                "phi-vision" to "Phi-3-Vision (Más rápido)"
+                            )
+                            var selectedVlm by remember(uiState.localVisionModel) {
+                                mutableStateOf(vlmOptions.indexOfFirst { it.first == uiState.localVisionModel }.takeIf { it >= 0 } ?: 0)
+                            }
+                            var customVlm by remember(uiState.localVisionModel) {
+                                mutableStateOf(if (vlmOptions.any { it.first == uiState.localVisionModel }) "" else uiState.localVisionModel)
+                            }
+
+                            vlmOptions.forEachIndexed { index, (modelId, label) ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .then(
+                                            if (selectedVlm == index) Modifier.background(effectiveAccent.copy(alpha = 0.08f))
+                                            else Modifier
+                                        )
+                                        .clickable {
+                                            selectedVlm = index
+                                            customVlm = ""
+                                            onSetLocalVisionModel(modelId)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    RadioButton(
+                                        selected = selectedVlm == index,
+                                        onClick = {
+                                            selectedVlm = index
+                                            customVlm = ""
+                                            onSetLocalVisionModel(modelId)
+                                        },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = effectiveAccent,
+                                            unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        Text("Modelo: $modelId", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                                     }
                                 }
-                            )
+                            }
+
+                            // Custom model option
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .then(
+                                        if (selectedVlm == vlmOptions.size) Modifier.background(effectiveAccent.copy(alpha = 0.08f))
+                                        else Modifier
+                                    )
+                                    .clickable { selectedVlm = vlmOptions.size }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = selectedVlm == vlmOptions.size,
+                                    onClick = { selectedVlm = vlmOptions.size },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = effectiveAccent,
+                                        unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text("Personalizado:", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            }
+                            if (selectedVlm == vlmOptions.size) {
+                                OutlinedTextField(
+                                    value = customVlm,
+                                    onValueChange = { customVlm = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    placeholder = { Text("Nombre del modelo en litellm_config.yaml", fontSize = 11.sp) },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                    trailingIcon = {
+                                        TextButton(onClick = { onSetLocalVisionModel(customVlm) }) {
+                                            Text("Guardar", fontSize = 11.sp, color = effectiveAccent)
+                                        }
+                                    }
+                                )
+                            }
+
                             Text(
-                                "Modelo multimodal para visión (llava, qwen2.5-vl, phi-vision). Debe estar en litellm_config.yaml.",
+                                "Debe estar configurado en litellm_config.yaml. Streaming habilitado para todos los modelos.",
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )

@@ -1329,6 +1329,17 @@ REAL-TIME DATA & SEARCHES:
             )
         }
 
+        // Add a streaming placeholder for the assistant message
+        val streamingMsg = Message(
+            id = assistantId,
+            role = "assistant",
+            content = "",
+            isStreaming = true
+        )
+        updateActiveSession { s ->
+            s.copy(messages = s.messages + streamingMsg, updatedAt = System.currentTimeMillis())
+        }
+
         _uiState.value = _uiState.value.copy(isThinking = true, error = null)
         
         // Audible feedback for Hands-Free
@@ -1346,17 +1357,96 @@ REAL-TIME DATA & SEARCHES:
                 val visionModel = _uiState.value.localVisionModel
 
                 if (useLocal) {
-                    // ── Local LiteLLM Vision (llava:7b via :4000) ──
-                    android.util.Log.d("NexaVM", "Sending vision to LiteLLM at $localUrl model=$visionModel")
-                    result = repository.sendLiteLLMVisionRequest(
+                    // ── Local LiteLLM Vision STREAMING (llava:7b / qwen2.5-vl via :4000) ──
+                    android.util.Log.d("NexaVM", "Sending STREAMING vision to LiteLLM at $localUrl model=$visionModel")
+                    
+                    repository.sendLiteLLMVisionStream(
                         baseUrl = localUrl,
                         base64Image = base64Image,
                         mimeType = mimeType,
                         question = question,
                         model = visionModel
-                    ) ?: ""
+                    ).collect { event ->
+                        when (event) {
+                            is StreamEvent.Text -> {
+                                result += event.text
+                                // Update the streaming message in real-time
+                                updateActiveSession { s ->
+                                    s.copy(
+                                        messages = s.messages.map { msg ->
+                                            if (msg.id == assistantId) msg.copy(content = result)
+                                            else msg
+                                        },
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                }
+                            }
+                            is StreamEvent.Done -> {
+                                // Finalize the message
+                                updateActiveSession { s ->
+                                    s.copy(
+                                        messages = s.messages.map { msg ->
+                                            if (msg.id == assistantId) msg.copy(isStreaming = false, content = result)
+                                            else msg
+                                        },
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                }
+                                if (_uiState.value.voiceMode && _uiState.value.autoSpeak && result.isNotBlank()) {
+                                    speak(result, assistantId)
+                                }
+                            }
+                            is StreamEvent.Error -> {
+                                if (result.isBlank()) {
+                                    // If no text received yet, show error
+                                    val errorMsg = if (lang == AppLanguage.SPANISH)
+                                        "Error en visión: ${event.message}"
+                                    else
+                                        "Vision error: ${event.message}"
+                                    updateActiveSession { s ->
+                                        s.copy(
+                                            messages = s.messages.map { msg ->
+                                                if (msg.id == assistantId) msg.copy(
+                                                    isStreaming = false,
+                                                    content = errorMsg
+                                                )
+                                                else msg
+                                            }
+                                        )
+                                    }
+                                } else {
+                                    // Partial result received before error - finalize it
+                                    updateActiveSession { s ->
+                                        s.copy(
+                                            messages = s.messages.map { msg ->
+                                                if (msg.id == assistantId) msg.copy(isStreaming = false)
+                                                else msg
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            is StreamEvent.Provider -> { /* Provider info */ }
+                            is StreamEvent.AuthExpired -> {
+                                updateActiveSession { s ->
+                                    s.copy(
+                                        messages = s.messages.map { msg ->
+                                            if (msg.id == assistantId) msg.copy(
+                                                isStreaming = false,
+                                                content = if (lang == AppLanguage.SPANISH)
+                                                    "Sesión expirada. Por favor, inicia sesión de nuevo."
+                                                else
+                                                    "Session expired. Please log in again."
+                                            )
+                                            else msg
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    // Smart routing: try on-device first if offline, otherwise use cloud
+                    // Non-streaming fallback: Smart routing (on-device > cloud)
                     val smartRouter = SmartRoutingManager(getApplication())
                     val visionDecision = smartRouter.routeVision()
 
@@ -1375,26 +1465,44 @@ REAL-TIME DATA & SEARCHES:
                             question = question
                         ) ?: visionDecision.fallbackMessage ?: if (lang == AppLanguage.SPANISH) "No se recibió una descripción clara del servidor." else "No description received from server."
                     }
-                }
 
-                if (result.isNotBlank()) {
-                    val assistantMsg = Message(id = assistantId, role = "assistant", content = result)
-                    updateActiveSession { s ->
-                        s.copy(messages = s.messages + assistantMsg, updatedAt = System.currentTimeMillis())
-                    }
+                    if (result.isNotBlank()) {
+                        updateActiveSession { s ->
+                            s.copy(
+                                messages = s.messages.map { msg ->
+                                    if (msg.id == assistantId) msg.copy(content = result, isStreaming = false)
+                                    else msg
+                                },
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        }
 
-                    if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
-                        speak(result, assistantId)
+                        if (_uiState.value.voiceMode && _uiState.value.autoSpeak) {
+                            speak(result, assistantId)
+                        }
+                    } else {
+                        // Remove the empty streaming placeholder
+                        updateActiveSession { s ->
+                            s.copy(messages = s.messages.filter { it.id != assistantId })
+                        }
+                        _uiState.update { it.copy(error = if (lang == AppLanguage.SPANISH) "No se pudo analizar la imagen" else "Could not analyze image") }
                     }
-                } else {
-                    _uiState.update { it.copy(error = if (lang == AppLanguage.SPANISH) "No se pudo analizar la imagen" else "Could not analyze image") }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("NexaVM", "Vision error: ${e.message}")
-                _uiState.update {
-                    it.copy(
-                        error = if (lang == AppLanguage.SPANISH) "Error al analizar imagen: ${e.message}" else "Vision error: ${e.message}",
-                        isThinking = false
+                // Try to update the streaming message with error
+                updateActiveSession { s ->
+                    s.copy(
+                        messages = s.messages.map { msg ->
+                            if (msg.id == assistantId) msg.copy(
+                                isStreaming = false,
+                                content = if (lang == AppLanguage.SPANISH)
+                                    "Error al analizar imagen: ${e.message}"
+                                else
+                                    "Vision error: ${e.message}"
+                            )
+                            else msg
+                        }
                     )
                 }
             } finally {
