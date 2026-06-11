@@ -3,48 +3,79 @@ name: Build NEXA PRO APK
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Permite ejecutarlo manualmente desde la pestaña Actions
+  workflow_dispatch:  # Allows manual trigger from Actions tab
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout código
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Configurar JDK 17
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Configurar Android SDK
+    - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Aceptar licencias Android SDK
+    - name: Accept Android SDK licenses
       run: yes | sdkmanager --licenses || true
 
-    - name: Instalar dependencias SDK necesarias
-      run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+    - name: Install required SDK components
+      run: |
+        sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+        sdkmanager "ndk;27.0.12077973" 2>/dev/null || true
 
-    - name: Dar permisos a Gradle
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+        restore-keys: |
+          gradle-
+
+    - name: Make Gradle executable
       run: chmod +x gradlew
 
-    - name: Compilar APK Debug
+    - name: Create debug keystore for release build (if no secrets set)
+      run: |
+        mkdir -p android
+        if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          echo "Using keystore from GitHub Secrets"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/nexa-release.keystore
+        else
+          echo "No keystore secret found - generating debug keystore for CI"
+          keytool -genkeypair -v \
+            -keystore android/nexa-release.keystore \
+            -alias nexa \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "NexaAI2024!Release" \
+            -keypass "NexaAI2024!Release" \
+            -dname "CN=Nexa CI, OU=Dev, O=Nexa, L=CI, ST=CI, C=US"
+        fi
+
+    - name: Build Debug APK
       run: ./gradlew :android-native-app:assembleDebug --no-daemon --max-workers=2
 
-    - name: Subir APK Debug como artefacto
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: NEXA-PRO-debug-APK
         path: android-native-app/build/outputs/apk/debug/*.apk
         retention-days: 30
 
-    - name: Compilar APK Release
+    - name: Build Release APK
       run: ./gradlew :android-native-app:assembleRelease --no-daemon --max-workers=2
 
-    - name: Subir APK Release como artefacto
+    - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
         name: NEXA-PRO-release-APK
