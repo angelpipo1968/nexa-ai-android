@@ -53,6 +53,9 @@ class ChatUseCase @Inject constructor(
     var systemPrompt: String = ""
     var groqApiKey: String? = null
     var useLocalLLM: Boolean = false
+    var localLlmBaseUrl: String = "http://192.168.1.50:4000"
+    var localVisionModel: String = "vision"
+    var localChatModel: String = "qwen"
     var maxTokens: Int = 4096
 
     // Message history for API context
@@ -179,13 +182,49 @@ class ChatUseCase @Inject constructor(
 
     /**
      * Determine the base URL for the API request.
-     * Uses Groq API if an API key is set, otherwise the default server.
+     * Priority: Groq API > Local LiteLLM > Default server.
      */
     private fun determineBaseUrl(): String {
         return if (!groqApiKey.isNullOrBlank()) {
             "https://api.groq.com/openai/v1"
+        } else if (useLocalLLM) {
+            localLlmBaseUrl
         } else {
             baseUrl
+        }
+    }
+
+    /**
+     * Send a vision request to local LiteLLM with an image and text prompt.
+     * Uses OpenAI-compatible chat completions with multimodal content.
+     *
+     * @param base64Image Base64-encoded image data (raw, without data URI prefix)
+     * @param mimeType Image MIME type, e.g. "image/jpeg"
+     * @param question Text prompt about the image
+     * @param viewModelScope Coroutine scope for the request
+     * @param onResult Callback with the assistant's response text or null on error
+     */
+    fun sendVisionMessage(
+        base64Image: String,
+        mimeType: String,
+        question: String,
+        viewModelScope: CoroutineScope,
+        onResult: (String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val result = repository.sendLiteLLMVisionRequest(
+                    baseUrl = localLlmBaseUrl,
+                    base64Image = base64Image,
+                    mimeType = mimeType,
+                    question = question,
+                    model = localVisionModel
+                )
+                onResult(result)
+            } catch (e: Exception) {
+                android.util.Log.e("ChatUseCase", "Vision message error: ${e.message}", e)
+                onResult(null)
+            }
         }
     }
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,7 +41,10 @@ fun OfflineSettingsScreen(
     onToggleLocalLLM: (Boolean) -> Unit,
     onToggleSync: (Boolean) -> Unit,
     onSetMaxTokens: (Int) -> Unit,
-    onDownloadModel: () -> Unit
+    onDownloadModel: () -> Unit,
+    onSetLocalLlmBaseUrl: (String) -> Unit = {},
+    onSetLocalVisionModel: (String) -> Unit = {},
+    onSetLocalChatModel: (String) -> Unit = {}
 ) {
     val effectiveAccent = LocalAccentColor.current
     val infiniteTransition = rememberInfiniteTransition(label = "ambient")
@@ -238,6 +242,110 @@ fun OfflineSettingsScreen(
                             )
                             Text(
                                 "Limita la longitud máxima de las respuestas generadas en modo offline.",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                }
+
+                // ── LiteLLM Configuration Card ──
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            "Servidor LiteLLM Local",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Conecta tu app al servidor LiteLLM en tu red local (RTX 3090). El chat usa el modelo de texto y la cámara usa el modelo de visión (VLM).",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+
+                        // Base URL
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("URL del servidor LiteLLM", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            var baseUrl by remember(uiState.localLlmBaseUrl) { mutableStateOf(uiState.localLlmBaseUrl) }
+                            OutlinedTextField(
+                                value = baseUrl,
+                                onValueChange = { baseUrl = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("http://192.168.1.50:4000", fontSize = 12.sp) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                trailingIcon = {
+                                    TextButton(onClick = { onSetLocalLlmBaseUrl(baseUrl) }) {
+                                        Text("Guardar", fontSize = 11.sp, color = effectiveAccent)
+                                    }
+                                }
+                            )
+                            Text(
+                                "IMPORTANTE: Siempre puerto 4000 (LiteLLM router). NO uses 8002 (vLLM) ni 3000 (Next.js UI).",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+
+                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                        // Chat Model
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Modelo de Chat (texto)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            var chatModel by remember(uiState.localChatModel) { mutableStateOf(uiState.localChatModel) }
+                            OutlinedTextField(
+                                value = chatModel,
+                                onValueChange = { chatModel = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("qwen", fontSize = 12.sp) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                trailingIcon = {
+                                    TextButton(onClick = { onSetLocalChatModel(chatModel) }) {
+                                        Text("Guardar", fontSize = 11.sp, color = effectiveAccent)
+                                    }
+                                }
+                            )
+                            Text(
+                                "Modelo de solo texto configurado en litellm_config.yaml (ej: qwen, qwen2.5-7b-awq).",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+
+                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                        // Vision Model
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Modelo de Visión (VLM)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            var visionModel by remember(uiState.localVisionModel) { mutableStateOf(uiState.localVisionModel) }
+                            OutlinedTextField(
+                                value = visionModel,
+                                onValueChange = { visionModel = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("vision", fontSize = 12.sp) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                trailingIcon = {
+                                    TextButton(onClick = { onSetLocalVisionModel(visionModel) }) {
+                                        Text("Guardar", fontSize = 11.sp, color = effectiveAccent)
+                                    }
+                                }
+                            )
+                            Text(
+                                "Modelo multimodal para visión (llava, qwen2.5-vl, phi-vision). Debe estar en litellm_config.yaml.",
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )

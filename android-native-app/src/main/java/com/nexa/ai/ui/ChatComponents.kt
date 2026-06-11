@@ -35,6 +35,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -451,6 +453,40 @@ fun MessageBubble(message: Message, isSpeaking: Boolean, language: AppLanguage,
                     if (message.content.length > message.attachmentName.length + 3) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(message.content.removePrefix("📎 ${message.attachmentName}\n"), fontSize = 15.sp, lineHeight = 22.sp, color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
+                    }
+                } else if (message.imageBase64 != null) {
+                    // ── Inline vision image from camera/gallery ──
+                    // Display the captured/picked image inline in the chat bubble
+                    val imageBytes = android.util.Base64.decode(message.imageBase64, android.util.Base64.DEFAULT)
+                    val bitmap = remember(imageBytes) {
+                        android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    }
+                    if (bitmap != null) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = "Imagen adjunta",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 200.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    }
+                    // Also show text content if present (beyond the "[Imagen analizada]" marker)
+                    val textContent = message.content
+                        .removePrefix("[Imagen analizada]")
+                        .removePrefix("[Image analyzed]")
+                        .trim()
+                    if (textContent.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(textContent, fontSize = 15.sp, lineHeight = 22.sp, color = if (isUser) userTextColor else MaterialTheme.colorScheme.onSurface)
                     }
                 } else if (message.isStreaming && message.content.isEmpty()) {
                     DotsTyping()

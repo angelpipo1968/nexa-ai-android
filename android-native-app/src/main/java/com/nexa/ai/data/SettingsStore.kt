@@ -32,6 +32,11 @@ class SettingsStore(private val context: Context) {
     private val KEY_ALLOW_SYNC = booleanPreferencesKey("allow_sync")
     private val KEY_MAX_TOKENS = intPreferencesKey("max_tokens")
 
+    // Local LiteLLM keys
+    private val KEY_LOCAL_LLM_BASE_URL = stringPreferencesKey("local_llm_base_url")
+    private val KEY_LOCAL_VISION_MODEL = stringPreferencesKey("local_vision_model")
+    private val KEY_LOCAL_CHAT_MODEL = stringPreferencesKey("local_chat_model")
+
     val groqApiKey: Flow<String> = context.settingsStore.data.map { prefs ->
         prefs[KEY_GROQ_API_KEY] ?: ""
     }
@@ -128,6 +133,38 @@ class SettingsStore(private val context: Context) {
     suspend fun setMaxTokens(tokens: Int) {
         context.settingsStore.edit { prefs ->
             prefs[KEY_MAX_TOKENS] = tokens
+        }
+    }
+
+    // ── Local LiteLLM Settings ──
+
+    val localLlmBaseUrl: Flow<String> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_LOCAL_LLM_BASE_URL] ?: "http://192.168.1.50:4000"
+    }
+
+    suspend fun setLocalLlmBaseUrl(url: String) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_LOCAL_LLM_BASE_URL] = url.trimEnd('/')
+        }
+    }
+
+    val localVisionModel: Flow<String> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_LOCAL_VISION_MODEL] ?: "vision"
+    }
+
+    suspend fun setLocalVisionModel(model: String) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_LOCAL_VISION_MODEL] = model
+        }
+    }
+
+    val localChatModel: Flow<String> = context.settingsStore.data.map { prefs ->
+        prefs[KEY_LOCAL_CHAT_MODEL] ?: "qwen"
+    }
+
+    suspend fun setLocalChatModel(model: String) {
+        context.settingsStore.edit { prefs ->
+            prefs[KEY_LOCAL_CHAT_MODEL] = model
         }
     }
 }

@@ -221,6 +221,111 @@ class NexaRepository @Inject constructor() {
             null
         }
     }
+
+    /**
+     * Send a vision request to LiteLLM using the OpenAI-compatible chat completions format.
+     * This sends an image (as base64 data URI) along with a text prompt to a VLM model
+     * (e.g., llava:7b) through LiteLLM's proxy on port 4000.
+     *
+     * Flow: Android Camera → Base64 → LiteLLM :4000/v1/chat/completions → VLM → Response
+     *
+     * @param baseUrl LiteLLM base URL, e.g. "http://192.168.1.50:4000"
+     * @param base64Image Base64-encoded image data (raw, without data URI prefix)
+     * @param mimeType Image MIME type, e.g. "image/jpeg"
+     * @param question Text prompt/question about the image
+     * @param model Model name configured in LiteLLM, e.g. "vision"
+     * @return The assistant's text response, or null on error
+     */
+    suspend fun sendLiteLLMVisionRequest(
+        baseUrl: String,
+        base64Image: String,
+        mimeType: String = "image/jpeg",
+        question: String = "Describe esta imagen en detalle",
+        model: String = "vision"
+    ): String? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val dataUri = "data:$mimeType;base64,$base64Image"
+
+            // Build OpenAI-compatible vision request
+            val body = JsonObject().apply {
+                addProperty("model", model)
+                addProperty("max_tokens", 1024)
+
+                val messagesArray = com.google.gson.JsonArray()
+                val userMessage = JsonObject().apply {
+                    addProperty("role", "user")
+                    val contentArray = com.google.gson.JsonArray()
+
+                    // Text part
+                    val textPart = JsonObject().apply {
+                        addProperty("type", "text")
+                        addProperty("text", question)
+                    }
+                    contentArray.add(textPart)
+
+                    // Image part
+                    val imagePart = JsonObject().apply {
+                        addProperty("type", "image_url")
+                        val imageUrlObj = JsonObject().apply {
+                            addProperty("url", dataUri)
+                        }
+                        add("image_url", imageUrlObj)
+                    }
+                    contentArray.add(imagePart)
+
+                    add("content", contentArray)
+                }
+                messagesArray.add(userMessage)
+                add("messages", messagesArray)
+            }
+
+            Log.d(TAG, "Sending LiteLLM vision request to $baseUrl/v1/chat/completions model=$model")
+
+            val request = Request.Builder()
+                .url("$baseUrl/v1/chat/completions")
+                .header("Content-Type", "application/json")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            client.newBuilder()
+                .readTimeout(120, TimeUnit.SECONDS) // VLM inference can be slow
+                .build()
+                .newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        val errorBody = response.body?.string()
+                        Log.e(TAG, "LiteLLM Vision API error: ${response.code} - $errorBody")
+                        return@withContext null
+                    }
+
+                    val responseBody = response.body?.string() ?: return@withContext null
+                    val obj = gson.fromJson(responseBody, JsonObject::class.java)
+
+                    // Parse OpenAI chat completions response format
+                    return@withContext when {
+                        obj.has("choices") && obj.getAsJsonArray("choices").size() > 0 -> {
+                            val choice = obj.getAsJsonArray("choices")[0].asJsonObject
+                            if (choice.has("message")) {
+                                choice.getAsJsonObject("message").get("content")?.asString
+                            } else if (choice.has("text")) {
+                                choice.get("text")?.asString
+                            } else null
+                        }
+                        obj.has("error") -> {
+                            val err = obj.get("error")
+                            Log.e(TAG, "LiteLLM Vision error: $err")
+                            if (err.isJsonObject) err.asJsonObject.get("message")?.asString else err.asString
+                        }
+                        else -> {
+                            Log.e(TAG, "Unexpected LiteLLM vision response: $responseBody")
+                            null
+                        }
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "LiteLLM Vision request error", e)
+            null
+        }
+    }
 }
 
 sealed class StreamEvent {

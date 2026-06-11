@@ -657,6 +657,9 @@ REAL-TIME DATA & SEARCHES:
             val savedAccent = settingsStore.accentColor.first()
             val savedGroqKey = settingsStore.groqApiKey.first()
             val savedUseLocalLLM = settingsStore.useLocalLLM.first()
+            val savedLocalLlmBaseUrl = settingsStore.localLlmBaseUrl.first()
+            val savedLocalVisionModel = settingsStore.localVisionModel.first()
+            val savedLocalChatModel = settingsStore.localChatModel.first()
             val savedAllowSync = settingsStore.allowSync.first()
             val savedMaxTokens = settingsStore.maxTokens.first()
             
@@ -667,6 +670,9 @@ REAL-TIME DATA & SEARCHES:
                 accentColor = savedAccent,
                 groqApiKey = savedGroqKey,
                 useLocalLLM = savedUseLocalLLM,
+                localLlmBaseUrl = savedLocalLlmBaseUrl,
+                localVisionModel = savedLocalVisionModel,
+                localChatModel = savedLocalChatModel,
                 allowSync = savedAllowSync,
                 maxTokens = savedMaxTokens
             )
@@ -1151,6 +1157,9 @@ REAL-TIME DATA & SEARCHES:
                 groqApiKey = _uiState.value.groqApiKey
                 maxTokens = _uiState.value.maxTokens
                 useLocalLLM = _uiState.value.useLocalLLM
+                localLlmBaseUrl = _uiState.value.localLlmBaseUrl
+                localVisionModel = _uiState.value.localVisionModel
+                localChatModel = _uiState.value.localChatModel
             }
             chatUseCase.sendMessage(fullContent, viewModelScope, extraContext = webContext)
         }
@@ -1305,10 +1314,11 @@ REAL-TIME DATA & SEARCHES:
 
         _uiState.update { it.copy(cameraImageUri = null, requestCameraCapture = false) }
 
-        // Create user message with vision indicator
+        // Create user message with the inline image
         val userMsg = Message(
             role = "user",
             content = if (lang == AppLanguage.SPANISH) "[Imagen analizada]" else "[Image analyzed]",
+            imageBase64 = base64Image  // Store image for inline display
         )
         val assistantId = "a-${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}"
 
@@ -1330,24 +1340,41 @@ REAL-TIME DATA & SEARCHES:
             try {
                 var result = ""
 
-                // Smart routing: try on-device first if offline, otherwise use cloud
-                val smartRouter = SmartRoutingManager(getApplication())
-                val visionDecision = smartRouter.routeVision()
+                // Route vision request: Local LiteLLM (VLM) > On-device > Cloud
+                val useLocal = _uiState.value.useLocalLLM
+                val localUrl = _uiState.value.localLlmBaseUrl
+                val visionModel = _uiState.value.localVisionModel
 
-                if (visionDecision.useOnDevice) {
-                    // On-device vision via Nexa SDK
-                    val onDevice = smartRouter.getOnDeviceManager()
-                    result = onDevice.analyzeImage(base64Image, question)
-                        ?: visionDecision.fallbackMessage
-                        ?: "No se pudo analizar la imagen offline."
-                } else {
-                    // Cloud vision via /api/vision (GLM-4.6V)
-                    result = repository.sendVisionRequest(
-                        baseUrl = BuildConfig.API_BASE_URL,
+                if (useLocal) {
+                    // ── Local LiteLLM Vision (llava:7b via :4000) ──
+                    android.util.Log.d("NexaVM", "Sending vision to LiteLLM at $localUrl model=$visionModel")
+                    result = repository.sendLiteLLMVisionRequest(
+                        baseUrl = localUrl,
                         base64Image = base64Image,
                         mimeType = mimeType,
-                        question = question
-                    ) ?: visionDecision.fallbackMessage ?: if (lang == AppLanguage.SPANISH) "No se recibió una descripción clara del servidor." else "No description received from server."
+                        question = question,
+                        model = visionModel
+                    ) ?: ""
+                } else {
+                    // Smart routing: try on-device first if offline, otherwise use cloud
+                    val smartRouter = SmartRoutingManager(getApplication())
+                    val visionDecision = smartRouter.routeVision()
+
+                    if (visionDecision.useOnDevice) {
+                        // On-device vision via Nexa SDK
+                        val onDevice = smartRouter.getOnDeviceManager()
+                        result = onDevice.analyzeImage(base64Image, question)
+                            ?: visionDecision.fallbackMessage
+                            ?: "No se pudo analizar la imagen offline."
+                    } else {
+                        // Cloud vision via /api/vision (GLM-4.6V)
+                        result = repository.sendVisionRequest(
+                            baseUrl = BuildConfig.API_BASE_URL,
+                            base64Image = base64Image,
+                            mimeType = mimeType,
+                            question = question
+                        ) ?: visionDecision.fallbackMessage ?: if (lang == AppLanguage.SPANISH) "No se recibió una descripción clara del servidor." else "No description received from server."
+                    }
                 }
 
                 if (result.isNotBlank()) {
@@ -1454,6 +1481,22 @@ REAL-TIME DATA & SEARCHES:
     fun toggleLocalLLM(enabled: Boolean) {
         _uiState.update { it.copy(useLocalLLM = enabled) }
         viewModelScope.launch { settingsStore.setUseLocalLLM(enabled) }
+    }
+
+    fun setLocalLlmBaseUrl(url: String) {
+        val trimmed = url.trimEnd('/')
+        _uiState.update { it.copy(localLlmBaseUrl = trimmed) }
+        viewModelScope.launch { settingsStore.setLocalLlmBaseUrl(trimmed) }
+    }
+
+    fun setLocalVisionModel(model: String) {
+        _uiState.update { it.copy(localVisionModel = model) }
+        viewModelScope.launch { settingsStore.setLocalVisionModel(model) }
+    }
+
+    fun setLocalChatModel(model: String) {
+        _uiState.update { it.copy(localChatModel = model) }
+        viewModelScope.launch { settingsStore.setLocalChatModel(model) }
     }
 
     fun toggleSync(enabled: Boolean) {

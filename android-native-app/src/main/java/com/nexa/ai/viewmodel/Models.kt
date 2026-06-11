@@ -13,7 +13,8 @@ data class Message(
     val role: String,
     val content: String,
     val isStreaming: Boolean = false,
-    val attachmentName: String? = null
+    val attachmentName: String? = null,
+    val imageBase64: String? = null  // Base64 image for vision messages (data URI format)
 )
 
 data class ChatSession(
@@ -114,6 +115,9 @@ data class NexaUiState(
     // Offline
     val pendingMessageCount: Int = 0,
     val useLocalLLM: Boolean = false,
+    val localLlmBaseUrl: String = "http://192.168.1.50:4000",
+    val localVisionModel: String = "vision",
+    val localChatModel: String = "qwen",
     val allowSync: Boolean = true,
     val maxTokens: Int = 256,
     val modelDownloadProgress: Float = 0f,

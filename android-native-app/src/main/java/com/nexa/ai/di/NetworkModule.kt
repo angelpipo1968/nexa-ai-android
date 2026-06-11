@@ -2,6 +2,7 @@ package com.nexa.ai.di
 
 import android.content.Context
 import com.nexa.ai.data.local.ApiKeyManager
+import com.nexa.ai.data.remote.LiteLLMApi
 import com.nexa.ai.data.remote.OpenAiApi
 import com.nexa.ai.data.remote.ReplicateApi
 import dagger.Module
@@ -17,6 +18,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -86,5 +88,43 @@ object NetworkModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ReplicateApi::class.java)
+    }
+
+    /**
+     * Provides an OkHttpClient specifically for local LiteLLM.
+     * No auth interceptor needed — LiteLLM on local network doesn't require API keys.
+     * Longer timeouts for VLM inference which can be slow on first load.
+     */
+    @Provides
+    @Named("litellm")
+    @Singleton
+    fun provideLiteLLMOkHttpClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            })
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(180, TimeUnit.SECONDS)   // VLM inference can be slow
+            .writeTimeout(60, TimeUnit.SECONDS)    // Large base64 images
+            .build()
+    }
+
+    /**
+     * Provides LiteLLMApi with a dynamic base URL.
+     * Default: http://192.168.1.50:4000/
+     *
+     * IMPORTANT: Always connect to port 4000 (LiteLLM router), NOT:
+     * - Port 8002 (vLLM internal - no fallback/router/balance)
+     * - Port 3000 (Next.js web UI)
+     */
+    @Provides
+    @Singleton
+    fun provideLiteLLMApi(@Named("litellm") okHttpClient: OkHttpClient): LiteLLMApi {
+        return Retrofit.Builder()
+            .baseUrl("http://192.168.1.50:4000/")  // Default; can be updated dynamically
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(LiteLLMApi::class.java)
     }
 }
