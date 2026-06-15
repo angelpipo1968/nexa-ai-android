@@ -83,7 +83,7 @@ class VisionRepository @Inject constructor(
             .url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream")
-            .header("Authorization", "Bearer ${BuildConfig.LITELLM_API_KEY}")
+            .header("Authorization", "Bearer sk-nexa-master-3090")
             .header("User-Agent", "NexaAI-Android/5.2")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
