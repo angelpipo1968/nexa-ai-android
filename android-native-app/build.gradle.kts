@@ -1,16 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-<<<<<<< HEAD
-    // Kotlin is built-in with AGP 9.0+
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
-=======
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.10"
-    id("com.google.devtools.ksp") version "2.1.10-1.0.31"
-    id("com.google.dagger.hilt.android") version "2.51.1"
->>>>>>> ae42962 (Merged remote changes, keeping local fixes)
 }
 
 
@@ -159,9 +152,6 @@ dependencies {
 
     // Android Auto
     implementation("androidx.car.app:app:1.4.0")
-
-    // Nexa SDK
-    implementation("ai.nexa:core:0.0.24")
 
     // ML Kit
     implementation("com.google.mlkit:language-id:17.0.0")
