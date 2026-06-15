@@ -7,6 +7,9 @@ import com.nexa.ai.data.SettingsStore
 import com.nexa.ai.data.UpdateChecker
 import com.nexa.ai.data.LocationStore
 import com.nexa.ai.data.SessionStore
+import com.nexa.ai.data.repository.ImageRepository
+import com.nexa.ai.data.repository.VideoRepository
+import com.nexa.ai.data.remote.NexaMediaApi
 import com.nexa.ai.iot.IoTManager
 import com.nexa.ai.media.VideoGenerator
 import com.nexa.ai.memory.EpisodicMemoryManager
@@ -96,7 +99,17 @@ object AppModule {
     @Singleton
     fun provideIoTManager(application: Application): IoTManager = IoTManager(application)
 
-    // ─── Media provider ──────────────────────────────────────────
+    // ─── Media providers ─────────────────────────────────────────
+
+    @Provides
+    @Singleton
+    fun provideImageRepository(nexaMediaApi: NexaMediaApi): ImageRepository =
+        ImageRepository(nexaMediaApi)
+
+    @Provides
+    @Singleton
+    fun provideVideoRepository(nexaMediaApi: NexaMediaApi): VideoRepository =
+        VideoRepository(nexaMediaApi)
 
     @Provides
     @Singleton

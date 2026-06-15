@@ -3,6 +3,7 @@ package com.nexa.ai.di
 import android.content.Context
 import com.nexa.ai.data.local.ApiKeyManager
 import com.nexa.ai.data.remote.LiteLLMApi
+import com.nexa.ai.data.remote.NexaMediaApi
 import com.nexa.ai.data.remote.OpenAiApi
 import com.nexa.ai.data.remote.ReplicateApi
 import dagger.Module
@@ -126,5 +127,30 @@ object NetworkModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(LiteLLMApi::class.java)
+    }
+
+    /**
+     * Provides NexaMediaApi for FREE image/video generation.
+     * Connects to Nexa server which uses z-ai-web-dev-sdk (no API keys needed).
+     * Supports both local (http://192.168.50.158:3000/) and cloud (https://nexa-ai.dev/).
+     */
+    @Provides
+    @Singleton
+    fun provideNexaMediaApi(): NexaMediaApi {
+        val client = OkHttpClient.Builder()
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            })
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(180, TimeUnit.SECONDS)  // Image/video gen can take time
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl("https://nexa-ai.dev/")  // Cloud endpoint (always available)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(NexaMediaApi::class.java)
     }
 }
