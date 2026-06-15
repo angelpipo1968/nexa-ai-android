@@ -1,231 +1,194 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
-:root {
-    --nexa-bg: #030305;
-    --nexa-bg-alt: #0d1117;
-    --nexa-purple: #a855f7;
-    --nexa-purple-glow: rgba(168, 85, 247, 0.4);
-    --nexa-cyan: #06b6d4;
-    --nexa-cyan-glow: rgba(6, 182, 212, 0.4);
-    --nexa-pink: #ec4899;
-    --nexa-glass: rgba(13, 17, 23, 0.7);
-    --nexa-glass-border: rgba(168, 85, 247, 0.15);
-    --nexa-text: #f8fafc;
-    --nexa-text-dim: #94a3b8;
-    --nexa-accent: #00e5a0;
-    --nexa-safe-bottom: env(safe-area-inset-bottom, 0px);
-    --nexa-safe-top: env(safe-area-inset-top, 0px);
-    --nexa-safe-left: env(safe-area-inset-left, 0px);
-    --nexa-safe-right: env(safe-area-inset-right, 0px);
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #02020a;
-    color: #e8e8f0;
-    overflow: hidden;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Safe area for notched devices (Capacitor Android/iOS) */
-    padding: var(--nexa-safe-top) var(--nexa-safe-right) var(--nexa-safe-bottom) var(--nexa-safe-left);
-}
-::selection { background: var(--nexa-accent, #00e5a0); color: #02020a; }
-
-/* ═══ Scrollbar ═══ */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
-
-/* ═══ Animations ═══ */
-@keyframes nexa-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-@keyframes nexa-glow { 0%,100%{box-shadow:0 0 5px rgba(0,229,160,0.3)} 50%{box-shadow:0 0 20px rgba(0,229,160,0.15)} }
-@keyframes nexa-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
-@keyframes nexa-shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-@keyframes nexa-slide-up {
-    from{opacity:0;transform:translateY(16px)}
-    to{opacity:1;transform:translateY(0)}
-}
-@keyframes nexa-fade-in { from{opacity:0} to{opacity:1} }
-@keyframes typing-dot {
-    0%,60%,100%{opacity:0.2;transform:translateY(0)}
-    30%{opacity:1;transform:translateY(-4px)}
-}
-@keyframes pulse-ring {
-    0%{transform:scale(0.9);opacity:0.7}
-    50%{transform:scale(1.1);opacity:0.3}
-    100%{transform:scale(0.9);opacity:0.7}
-}
-@keyframes gradient-shift {
-    0%{background-position:0% 50%}
-    50%{background-position:100% 50%}
-    100%{background-position:0% 50%}
-}
-@keyframes pulse { 0%{opacity:1} 50%{opacity:0.5} 100%{opacity:1} }
-
-textarea::placeholder, input::placeholder { color: #3a3a60; }
-
-/* ═══ Message animations ═══ */
-.msg-enter { animation: nexa-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-/* ═══ Typing indicator ═══ */
-.typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--nexa-accent, #00e5a0); animation: typing-dot 1.4s infinite; }
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-/* ═══ Theme transitions ═══ */
-.theme-transition, .theme-transition *, .theme-transition *::before, .theme-transition *::after {
-    transition: background-color 0.4s ease, border-color 0.4s ease, color 0.3s ease, box-shadow 0.4s ease !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0a0a0f;
+  color: #e2e8f0;
+  overflow: hidden;
+  /* Prevent overscroll bounce on iOS */
+  overscroll-behavior: none;
 }
 
-/* ═══ Gradient text ═══ */
-.gradient-text {
-    background: linear-gradient(135deg, #00e5a0, #00b4ff, #a855f7);
-    background-size: 200% 200%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: gradient-shift 4s ease infinite;
+a {
+  transition: opacity 0.2s;
 }
 
-/* ═══ Glow button ═══ */
-.glow-btn { position: relative; overflow: hidden; }
-.glow-btn::after {
-    content: ''; position: absolute; inset: -2px; border-radius: inherit;
-    background: linear-gradient(135deg, var(--nexa-accent, #00e5a0), #00b4ff, #a855f7);
-    z-index: -1; opacity: 0; transition: opacity 0.3s; filter: blur(8px);
-}
-.glow-btn:hover::after { opacity: 0.5; }
-
-/* ═══ Focus visible ═══ */
-:focus-visible { outline: 2px solid var(--nexa-accent, #00e5a0); outline-offset: 2px; border-radius: 4px; }
-
-/* ═══ Chat scroll — force scroll on all devices ═══ */
-.chat-scroll {
-    overflow-y: scroll !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior-y: contain;
-    touch-action: pan-y;
+a:hover {
+  opacity: 0.8;
 }
 
-/* ═══ Responsive — Base mobile-first ═══ */
-@media (max-width: 640px) {
-    ::-webkit-scrollbar { width: 2px; }
-    .chat-scroll {
-        overflow-y: scroll !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-    /* Smaller header on mobile */
-    .nexa-header {
-        padding: 8px 12px !important;
-    }
-    /* Compact messages on mobile */
-    .nexa-msg-bubble {
-        max-width: 92% !important;
-        padding: 12px 14px !important;
-        font-size: 14px !important;
-    }
-    /* Compact input on mobile */
-    .nexa-input-area {
-        padding: 10px 12px 16px !important;
-    }
-    /* Slightly smaller welcome text */
-    .nexa-welcome-title {
-        font-size: 24px !important;
-    }
-    .nexa-welcome-subtitle {
-        font-size: 13px !important;
-    }
+button {
+  transition: all 0.2s;
 }
 
-/* ═══ Tablet (641px-1024px) ═══ */
-@media (min-width: 641px) and (max-width: 1024px) {
-    .nexa-drawer {
-        width: 300px !important;
-    }
-    .nexa-msg-bubble {
-        max-width: 85% !important;
-    }
-    .nexa-messages-container {
-        max-width: 85% !important;
-    }
+button:hover {
+  opacity: 0.9;
 }
 
-/* ═══ Desktop (1025px+) ═══ */
-@media (min-width: 1025px) {
-    .nexa-drawer {
-        width: 320px !important;
-    }
-    .nexa-messages-container {
-        max-width: 800px !important;
-    }
+button:active {
+  transform: scale(0.98);
 }
 
-/* ═══ Large desktop (1440px+) ═══ */
-@media (min-width: 1440px) {
-    .nexa-messages-container {
-        max-width: 900px !important;
-    }
-    .nexa-msg-bubble {
-        max-width: 80% !important;
-        padding: 16px 22px !important;
-    }
+input:focus, textarea:focus, select:focus {
+  outline: none;
 }
 
-/* ═══ Landscape mobile ═══ */
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a4a;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a5a;
+}
+
+/* Selection */
+::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: #fff;
+}
+
+/* Textarea auto-resize */
+textarea {
+  field-sizing: content;
+}
+
+/* Nexa gradient text */
+.nexa-gradient {
+  background: linear-gradient(135deg, #a855f7, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Typing animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.typing-dot:nth-child(1) { animation: pulse-dot 1.4s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation: pulse-dot 1.4s ease-in-out 0.2s infinite; }
+.typing-dot:nth-child(3) { animation: pulse-dot 1.4s ease-in-out 0.4s infinite; }
+
+/* Sidebar transition */
+.sidebar-transition {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+/* Message animation */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Glow effect */
+.glow-purple {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 60px rgba(168, 85, 247, 0.1);
+}
+
+/* Speaking wave animation */
+@keyframes speaking-wave {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE RESPONSIVE STYLES
+   ═══════════════════════════════════════════ */
+
+/* Touch-friendly targets on mobile */
+@media (max-width: 768px) {
+  button {
+    min-height: 36px;
+    min-width: 36px;
+  }
+
+  /* Prevent text selection on touch elements */
+  button, a {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Larger input area for mobile */
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+
+  /* Smaller scrollbar on mobile */
+  ::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  /* Hide collapse toggle on mobile (sidebar is a drawer) */
+  .sidebar-collapse-toggle {
+    display: none !important;
+  }
+}
+
+/* Small phones */
+@media (max-width: 380px) {
+  .nexa-gradient {
+    font-size: 14px;
+  }
+}
+
+/* Landscape mobile */
 @media (max-height: 500px) and (orientation: landscape) {
-    .nexa-header {
-        padding: 4px 12px !important;
-    }
-    .nexa-input-area {
-        padding: 6px 12px 10px !important;
-    }
-    .nexa-welcome-title {
-        font-size: 20px !important;
-    }
+  .chat-welcome {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
 }
 
-/* ═══ Safe area insets for Capacitor (notched phones) ═══ */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .nexa-input-area {
-        padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
-    }
-    .nexa-header {
-        padding-top: calc(10px + env(safe-area-inset-top)) !important;
-    }
+/* Safe area insets for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .chat-input-area {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
-/* ═══ Touch target sizes for mobile accessibility ═══ */
-@media (pointer: coarse) {
-    button[aria-label],
-    .nexa-action-btn {
-        min-width: 44px !important;
-        min-height: 44px !important;
-    }
-    /* Ensure keyboard hints hidden on touch devices */
-    .nexa-keyboard-hints {
-        display: none !important;
-    }
-    /* Larger send/voice buttons on touch */
-    .nexa-send-btn,
-    .nexa-voice-btn {
-        width: 44px !important;
-        height: 44px !important;
-    }
+/* PWA standalone mode */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
-/* ═══ Prefers reduced motion ═══ */
-@media (prefers-reduced-motion: reduce) {
-    .msg-enter { animation: none !important; }
-    .typing-dot { animation: none !important; opacity: 0.5; }
-    .gradient-text { animation: none !important; }
-    * { transition-duration: 0.01ms !important; }
-}
+/* Disable hover effects on touch devices */
+@media (hover: none) {
+  button:hover {
+    opacity: 1;
+  }
 
-/* ═══ Print styles ═══ */
-@media print {
-    .nexa-header, .nexa-input-area, .nexa-drawer { display: none !important; }
-    .chat-scroll { overflow: visible !important; height: auto !important; }
+  button:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
 }
