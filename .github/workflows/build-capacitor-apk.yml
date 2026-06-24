@@ -56,9 +56,6 @@ jobs:
             @capacitor/core@6 @capacitor/android@6 @capacitor/cli@6
           npm install
 
-      - name: Verify Capacitor config
-        working-directory: nexa-capacitor
-
       - name: Sync Capacitor
         working-directory: nexa-capacitor
         run: npx cap sync android
