@@ -1,28 +1,47 @@
-# Nexa AI — APK Releases
+# Nexa AI — APK Oficial
 
-## ⭐ Última versión: v2 (2026-06-24 10:13)
+## ⭐ ÚNICA APK ACTUAL: NEXA-AI-OFICIAL-11JUN-2026.apk
 
-### 👉 Archivo: `nexa-ai-v2-2026-06-24.apk` (5.3 MB)
+- **Compilada:** 2026-06-24 11:06 (Build #18 en GitHub Actions)
+- **Tamaño:** 5.3 MB
+- **MD5:** `7d3b60eb0f530f91afb781b9718e6583`
 
-**MD5:** `60a6d4cd033b8969044b5447924ce57f`
+## Cómo descargar (PASO A PASO)
 
-### Cambios v2 (hoy)
-- ✅ **Servidor único:** `https://www.nexa-ai.dev` (funciona desde cualquier red: WiFi, 4G, 5G)
-- ❌ **Eliminado fallback a 192.168.50.158** (causaba pantalla blanca si no estabas en tu WiFi)
-- ✅ **TTS nativo Android** (fix para "manos libres no habla")
-- ✅ Pantalla offline con botón "Reintentar"
-- ✅ Permisos runtime: RECORD_AUDIO + POST_NOTIFICATIONS (Android 13+)
+1. Entrá al archivo `NEXA-AI-OFICIAL-11JUN-2026.apk` desde esta página
+2. Tocá el botón "Download" arriba a la derecha
+3. Te descarga un archivo de 5.3 MB
 
-### Commit del código
-`8a0b634` en rama `capacitor-wrapper-v2`
+## IMPORTANTE - Antes de instalar
 
-### Cómo instalar
-1. Descargar `nexa-ai-v2-2026-06-24.apk`
-2. Abrir el archivo en Android
-3. Permitir "instalar apps de origen desconocido"
-4. Si Play Protect bloquea → "Instalar de todos modos"
-5. Abrir icono **Nexa AI** del launcher (NO Firefox/Chrome)
+1. **Desinstalá la APK vieja** que tenés instalada:
+   - Ajustes → Apps → Nexa AI → Desinstalar
+   - O dejá presionado el icono → Desinstalar
 
-### Cómo verificar que tenés la v2
-MD5 del archivo: `60a6d4cd033b8969044b5447924ce57f`
-Si tu APK tiene otro hash, es la versión vieja.
+2. **Borrá todas las APKs viejas** de tu carpeta Downloads:
+   - Mis Archivos → Downloads
+   - Borrá cualquier `nexa-ai-debug.apk` o `nexa-ai-v2-*.apk`
+
+3. **Instalá la nueva:**
+   - Tocá `NEXA-AI-OFICIAL-11JUN-2026.apk`
+   - Permitir "instalar apps de origen desconocido"
+   - Si Play Protect se queja → "Instalar de todos modos"
+
+4. **Abrí el icono Nexa AI** (NO Firefox/Chrome)
+
+## Qué incluye esta versión
+
+✅ Servidor único: `https://www.nexa-ai.dev`
+✅ Funciona desde cualquier red (WiFi, 4G, 5G, otro WiFi, etc.)
+✅ Sin pantalla blanca cuando no estás en tu WiFi de casa
+✅ TTS nativo Android (fix para "manos libres no habla")
+✅ Botón "Reintentar" si no hay conexión
+✅ Permisos runtime: micrófono + notificaciones
+
+## Cómo verificar que tenés la versión correcta
+
+- Nombre del archivo: `NEXA-AI-OFICIAL-11JUN-2026.apk`
+- Tamaño: 5.3 MB (5.527.345 bytes exactos)
+- MD5: `7d3b60eb0f530f91afb781b9718e6583`
+
+Si tu APK se llama distinto o pesa distinto → NO es esta versión.
