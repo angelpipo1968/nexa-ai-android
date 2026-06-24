@@ -1,0 +1,23 @@
+# Build artifacts
+android/app/build/
+android/.gradle/
+android/captures/
+android/local.properties
+android/capacitor-cordova-android-plugins/
+android/app/capacitor.build.gradle
+node_modules/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Build outputs
+*.apk
+*.aab
+*.keystore
+
+# Logs
+*.log
+npm-debug.log*

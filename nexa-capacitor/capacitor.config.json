@@ -1,0 +1,23 @@
+{
+  "appId": "com.nexaai.app",
+  "appName": "Nexa AI",
+  "webDir": "www",
+  "server": {
+    "url": "http://192.168.50.158:3000",
+    "cleartext": true,
+    "androidScheme": "http"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0f0a1f",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false
+    }
+  }
+}
