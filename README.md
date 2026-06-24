@@ -1,47 +1,71 @@
-# Nexa AI — APK Oficial
+# Nexa AI — APK Oficial (Chat Directo)
 
-## ⭐ ÚNICA APK ACTUAL: NEXA-AI-OFICIAL-11JUN-2026.apk
+## ⭐ APK ACTUAL: NEXA-AI-CHAT-DIRECTO-2026-06-24.apk
 
-- **Compilada:** 2026-06-24 11:06 (Build #18 en GitHub Actions)
+- **Compilada:** 2026-06-24 11:47 (Build #19)
 - **Tamaño:** 5.3 MB
-- **MD5:** `7d3b60eb0f530f91afb781b9718e6583`
+- **MD5:** `ad42f601be992111c745bcf5b78b7c83`
+- **Server URL:** `https://www.nexa-ai.dev/chat` (ABRE DIRECTO EN EL CHAT)
 
-## Cómo descargar (PASO A PASO)
+## 🔥 Qué cambió en esta versión
 
-1. Entrá al archivo `NEXA-AI-OFICIAL-11JUN-2026.apk` desde esta página
-2. Tocá el botón "Download" arriba a la derecha
-3. Te descarga un archivo de 5.3 MB
+### ANTES (lo que te pasó)
+La APK abría la landing page con botones "Start Chatting" → tenías que tocar para entrar al chat.
 
-## IMPORTANTE - Antes de instalar
+### AHORA (esta APK)
+Abre **directamente en el chat** con el campo de mensaje y el botón "Manos Libres" abajo. Sin landing page, sin pasos extra.
 
-1. **Desinstalá la APK vieja** que tenés instalada:
+## 📥 Descarga
+
+👉 **Archivo:** `NEXA-AI-CHAT-DIRECTO-2026-06-24.apk`
+
+Link directo: https://github.com/angelpipo1968/nexa-ai-android/raw/apk-releases/NEXA-AI-CHAT-DIRECTO-2026-06-24.apk
+
+## ⚠️ ANTES DE INSTALAR — MUY IMPORTANTE
+
+1. **Desinstalá la APK vieja:**
    - Ajustes → Apps → Nexa AI → Desinstalar
-   - O dejá presionado el icono → Desinstalar
 
-2. **Borrá todas las APKs viejas** de tu carpeta Downloads:
+2. **Borrá TODAS las APKs viejas de Downloads:**
    - Mis Archivos → Downloads
-   - Borrá cualquier `nexa-ai-debug.apk` o `nexa-ai-v2-*.apk`
+   - Borrá: `nexa-ai-debug.apk`, `nexa-ai-v2-*.apk`, `NEXA-AI-OFICIAL-*.apk`
 
-3. **Instalá la nueva:**
-   - Tocá `NEXA-AI-OFICIAL-11JUN-2026.apk`
-   - Permitir "instalar apps de origen desconocido"
-   - Si Play Protect se queja → "Instalar de todos modos"
+3. **Limpiá caché del navegador** (Chrome o Firefox):
+   - 3 puntos → Historial → Borrar datos → "Imágenes y archivos almacenados"
 
-4. **Abrí el icono Nexa AI** (NO Firefox/Chrome)
+4. **Descargá la nueva APK** desde el link de arriba
+   - El archivo se tiene que llamar `NEXA-AI-CHAT-DIRECTO-2026-06-24.apk`
 
-## Qué incluye esta versión
+5. **Instalala** tocándola → "Permitir origen desconocido" → "Instalar de todos modos"
 
-✅ Servidor único: `https://www.nexa-ai.dev`
-✅ Funciona desde cualquier red (WiFi, 4G, 5G, otro WiFi, etc.)
-✅ Sin pantalla blanca cuando no estás en tu WiFi de casa
+6. **Abrí el icono Nexa AI** del launcher
+
+## ✅ Cómo saber si tenés la versión correcta
+
+Cuando abras la app, deberías ver **directamente el chat** con:
+- Campo "Escribe tu mensaje..." abajo
+- Botón circular con micrófono (verde) abajo a la derecha
+- Botón "Manos Libres" abajo
+
+**NO deberías ver:**
+- "Start Chatting →"
+- "Your AI Assistant for Everything"
+- "50+ Languages Supported"
+
+Si ves la landing page, descargaste la versión vieja cacheada.
+
+## Cómo verificar el MD5
+
+Para confirmar que tenés la nueva APK:
+- En Android, instalá una app tipo "MD5 Checker" 
+- Abrí la APK y mirá su MD5
+- Tiene que ser: `ad42f601be992111c745bcf5b78b7c83`
+
+## Funciones incluidas
+
+✅ Abre directo en el chat (sin landing page)
+✅ Server único: `https://www.nexa-ai.dev/chat`
+✅ Funciona desde cualquier red (WiFi, 4G, 5G)
 ✅ TTS nativo Android (fix para "manos libres no habla")
 ✅ Botón "Reintentar" si no hay conexión
-✅ Permisos runtime: micrófono + notificaciones
-
-## Cómo verificar que tenés la versión correcta
-
-- Nombre del archivo: `NEXA-AI-OFICIAL-11JUN-2026.apk`
-- Tamaño: 5.3 MB (5.527.345 bytes exactos)
-- MD5: `7d3b60eb0f530f91afb781b9718e6583`
-
-Si tu APK se llama distinto o pesa distinto → NO es esta versión.
+✅ Permisos runtime: micrófono + notificaciones (Android 13+)
