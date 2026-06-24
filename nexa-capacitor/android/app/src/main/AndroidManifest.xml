@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.nexaai.app">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet permission to reach the live Nexa server -->
+    <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -10,12 +9,14 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Camera (for the + menu camera option) -->
+    <!-- Camera for + menu -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Notifications (Android 13+) - REQUIRED to avoid crash -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Storage for file uploads -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -27,13 +28,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
+        android:largeHeap="true"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:theme="@style/AppTheme">
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTask"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
