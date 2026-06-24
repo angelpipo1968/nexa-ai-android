@@ -22,8 +22,8 @@ import android.graphics.Color;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    // Public HTTPS domain (works from any network: WiFi, 4G, 5G, etc.)
-    private static final String SERVER_URL = "https://www.nexa-ai.dev";
+    // Public HTTPS domain - directly to the chat (skip landing page)
+    private static final String SERVER_URL = "https://www.nexa-ai.dev/chat";
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     private WebView webView;
@@ -298,4 +298,3 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 }
-// Build v2.1 - Wed Jun 24 11:04:31 UTC 2026
