@@ -58,7 +58,6 @@ jobs:
 
       - name: Verify Capacitor config
         working-directory: nexa-capacitor
-        run: npx cap verify android || true
 
       - name: Sync Capacitor
         working-directory: nexa-capacitor
