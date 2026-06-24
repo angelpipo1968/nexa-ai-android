@@ -1,0 +1,92 @@
+name: Build Capacitor APK (v2)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ capacitor-wrapper-v2 ]
+    paths:
+      - 'nexa-capacitor/**'
+      - '.github/workflows/build-capacitor-apk.yml'
+
+jobs:
+  build:
+    name: Build Capacitor Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Verify Android SDK (pre-installed on runner)
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la $ANDROID_HOME 2>&1 | head -10
+          echo "---"
+          echo "Available platforms:"
+          ls $ANDROID_HOME/platforms/ 2>&1 || echo "No platforms dir"
+          echo "---"
+          echo "Available build-tools:"
+          ls $ANDROID_HOME/build-tools/ 2>&1 || echo "No build-tools dir"
+
+      - name: Ensure Android SDK 34 components
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
+          echo "After install:"
+          ls $ANDROID_HOME/platforms/ 2>&1
+          ls $ANDROID_HOME/build-tools/ 2>&1
+
+      - name: Install Capacitor deps
+        working-directory: nexa-capacitor
+        run: |
+          npm install --no-package-lock --no-save \
+            @capacitor/core@6 @capacitor/android@6 @capacitor/cli@6
+          npm install
+
+      - name: Sync Capacitor
+        working-directory: nexa-capacitor
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        working-directory: nexa-capacitor/android
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        working-directory: nexa-capacitor/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: List built APK
+        working-directory: nexa-capacitor/android
+        run: |
+          find . -name "*.apk" -type f -exec ls -lh {} \;
+          echo "---"
+          echo "APK_PATH=$(find . -name '*.apk' -type f | head -1)"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexa-ai-capacitor-debug-apk
+          path: nexa-capacitor/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Show download instructions
+        run: |
+          echo "============================================================"
+          echo "Capacitor APK built successfully!"
+          echo "Server URL: http://192.168.50.158:3000"
+          echo "Download artifact 'nexa-ai-capacitor-debug-apk' from this run."
+          echo "============================================================"

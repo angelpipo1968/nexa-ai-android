@@ -1,0 +1,14 @@
+{
+  "appId": "com.nexaai.app",
+  "appName": "Nexa AI",
+  "webDir": "www",
+  "server": {
+    "url": "https://www.nexa-ai.dev",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}

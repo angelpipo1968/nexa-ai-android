@@ -1,0 +1,22 @@
+{
+  "name": "nexa-ai-android",
+  "version": "1.0.0",
+  "description": "Nexa AI Android wrapper (Capacitor) — points to live server",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "sync": "echo 'No web build needed — using live server URL'"
+  },
+  "keywords": [
+    "nexa-ai",
+    "android",
+    "capacitor",
+    "webview"
+  ],
+  "author": "angelpipo1968",
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  }
+}

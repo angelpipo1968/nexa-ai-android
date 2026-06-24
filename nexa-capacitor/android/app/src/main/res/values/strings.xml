@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nexa AI</string>
+    <string name="title_activity_main">Nexa AI</string>
+    <string name="custom_url_scheme">nexaai</string>
+    <string name="server_url">http://192.168.50.158:3000</string>
+</resources>
