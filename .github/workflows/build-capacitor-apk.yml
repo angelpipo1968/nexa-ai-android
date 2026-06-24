@@ -29,12 +29,25 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-34
-            build-tools;34.0.0
+      - name: Verify Android SDK (pre-installed on runner)
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la $ANDROID_HOME 2>&1 | head -10
+          echo "---"
+          echo "Available platforms:"
+          ls $ANDROID_HOME/platforms/ 2>&1 || echo "No platforms dir"
+          echo "---"
+          echo "Available build-tools:"
+          ls $ANDROID_HOME/build-tools/ 2>&1 || echo "No build-tools dir"
+
+      - name: Ensure Android SDK 34 components
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
+          echo "After install:"
+          ls $ANDROID_HOME/platforms/ 2>&1
+          ls $ANDROID_HOME/build-tools/ 2>&1
 
       - name: Install Capacitor deps
         working-directory: nexa-capacitor
@@ -61,7 +74,10 @@ jobs:
 
       - name: List built APK
         working-directory: nexa-capacitor/android
-        run: find . -name "*.apk" -type f -exec ls -lh {} \;
+        run: |
+          find . -name "*.apk" -type f -exec ls -lh {} \;
+          echo "---"
+          echo "APK_PATH=$(find . -name '*.apk' -type f | head -1)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
