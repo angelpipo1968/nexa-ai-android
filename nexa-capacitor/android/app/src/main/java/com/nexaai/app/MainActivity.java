@@ -22,10 +22,8 @@ import android.graphics.Color;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    // Primary: public HTTPS domain (works from any network)
-    // Fallback: local LAN IP (only works on home WiFi)
+    // Public HTTPS domain (works from any network: WiFi, 4G, 5G, etc.)
     private static final String SERVER_URL = "https://www.nexa-ai.dev";
-    private static final String FALLBACK_URL = "http://192.168.50.158:3000";
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     private WebView webView;
@@ -94,16 +92,6 @@ public class MainActivity extends Activity {
                 @Override
                 public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                     if (request != null && request.isForMainFrame()) {
-                        // If primary URL failed and we haven't tried fallback yet, try LAN IP
-                        String failedUrl = request.getUrl() != null ? request.getUrl().toString() : "";
-                        if (failedUrl.startsWith("https://") && !failedUrl.contains("192.168.")) {
-                            try {
-                                webView.loadUrl(FALLBACK_URL);
-                                return;
-                            } catch (Exception e) {
-                                // ignore - go to offline screen
-                            }
-                        }
                         showOfflineScreen();
                     }
                 }
@@ -234,7 +222,7 @@ public class MainActivity extends Activity {
         layout.addView(title);
 
         TextView msg = new TextView(this);
-        msg.setText("No se pudo conectar al servidor.\n\nProbamos https://www.nexa-ai.dev y luego 192.168.50.158:3000 sin éxito.\n\nVerificá tu conexión a Internet o que el servidor local esté corriendo.");
+        msg.setText("No se pudo conectar con https://www.nexa-ai.dev\n\nVerificá tu conexión a Internet (WiFi o datos móviles) e intentá de nuevo.");
         msg.setTextColor(Color.WHITE);
         msg.setTextSize(16);
         msg.setGravity(android.view.Gravity.CENTER);
