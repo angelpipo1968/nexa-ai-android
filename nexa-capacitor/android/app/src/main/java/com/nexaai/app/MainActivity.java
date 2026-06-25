@@ -100,6 +100,9 @@ public class MainActivity extends Activity {
             // Load the server URL
             webView.loadUrl(SERVER_URL);
 
+            // Show version banner for 3 seconds so user can verify the APK version
+            showVersionBanner();
+
         } catch (Exception e) {
             TextView errorView = new TextView(this);
             errorView.setText("Error al iniciar: " + e.getMessage());
@@ -253,6 +256,43 @@ public class MainActivity extends Activity {
         setContentView(layout);
     }
 
+    private void showVersionBanner() {
+        try {
+            final android.widget.TextView banner = new android.widget.TextView(this);
+            banner.setText("✦ NEXA AI v3.0 — Build 20 HOY 17:11\nURL: https://www.nexa-ai.dev/chat\n\nSi ves este cartel, tenés la APK nueva ✅");
+            banner.setTextColor(Color.WHITE);
+            banner.setTextSize(14);
+            banner.setBackgroundColor(Color.parseColor("#CC000000"));
+            banner.setPadding(40, 30, 40, 30);
+            banner.setGravity(android.view.Gravity.CENTER);
+
+            android.widget.FrameLayout overlay = new android.widget.FrameLayout(this);
+            android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.gravity = android.view.Gravity.TOP;
+            banner.setLayoutParams(params);
+            overlay.addView(banner);
+
+            setContentView(overlay, new android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+
+            // After 3 seconds, show the WebView
+            new android.os.Handler().postDelayed(() -> {
+                try {
+                    setContentView(webView);
+                } catch (Exception e) {
+                    // ignore
+                }
+            }, 3000);
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
     private void requestRuntimePermissions() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -298,4 +338,3 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 }
-// Build fresh Wed Jun 24 17:09:55 UTC 2026
