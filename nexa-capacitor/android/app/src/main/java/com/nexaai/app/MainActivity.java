@@ -23,7 +23,7 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     // Public HTTPS domain - directly to the chat (skip landing page)
-    private static final String SERVER_URL = "https://www.nexa-ai.dev/chat";
+    private static final String SERVER_URL = "https://nexa-ai.dev/chat";
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     private WebView webView;
@@ -97,11 +97,11 @@ public class MainActivity extends Activity {
                 }
             });
 
+            // Show version banner overlay (WebView keeps loading underneath)
+            showVersionBanner();
+
             // Load the server URL
             webView.loadUrl(SERVER_URL);
-
-            // Show version banner for 3 seconds so user can verify the APK version
-            showVersionBanner();
 
         } catch (Exception e) {
             TextView errorView = new TextView(this);
@@ -225,7 +225,7 @@ public class MainActivity extends Activity {
         layout.addView(title);
 
         TextView msg = new TextView(this);
-        msg.setText("No se pudo conectar con https://www.nexa-ai.dev\n\nVerificá tu conexión a Internet (WiFi o datos móviles) e intentá de nuevo.");
+        msg.setText("No se pudo conectar con https://nexa-ai.dev\n\nVerificá tu conexión a Internet (WiFi o datos móviles) e intentá de nuevo.");
         msg.setTextColor(Color.WHITE);
         msg.setTextSize(16);
         msg.setGravity(android.view.Gravity.CENTER);
@@ -259,35 +259,45 @@ public class MainActivity extends Activity {
     private void showVersionBanner() {
         try {
             final android.widget.TextView banner = new android.widget.TextView(this);
-            banner.setText("✦ NEXA AI v3.0 — Build 20 HOY 17:11\nURL: https://www.nexa-ai.dev/chat\n\nSi ves este cartel, tenés la APK nueva ✅");
+            String now = new java.text.SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(new java.util.Date());
+            banner.setText("✦ NEXA AI v4.0 — DOMINIO SIN WWW\nURL: https://nexa-ai.dev/chat\nCompilado: " + now + "\n\nSi ves este cartel, tenés la APK NUEVA ✅");
             banner.setTextColor(Color.WHITE);
-            banner.setTextSize(14);
+            banner.setTextSize(15);
             banner.setBackgroundColor(Color.parseColor("#CC000000"));
-            banner.setPadding(40, 30, 40, 30);
+            banner.setPadding(40, 40, 40, 40);
             banner.setGravity(android.view.Gravity.CENTER);
 
-            android.widget.FrameLayout overlay = new android.widget.FrameLayout(this);
-            android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            );
-            params.gravity = android.view.Gravity.TOP;
-            banner.setLayoutParams(params);
-            overlay.addView(banner);
-
-            setContentView(overlay, new android.view.ViewGroup.LayoutParams(
+            // Wrap the WebView in a FrameLayout and add the banner on top,
+            // so the WebView stays attached to the window and keeps loading.
+            android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+            root.setLayoutParams(new android.view.ViewGroup.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT
             ));
+            root.addView(webView,
+                new android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            );
+            android.widget.FrameLayout.LayoutParams bannerParams = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            );
+            bannerParams.gravity = android.view.Gravity.TOP;
+            banner.setLayoutParams(bannerParams);
+            root.addView(banner);
 
-            // After 3 seconds, show the WebView
+            setContentView(root);
+
+            // After 4 seconds, remove just the banner (keep the WebView)
             new android.os.Handler().postDelayed(() -> {
                 try {
-                    setContentView(webView);
+                    root.removeView(banner);
                 } catch (Exception e) {
                     // ignore
                 }
-            }, 3000);
+            }, 4000);
         } catch (Exception e) {
             // ignore
         }
