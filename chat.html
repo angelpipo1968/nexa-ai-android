@@ -929,6 +929,21 @@
         let isHandsFreeEnabled = false; // Nuevo: modo manos libres
         let currentCategory = 'general';
 
+        const getApiUrl = () => {
+            const origin = window.location.origin;
+            if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+                if (!window.location.port) {
+                    return 'http://localhost:3005';
+                }
+                return origin;
+            }
+            if (origin.startsWith('http') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+                return origin;
+            }
+            return 'http://localhost:3005';
+        };
+        const API_URL = getApiUrl();
+
         // Nuevas variables para indicadores de manos libres
         let handsFreeStatusEl = null;
         let latencyValueEl = null;
@@ -1419,7 +1434,7 @@
             const typingIndicator = createTypingIndicator();
 
             try {
-                const res = await fetch('http://localhost:3001/api/chat', {
+                const res = await fetch(`${API_URL}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: userMsg })
