@@ -18,12 +18,14 @@ import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.graphics.Color;
+import android.speech.tts.Voice;
+import java.util.Set;
 
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    // Public HTTPS domain - directly to the chat (skip landing page)
-    private static final String SERVER_URL = "https://nexa-ai.dev/chat";
+    // URL local para cargar los archivos compilados en la APK
+    private static final String SERVER_URL = "file:///android_asset/public/index.html";
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     private WebView webView;
@@ -182,16 +184,25 @@ public class MainActivity extends Activity {
         public void speak(final String text, final String lang) {
             if (tts == null || text == null || text.isEmpty()) return;
             try {
-                if (lang != null && !lang.isEmpty()) {
-                    Locale loc;
-                    if (lang.contains("-")) {
-                        String[] parts = lang.split("-");
-                        loc = parts.length > 1 ? new Locale(parts[0], parts[1]) : new Locale(parts[0]);
-                    } else {
-                        loc = new Locale(lang);
+                // Seleccionar voz basada en el género (es-ES-male o es-ES-female)
+                if (lang != null && lang.startsWith("es-ES")) {
+                    Set<Voice> voices = tts.getVoices();
+                    if (voices != null) {
+                        for (Voice v : voices) {
+                            if (v.getLocale().getLanguage().equals("es")) {
+                                if (lang.contains("female") && v.getName().toLowerCase().contains("female")) {
+                                    tts.setVoice(v);
+                                    break;
+                                } else if (lang.contains("male") && v.getName().toLowerCase().contains("male")) {
+                                    tts.setVoice(v);
+                                    break;
+                                }
+                            }
+                        }
                     }
-                    tts.setLanguage(loc);
+                    tts.setLanguage(new Locale("es", "ES"));
                 }
+
                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nexa_" + System.currentTimeMillis());
             } catch (Exception e) {
                 // swallow
@@ -260,7 +271,7 @@ public class MainActivity extends Activity {
         try {
             final android.widget.TextView banner = new android.widget.TextView(this);
             String now = new java.text.SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(new java.util.Date());
-            banner.setText("✦ NEXA AI v4.0 — DOMINIO SIN WWW\nURL: https://nexa-ai.dev/chat\nCompilado: " + now + "\n\nSi ves este cartel, tenés la APK NUEVA ✅");
+            banner.setText("✦ NEXA AI v5.0 — VERSIÓN COMPILADA LOCAL\nCargando: " + SERVER_URL + "\nCompilado: " + now + "\n\nAPK ACTUALIZADA ✅");
             banner.setTextColor(Color.WHITE);
             banner.setTextSize(15);
             banner.setBackgroundColor(Color.parseColor("#CC000000"));

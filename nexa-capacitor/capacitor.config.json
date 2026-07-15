@@ -3,7 +3,6 @@
   "appName": "Nexa AI",
   "webDir": "www",
   "server": {
-    "url": "https://nexa-ai.dev",
     "cleartext": true
   },
   "android": {

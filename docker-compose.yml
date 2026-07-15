@@ -29,7 +29,7 @@ services:
     image: ollama/ollama:latest
     container_name: nexa-ollama
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
     deploy:
@@ -41,7 +41,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -49,7 +49,7 @@ services:
   # ── LiteLLM: OpenAI-Compatible API Proxy ──
   # Android connects to http://YOUR-IP:4000/v1/
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:latest
     container_name: nexa-litellm
     ports:
       - "4000:4000"
@@ -58,17 +58,41 @@ services:
     environment:
       - LITELLM_MASTER_KEY=sk-nexa-local-key  # Optional security
       - OLLAMA_API_BASE=http://ollama:11434    # Internal Docker network
+      - UI_USERNAME=admin
+      - UI_PASSWORD=sk-nexa-local-key
+      - DATABASE_URL=postgresql://litellm:litellmpass@litellm-db:5432/litellm
     depends_on:
       ollama:
+        condition: service_healthy
+      litellm-db:
         condition: service_healthy
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
       interval: 30s
       timeout: 10s
       retries: 5
 
+  # ── PostgreSQL Database for LiteLLM UI ──
+  litellm-db:
+    image: postgres:16-alpine
+    container_name: nexa-litellm-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=litellm
+      - POSTGRES_PASSWORD=litellmpass
+      - POSTGRES_DB=litellm
+    volumes:
+      - litellm_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   ollama_data:
+    driver: local
+  litellm_db_data:
     driver: local

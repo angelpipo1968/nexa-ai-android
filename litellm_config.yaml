@@ -37,7 +37,7 @@ model_list:
   - model_name: qwen
     litellm_params:
       model: ollama/qwen2.5:7b
-      api_base: http://host.docker.internal:11434
+      api_base: http://ollama:11434
       max_tokens: 4096
       temperature: 0.7
 
@@ -47,7 +47,7 @@ model_list:
   - model_name: vision
     litellm_params:
       model: ollama/llava:7b
-      api_base: http://host.docker.internal:11434
+      api_base: http://ollama:11434
       max_tokens: 1024
       temperature: 0.5
 
@@ -55,7 +55,7 @@ model_list:
   - model_name: qwen-vision
     litellm_params:
       model: ollama/qwen2.5-vl:7b
-      api_base: http://host.docker.internal:11434
+      api_base: http://ollama:11434
       max_tokens: 2048
       temperature: 0.5
 
@@ -80,7 +80,7 @@ litellm_settings:
 # ── Router Settings ──
 router_settings:
   # Routing strategy: simple (round-robin), least-busy, latency-based
-  routing_strategy: simple
+  routing_strategy: simple-shuffle
   # Model retry count
   num_retries: 2
   # Timeout per request (seconds)
@@ -98,3 +98,14 @@ general_settings:
   # max_budget: 100
   # Database URL for tracking spend (optional)
   # database_url: postgresql://user:pass@localhost:5432/litellm
+
+# ── API & Swagger Branding ──
+proxy:
+  branding:
+    title: "Nexa AI - Gateway API"
+    description: "API de enrutamiento avanzado para modelos de lenguaje y visión, impulsado por Nexa AI."
+    logo_url: "https://raw.githubusercontent.com/angelpipo1968/nexa-ai-android/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp"
+  custom_routes:
+    - path: /custom-endpoint
+      method: GET
+      handler_function: my_custom_handler
